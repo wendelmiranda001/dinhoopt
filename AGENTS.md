@@ -4707,3 +4707,36 @@ pm run copy-engine (296 files, ffmpeg 9.0 212MB); app fechado; DLLs copiadas par
 - **electronLanguages funcionou**: locales ~40 -> 4 (en-US, es, es-419, pt-BR)
 - compression maximum: tamanho quase igual (ffmpeg.exe 212MB domina e nao comprime mais) — ganho real ficou nos locales strip
 - Smoke engine empacotado: `DiNho.Capture.Poc.exe --encoders` EXIT=0; DLL hash win-unpacked == staging == instalado (`3CFF7496`)
+
+## G3 Plan — Sessões
+
+Execução por sessões (10) para não perder o processo. Log de achados imediatamente em `docs/G3-SCAN-LOG.md`; corrigir viáveis por sessão; commit por sessão.
+
+| # | Escopo | Status |
+|---|--------|--------|
+| 1 | `src/main/ipc/*.ipc.ts` (raiz) | 🔄 Em andamento |
+| 2 | `src/main/ipc/{debloater,windows-tweaks,game-mode}/` | ⏳ Para iniciar |
+| 3 | `src/main/ipc/{registry-cleaner,driver-manager}/` + restantes | ⏳ Para iniciar |
+| 4 | `src/main/services/malware-scanner/` | ⏳ Para iniciar |
+| 5 | `src/main/services/privacy-shield/` | ⏳ Para iniciar |
+| 6 | `src/main/services/registry-cleaner/` | ⏳ Para iniciar |
+| 7 | `src/main/services/` raiz parte 1 (schedulers, updater, perf, disk, memory) | ⏳ Para iniciar |
+| 8 | `src/main/services/` raiz parte 2 (settings, stores, misc) | ⏳ Para iniciar |
+| 9 | `src/main/cli/` (router + 14+ commands) | ⏳ Para iniciar |
+| 10 | `src/main/{rules,platform,constants,index.ts}` + triagem/closeout | ⏳ Para iniciar |
+
+Escopo e 8 tipos de verificação definidos na seção "G3 Plan — Varredura de Bugs e Inconsistências no Backend (`src/main/`)" acima.
+
+## Session Summary (2026-08-17 — S2 no-silent-catch fixes prontos no working tree; aguardando S3)
+
+### Done
+
+- **S2 no-silent-catch fixes prontos no working tree** (`debloater/handlers.ts`, `windows-tweaks/handlers.ts`, `environment-cleaner.ipc.ts`):
+  - `windows-tweaks/handlers.ts` `checkPowerCfgTweak` → `getLogger().warning(...)` + `return false` (não engole silenciosamente)
+  - `debloater/handlers.ts` → `getLogger().warning('debloater', ...)` antes de continue/return
+  - Fallback de reg delete: falha NÃO seta mais `deletedSource = true`
+- **Git**: HEAD `a2edc8e` (`chore: bump electron@44.2.0 + i18next@26.4.2`); 4 arquivos modificados não commitados (AGENTS.md, debloater/handlers.ts, environment-cleaner.ipc.ts, windows-tweaks/handlers.ts) — commit agendado para junto do todo 1 (paste do S3 findings)
+- **Todo 2 em andamento**: append deste resumo via fallback CRLF-safe `[IO.File]::AppendAllText` (Edit rejeitado 2× por mismatch de CRLF no arquivo de 4728 linhas)
+- **Próximo passo**: RED testes de `startup-manager` (toggle/delete/boot-trace) para os achados S3-silent-catch
+- **G3 Plan Sessões**: S1 ✅ commitado / S2 ⏳ fixes no working tree, commit pendente / S3–S10 ⏳
+- **Full suite**: pendente ao final do batch

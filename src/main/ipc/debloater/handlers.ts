@@ -237,6 +237,7 @@ export async function removeBloatware(
       } catch {
         failed++
         onProgress?.(i + 1, validNames.length, pkgName, 'failed')
+        logger.warning('debloater', `uninstall failed for ${pkgName}`)
       }
       continue
     }
@@ -265,6 +266,7 @@ export async function removeBloatware(
     } catch {
       failed++
       onProgress?.(i + 1, validNames.length, pkgName, 'failed')
+      logger.warning('debloater', `uninstall failed for ${pkgName}`)
     }
   }
 

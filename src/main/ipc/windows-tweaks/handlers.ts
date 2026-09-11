@@ -148,6 +148,10 @@ async function checkPowerCfgTweak(tweakId: string, expectedValue: number): Promi
       })
       stdout = result.stdout
     } catch {
+      getLogger().warning(
+        'windows-tweaks',
+        `checkPowerCfgTweak failed for scheme ${schemeGuid}, subgroup ${s.subgroup}, setting ${s.setting}`,
+      )
       return false
     }
     const match = stdout.match(/Current AC Power Setting Index: 0x([0-9a-fA-F]+)/i)

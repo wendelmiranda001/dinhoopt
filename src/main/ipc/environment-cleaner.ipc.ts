@@ -124,7 +124,8 @@ async function readWinRegistryEnv(scope: 'user' | 'system'): Promise<Map<string,
         vars.set(match[1]!, match[2]!)
       }
     }
-  } catch {
+  } catch (err) {
+    getLogger().warning('environment-cleaner', `Failed to read registry env var for scope '${scope}': ${String(err)}`);
     // Scope not accessible (e.g. HKLM without admin)
   }
   return vars
@@ -152,13 +153,12 @@ async function scanWindowsPathEntries(): Promise<EnvEntry[]> {
     const pathValue = vars.get('Path') || vars.get('PATH') || vars.get('path')
     if (!pathValue) continue
 
-    const entries = pathValue
-      .split(';')
+    const entries = (pathValue.match(/(?:[^";]|"[^"]*")+/g) ?? [])
       .map((e) => e.trim())
       .filter(Boolean)
     for (const entry of entries) {
       const expanded = expandWinVars(entry, mergedVars)
-      if (!existsSync(expanded)) {
+      if (expanded && !existsSync(expanded)) {
         orphaned.push({ variable: 'PATH', value: entry, scope, fullValue: pathValue })
       }
     }
@@ -199,11 +199,17 @@ async function removeWindowsPathEntry(entry: EnvEntry): Promise<void> {
   const vars = await readWinRegistryEnv(entry.scope)
   const currentPath = vars.get('Path') || vars.get('PATH') || vars.get('path') || ''
   const sep = ';'
-  const entries = currentPath
-    .split(sep)
+  const entries = (currentPath.match(/(?:[^";]|"[^"]*")+/g) ?? [])
     .map((e) => e.trim())
     .filter(Boolean)
-  const filtered = entries.filter((e) => e.toLowerCase() !== entry.value.toLowerCase())
+  let removed = false;
+  const filtered = entries.filter((e) => {
+    if (!removed && e.toLowerCase() === entry.value.toLowerCase()) {
+      removed = true;
+      return false;
+    }
+    return true;
+  });
 
   // Safety: never write an empty PATH — that would break the system
   if (filtered.length === 0) {
@@ -222,6 +228,9 @@ async function removeWindowsEnvVar(entry: EnvEntry): Promise<void> {
     entry.scope === 'user'
       ? 'HKCU\\Environment'
       : 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment'
+
+  const vars = await readWinRegistryEnv(entry.scope)
+  if (!vars.get(entry.variable)) return
 
   await execNativeUtf8('reg', ['delete', key, '/v', entry.variable, '/f'], { timeout: 10000 })
 }
@@ -249,7 +258,8 @@ async function broadcastWinEnvChange(): Promise<void> {
       ],
       { timeout: 15000, windowsHide: true },
     )
-  } catch {
+  } catch (err) {
+    getLogger().warning('environment-cleaner', `Failed to broadcast env change: ${String(err)}`);
     // Best effort — apps may need a restart to see changes
   }
 }
@@ -432,7 +442,7 @@ export function registerEnvironmentCleanerIpc(getWindow: WindowGetter): void {
       `Cleaned: ${filesDeleted} entries, ${filesSkipped} skipped, ${errors.length} errors`,
     )
     return {
-      totalCleaned: 0,
+      totalCleaned: filesDeleted,
       filesDeleted,
       filesSkipped,
       errors,
