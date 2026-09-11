@@ -9,6 +9,9 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 const mockGetWindow = vi.fn().mockReturnValue(null)
 const mockExecFile = vi.fn()
 
+// ── Mock logger ─────────────────────────────────────────────
+const mockLogger = { info: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() }
+
 // Build an execFile mock that has the custom promisify symbol so that
 // `promisify(execFile)` returns { stdout, stderr } like the real one.
 function createExecFileMock() {
@@ -50,6 +53,7 @@ vi.mock('../services/exec-utf8', () => ({
   psUtf8: (cmd: string) => cmd,
   psArgs: (script: string) => ['-NoProfile', '-NonInteractive', '-Command', script],
 }))
+vi.mock('../services/logger.service', () => ({ getLogger: () => mockLogger }))
 
 // ── Mock fs ─────────────────────────────────────────────────────────
 const mockExistsSync = vi.fn()
@@ -685,6 +689,16 @@ describe('toggleStartupItem', () => {
       const discordEntries = writtenData.filter((e: any) => e.name === 'Discord')
       expect(discordEntries.length).toBe(1)
     })
+
+  it('logs a warning when reading the registry raises an exception', async () => {
+    mockLogger.warning.mockReset()
+    const args = ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/s']
+    const handler = setupExecFileHandler(args)
+    handler.calls[0].cb(new Error('boom'), '', '')
+    const entries = await readStartupItems('registry-hkcu')
+    expect(entries).toEqual([])
+    expect(mockLogger.warning).toHaveBeenCalledWith('startup-manager', expect.stringContaining('registry'))
+  })
   })
 
   describe('enabling a registry item', () => {
