@@ -179,9 +179,11 @@ async function checkInterfaceTweakApplied(tweak: WindowsTweakDef): Promise<boole
 
 async function applyPolicyTweak(value: number): Promise<boolean> {
   const script = `
+    $ErrorActionPreference = 'Stop'
     Set-ItemProperty -Path "HKLM:\\SOFTWARE\\Microsoft\\PolicyManager\\default\\ApplicationManagement\\AllowGameDVR" -Name "value" -Value ${value} -Type DWord -Force
     Set-ItemProperty -Path "HKLM:\\SOFTWARE\\Microsoft\\PolicyManager\\current\\ApplicationManagement\\AllowGameDVR" -Name "value" -Value ${value} -Type DWord -Force -ErrorAction SilentlyContinue
     gpupdate /target:computer /force 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { Write-Error "gpupdate falhou com codigo $LASTEXITCODE"; exit 1 }
   `
   await runPsScript(script)
   return true
