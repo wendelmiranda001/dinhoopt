@@ -262,6 +262,7 @@ export async function removeBloatware(
         )
       } catch {
         // Deprovisioning failed (needs admin) — not critical
+        logger.warning('debloater', 'Deprovisioning failed (needs admin) — not critical')
       }
     } catch {
       failed++
