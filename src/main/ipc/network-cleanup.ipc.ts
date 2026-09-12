@@ -20,6 +20,7 @@ async function getDnsCacheCount(): Promise<number> {
     )
     return Number.parseInt(stdout.trim(), 10) || 0
   } catch {
+    getLogger().warning('network-cleanup', 'Failed to read DNS cache count, returning 0')
     return 0
   }
 }
@@ -30,7 +31,8 @@ async function getArpEntryCount(): Promise<number> {
     const { stdout } = await execFileAsync(cmd, ['-a'], { timeout: 10000 })
     const lines = stdout.split('\n').filter((l) => /\d+\.\d+\.\d+\.\d+/.test(l))
     return lines.length
-  } catch {
+  } catch (error) {
+    getLogger().warning('network-cleanup', 'Failed to read ARP entry count, returning 0', error)
     return 0
   }
 }
@@ -55,7 +57,8 @@ async function getNetworkHistory(): Promise<{ name: string; guid: string }[]> {
       }
     }
     return entries
-  } catch {
+  } catch (error) {
+    getLogger().warning('network-cleanup', 'Failed to read profiles from HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\NetworkList\\Profiles, returning []', error)
     return []
   }
 }
