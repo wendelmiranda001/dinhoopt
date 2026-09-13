@@ -1,6 +1,7 @@
 import { homedir } from 'node:os'
 import path from 'node:path'
 import type { AppCacheDef, BrowserPathConfig, BrowserPaths, CleanTarget, DatabaseTarget } from '../platform/types'
+import { getLogger } from '../services/logger.service'
 
 // ─── JSON Rule Types ─────────────────────────────────────
 
@@ -115,7 +116,19 @@ function getWinVars(): Record<string, string> {
 }
 
 function resolveVars(template: string, vars: Record<string, string>): string {
-  const resolved = template.replace(/\$\{(\w+)\}/g, (_, name) => vars[name] || '')
+  const unresolved = new Set<string>()
+  const resolved = template.replace(/\$\{(\w+)\}/g, (_, name: string) => {
+    const value = vars[name]
+    if (value === undefined) {
+      unresolved.add(name)
+      return ''
+    }
+    return value
+  })
+  if (unresolved.size > 0) {
+    const names = [...unresolved].sort().join(', ')
+    getLogger().warning('rules-loader', `Unresolved rule variables replaced with empty string: ${names}`)
+  }
   return path.win32.normalize(resolved)
 }
 

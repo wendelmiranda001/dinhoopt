@@ -1,12 +1,24 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RulesJsonSet } from './loader'
 import { buildCleanerPaths } from './loader'
+
+const mocks = {
+  logger: { info: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() },
+}
+
+vi.mock('../services/logger.service', () => ({
+  getLogger: () => mocks.logger,
+}))
+
+afterEach(() => {
+  vi.clearAllMocks()
+})
 
 const mockRules: RulesJsonSet = {
   system: {
     type: 'system',
     cleanTargets: [
-      { path: '${TEMP}\\cache', subcategory: 'cache', needsAdmin: true },
+      { path: '${LOCALAPPDATA}\\cache', subcategory: 'cache', needsAdmin: true },
       { path: '${LOCALAPPDATA}\\Temp', subcategory: 'temp' },
     ],
     singleFileTargets: [{ path: '${WINDIR}\\Prefetch', subcategory: 'prefetch' }],
@@ -244,5 +256,24 @@ describe('resolveVars', () => {
     const targets = cleaners.systemCleanTargets()
     expect(targets[0].path).not.toContain('UNKNOWN_VAR')
     expect(targets[0].path).toContain('cache')
+  })
+
+  it('logs a warning when a variable cannot be resolved', () => {
+    const rulesWithUnknownVar: RulesJsonSet = {
+      ...mockRules,
+      system: {
+        ...mockRules.system,
+        cleanTargets: [{ path: '${UNKNOWN_VAR}\\cache', subcategory: 'cache' }],
+      },
+    }
+    const cleaners = buildCleanerPaths(rulesWithUnknownVar, 'win32')
+    cleaners.systemCleanTargets()
+    expect(mocks.logger.warning).toHaveBeenCalledWith('rules-loader', expect.stringContaining('UNKNOWN_VAR'))
+  })
+
+  it('does not log a warning when every variable resolves', () => {
+    const cleaners = buildCleanerPaths(mockRules, 'win32')
+    cleaners.systemCleanTargets()
+    expect(mocks.logger.warning).not.toHaveBeenCalled()
   })
 })
