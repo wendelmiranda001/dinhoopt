@@ -10,6 +10,14 @@ vi.mock('util', () => ({
   promisify: () => execFileMock,
 }))
 
+const mocks = {
+  logger: { info: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() },
+}
+
+vi.mock('../../services/logger.service', () => ({
+  getLogger: () => mocks.logger,
+}))
+
 const { createWin32Security } = await import('./security')
 
 describe('win32 security', () => {
@@ -21,7 +29,56 @@ describe('win32 security', () => {
 
   describe('isServer', () => {
     it('returns false for Windows desktop', async () => {
+      execFileMock.mockResolvedValue({
+        stdout: JSON.stringify({ productType: 1, installationType: 'Client' }),
+        stderr: '',
+      })
+
       expect(await security.isServer()).toBe(false)
+    })
+
+    it('logs a warning when the host is not a server', async () => {
+      execFileMock.mockResolvedValue({
+        stdout: JSON.stringify({ productType: 1, installationType: 'Client' }),
+        stderr: '',
+      })
+
+      await security.isServer()
+      expect(mocks.logger.warning).toHaveBeenCalledWith('win32-security', expect.any(String))
+    })
+
+    it('returns true for domain controller product type', async () => {
+      execFileMock.mockResolvedValue({
+        stdout: JSON.stringify({ productType: 2, installationType: 'Server' }),
+        stderr: '',
+      })
+
+      expect(await security.isServer()).toBe(true)
+    })
+
+    it('returns true for server product type with server core installation', async () => {
+      execFileMock.mockResolvedValue({
+        stdout: JSON.stringify({ productType: 3, installationType: 'Server Core' }),
+        stderr: '',
+      })
+
+      expect(await security.isServer()).toBe(true)
+    })
+
+    it('returns true when installation type indicates a server but product type is unknown', async () => {
+      execFileMock.mockResolvedValue({
+        stdout: JSON.stringify({ productType: 0, installationType: 'Nano Server' }),
+        stderr: '',
+      })
+
+      expect(await security.isServer()).toBe(true)
+    })
+
+    it('returns false and logs a warning when detection fails', async () => {
+      execFileMock.mockRejectedValue(new Error('powershell unavailable'))
+
+      expect(await security.isServer()).toBe(false)
+      expect(mocks.logger.warning).toHaveBeenCalledWith('win32-security', expect.any(String))
     })
   })
 

@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { getLogger } from '../../services/logger.service'
 import type {
   AntivirusProduct,
   AntivirusStatus,
@@ -273,10 +274,39 @@ try {
   }
 }
 
+async function detectServerRole(): Promise<boolean> {
+  const stdout = await runPowerShell(`$os = Get-WmiObject -Class Win32_OperatingSystem | Select-Object -First 1
+$reg = Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' -Name 'InstallationType' -ErrorAction SilentlyContinue
+$productType = 0
+if ($null -ne $os) { $productType = [int]$os.ProductType }
+$installationType = ''
+if ($null -ne $reg) { $installationType = [string]$reg.InstallationType }
+[PSCustomObject]@{ productType = $productType; installationType = $installationType } | ConvertTo-Json -Compress`)
+  const data = JSON.parse(stdout)
+  const productType = Number(data.productType ?? 0)
+  const installationType = String(data.installationType ?? '')
+  return productType >= 2 || /server/i.test(installationType)
+}
+
 export function createWin32Security(): PlatformSecurity {
   return {
     async isServer() {
-      return false
+      try {
+        const server = await detectServerRole()
+        if (!server) {
+          getLogger().warning(
+            'win32-security',
+            'isServer() = false — trust decisions on the local server service are not verified',
+          )
+        }
+        return server
+      } catch (err) {
+        getLogger().warning(
+          'win32-security',
+          `isServer() could not be determined — defaulting to false: ${err instanceof Error ? err.message : String(err)}`,
+        )
+        return false
+      }
     },
     collectAntivirusStatus,
     collectFirewallStatus,
