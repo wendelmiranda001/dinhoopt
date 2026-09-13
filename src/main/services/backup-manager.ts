@@ -1,12 +1,12 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
-import { app } from 'electron'
+import { getBackupDir } from './backup-dir'
 import { getLogger } from './logger.service'
 
 let backupDir: string
 
 export function initBackupManager(): void {
-  backupDir = join(app.getPath('userData'), 'backups')
+  backupDir = getBackupDir()
   mkdirSync(backupDir, { recursive: true })
 }
 
@@ -31,6 +31,15 @@ export function getLatestBackup(sourcePath: string): string | null {
     const prefix = sourcePath.replace(/[\\/]/g, '_').replace(/:/g, '')
     const files = readdirSync(backupDir)
       .filter((f) => f.startsWith(prefix) && f.endsWith('.bak'))
+      .filter((f) => {
+        try {
+          const st = statSync(join(backupDir, f))
+          return st.size > 0
+        } catch {
+          // Corrupt / unreadable backup — skip it when resolving the latest.
+          return false
+        }
+      })
       .sort()
     return files.length > 0 ? join(backupDir, files[files.length - 1]!) : null
   } catch {

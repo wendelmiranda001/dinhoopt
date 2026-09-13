@@ -5,6 +5,16 @@ vi.mock('child_process', () => ({
   execSync: (...args: unknown[]) => mockExecSync(...args),
 }))
 
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warning: vi.fn(),
+  error: vi.fn(),
+}))
+
+vi.mock('./logger.service', () => ({
+  getLogger: () => mockLogger,
+}))
+
 import { scanMemory } from './memory-scanner.service'
 
 describe('MemoryScanner', () => {
@@ -82,11 +92,53 @@ describe('MemoryScanner', () => {
     expect(result.suspiciousCount).toBe(0)
   })
 
-  it('tasklist parsing handles malformed lines gracefully', () => {
+  it('tasklist parsing handles malformed lines gracefully', async () => {
     mockTasklist(
       '"good.exe","1","Console","1","10.000 K"\n"bad_line_no_commas"\n"another.exe","2","Console","1","20.000 K"',
     )
     const result = scanMemory()
     expect(result.processes.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('parses quoted image names containing commas (CSV fields)', () => {
+    mockTasklist('"chrome, dev.exe","4321","Console","1","45.678 K"')
+    const result = scanMemory()
+    expect(result.processes).toHaveLength(1)
+    expect(result.processes[0]!.name).toBe('chrome, dev.exe')
+    expect(result.processes[0]!.pid).toBe(4321)
+    expect(result.processes[0]!.memory).toBeCloseTo(45.678 / 1024, 2)
+  })
+
+  it('flags non-browser processes above the 500 MB high-memory threshold', () => {
+    mockTasklist('"notepad.exe","3333","Console","1","614400.000 K"')
+    const result = scanMemory()
+    expect(result.processes[0]!.memory).toBeGreaterThan(500)
+    expect(result.processes[0]!.suspicious).toBe(true)
+    expect(result.processes[0]!.reason).toBe('High Memory Usage')
+  })
+
+  it('does not flag browsers above the high-memory threshold', () => {
+    mockTasklist('"chrome.exe","3334","Console","1","614400.000 K"')
+    const result = scanMemory()
+    expect(result.processes[0]!.memory).toBeGreaterThan(500)
+    expect(result.processes[0]!.suspicious).toBe(false)
+  })
+
+  it('logs a warning and returns an empty list when tasklist fails', () => {
+    mockExecSync.mockImplementation(() => {
+      throw new Error('boom')
+    })
+    const result = scanMemory()
+    expect(result.processes).toEqual([])
+    expect(mockLogger.warning).toHaveBeenCalledWith('memory-scanner', expect.stringContaining('tasklist'))
+  })
+
+  it('mentions the timeout when tasklist times out', () => {
+    const err: NodeJS.ErrnoException = Object.assign(new Error('Command failed'), { code: 'ETIMEDOUT' })
+    mockExecSync.mockImplementation(() => {
+      throw err
+    })
+    scanMemory()
+    expect(mockLogger.warning).toHaveBeenCalledWith('memory-scanner', expect.stringContaining('timed out'))
   })
 })

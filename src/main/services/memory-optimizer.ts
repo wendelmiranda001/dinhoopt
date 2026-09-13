@@ -33,7 +33,10 @@ export interface MemoryOptimizeProgress {
 
 export type ProgressCallback = (progress: MemoryOptimizeProgress) => void
 
-function runPs(script: string, timeout = 30_000): Promise<string> {
+const GC_COLLECT_TIMEOUT_MS = 15_000
+const WORKINGSET_TIMEOUT_MS = 30_000
+
+function runPs(script: string, timeout = WORKINGSET_TIMEOUT_MS): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       'powershell.exe',
@@ -95,7 +98,10 @@ export async function optimizeMemory(
   notify(1, TOTAL_STEPS, 'gc', 'Collecting .NET garbage...')
   try {
     const before = (await si.mem()).used
-    await runPs('[System.GC]::Collect(); [System.GC]::WaitForPendingFinalizers(); [System.GC]::Collect()', 15_000)
+    await runPs(
+      '[System.GC]::Collect(); [System.GC]::WaitForPendingFinalizers(); [System.GC]::Collect()',
+      GC_COLLECT_TIMEOUT_MS,
+    )
     const after = (await si.mem()).used
     const freed = calcFreed(before, after)
     totalFreed += freed
@@ -131,7 +137,7 @@ public class MemUtil {
     try { [MemUtil]::EmptyWorkingSet($_.Handle) } catch {}
   }
 }`,
-      30_000,
+      WORKINGSET_TIMEOUT_MS,
     )
     const after = (await si.mem()).used
     const freed = calcFreed(before, after)

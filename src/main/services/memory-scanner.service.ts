@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process'
+import { getLogger } from './logger.service'
 
 export interface ProcessInfo {
   pid: number
@@ -16,6 +17,10 @@ export interface MemoryScanResult {
   timestamp: string
 }
 
+/** tasklist memory column reports kilobytes; 500 MB is the high-memory threshold. */
+const HIGH_MEMORY_MB = 500
+const TASKLIST_TIMEOUT_MS = 5_000
+
 const SUSPICIOUS_PATTERNS = [
   {
     name: 'Process Hollowing',
@@ -32,14 +37,14 @@ const SUSPICIOUS_PATTERNS = [
   {
     name: 'High Memory Usage',
     check: (p: ProcessInfo) =>
-      p.memory > 500 && !['chrome.exe', 'msedge.exe', 'firefox.exe', 'Code.exe', 'explorer.exe'].includes(p.name),
+      p.memory > HIGH_MEMORY_MB &&
+      !['chrome.exe', 'msedge.exe', 'firefox.exe', 'Code.exe', 'explorer.exe'].includes(p.name),
   },
   {
     name: 'Suspicious Parent',
     check: (p: ProcessInfo) =>
       p.name === 'powershell.exe' || p.name === 'cmd.exe' || p.name === 'wscript.exe' || p.name === 'cscript.exe',
   },
-  { name: 'Unknown Signed', check: () => false },
 ]
 
 export function scanMemory(): MemoryScanResult {
@@ -61,22 +66,56 @@ export function scanMemory(): MemoryScanResult {
 
 function getProcessList(): ProcessInfo[] {
   try {
-    const output = execSync('tasklist /FO CSV /NH', { encoding: 'utf-8', timeout: 5000 })
+    const output = execSync('tasklist /FO CSV /NH', { encoding: 'utf-8', timeout: TASKLIST_TIMEOUT_MS })
     const lines = output.trim().split('\n').filter(Boolean)
     return lines.map((line) => {
-      const parts = line.replace(/"/g, '').split(',')
-      const memStr = parts[4] || '0'
+      const parts = parseCsvLine(line)
+      const memStr = parts[parts.length - 1] || '0'
       const memNum = Number.parseFloat(memStr) / 1024
       return {
         pid: Number.parseInt(parts[1] || '0', 10),
-        name: parts[0] || 'unknown',
+        name: parts[0].trim() || 'unknown',
         path: '',
         cpu: 0,
         memory: Math.round(memNum * 100) / 100,
         suspicious: false,
       }
     })
-  } catch {
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException)?.code
+    getLogger().warning(
+      'memory-scanner',
+      `tasklist failed${code === 'ETIMEDOUT' ? ' (timed out)' : ''}: ${String(err)}`,
+    )
     return []
   }
+}
+
+/**
+ * Split a tasklist `/FO CSV /NH` line into its quoted fields. Image names may
+ * themselves contain commas (e.g. "chrome, dev.exe"), so a naive `replace(/"/g,'')
+ * .split(',')` corrupts both the name and every positional column after it.
+ */
+function parseCsvLine(line: string): string[] {
+  const fields: string[] = []
+  let field = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        field += '"'
+        i += 1
+      } else {
+        inQuotes = !inQuotes
+      }
+    } else if (ch === ',' && !inQuotes) {
+      fields.push(field)
+      field = ''
+    } else {
+      field += ch
+    }
+  }
+  fields.push(field)
+  return fields.map((f) => f.trim())
 }
