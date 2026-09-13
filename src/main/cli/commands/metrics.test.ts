@@ -2,6 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockState = vi.hoisted(() => ({
   handler: null as ((req: unknown, res: unknown) => void) | null,
+  instance: null as {
+    on: ReturnType<typeof vi.fn>
+    listen: ReturnType<typeof vi.fn>
+    close: ReturnType<typeof vi.fn>
+    closeAllConnections: ReturnType<typeof vi.fn>
+  } | null,
 }))
 
 vi.mock('node:http', () => ({
@@ -12,8 +18,10 @@ vi.mock('node:http', () => ({
         queueMicrotask(() => cb())
       }),
       close: vi.fn(),
+      closeAllConnections: vi.fn(),
     }
     mockState.handler = handler
+    mockState.instance = instance
     return instance
   }),
 }))
@@ -43,6 +51,21 @@ describe('handleMetricsServer', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockState.handler = null
+    mockState.instance = null
+  })
+
+  it('drains active connections on shutdown', async () => {
+    const { handleMetricsServer } = await import('./metrics')
+    const p = handleMetricsServer([], { json: false, verbosity: 'info' })
+
+    await vi.waitFor(() => expect(mockState.handler).not.toBeNull())
+
+    process.emit('SIGTERM')
+
+    expect(mockState.instance?.closeAllConnections).toHaveBeenCalled()
+    expect(mockState.instance?.close).toHaveBeenCalled()
+
+    p.catch(() => {})
   })
 
   it('responds to /metrics with prometheus text', async () => {

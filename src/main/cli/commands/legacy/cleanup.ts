@@ -30,7 +30,10 @@ export async function cleanRecycleBin(sizeBytes = 0): Promise<CleanResult> {
     const { psUtf8 } = await import('../../../services/exec-utf8')
     const cleanScript =
       '$shell = New-Object -ComObject Shell.Application; $shell.NameSpace(0x0a).Items() | ForEach-Object { Remove-Item $_.Path -Recurse -Force -ErrorAction SilentlyContinue }; Clear-RecycleBin -Force -Confirm:$false -ErrorAction SilentlyContinue'
-    await execFileAsync('powershell.exe', ['-NoProfile', '-Command', psUtf8(cleanScript)], { windowsHide: true })
+    await execFileAsync('powershell.exe', ['-NoProfile', '-Command', psUtf8(cleanScript)], {
+      timeout: 60_000,
+      windowsHide: true,
+    })
     return { totalCleaned: sizeBytes, filesDeleted: 1, filesSkipped: 0, errors: [], needsElevation: false }
   } catch (err: unknown) {
     const reason = err instanceof Error ? err.message : String(err)

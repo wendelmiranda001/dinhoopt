@@ -2570,6 +2570,26 @@ describe('legacy scan functions', () => {
       expect(stdoutWrite).toHaveBeenCalledWith(expect.stringContaining('No items found'))
       expect(appExitMock).toHaveBeenCalledWith(5)
     })
+
+    it('bounds the COM scan with a timeout', async () => {
+      const { getPlatform } = await import('./platform')
+      const { execFile } = await import('node:child_process')
+      ;(getPlatform as ReturnType<typeof vi.fn>).mockReturnValue(makePlatform({ trashPath: () => null }))
+      ;(execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+        (_file: string, _args: string[], _opts: unknown, cb: (err: unknown, result: unknown) => void) => {
+          cb(null, { stdout: '5|10240' })
+        },
+      )
+
+      process.argv = ['node.exe', 'script.js', '--cli', '--recycle-bin']
+      const { runCli } = await import('./cli')
+      await runCli()
+
+      const opts = (execFile as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[2] as
+        | { timeout?: number }
+        | undefined
+      expect(opts?.timeout).toBeGreaterThan(0)
+    })
   })
 
   // ── cleanRecycleBin ──────────────────────────────────────────
@@ -2649,6 +2669,32 @@ describe('legacy scan functions', () => {
 
       expect(stdoutWrite).toHaveBeenCalledWith(expect.stringContaining('Errors'))
       expect(appExitMock).toHaveBeenCalledWith(1)
+    })
+
+    it('bounds the COM clean with a timeout', async () => {
+      const { getPlatform } = await import('./platform')
+      const { execFile } = await import('node:child_process')
+      ;(getPlatform as ReturnType<typeof vi.fn>).mockReturnValue(makePlatform({ trashPath: () => null }))
+      ;(execFile as unknown as ReturnType<typeof vi.fn>)
+        .mockImplementationOnce(
+          (_file: string, _args: string[], _opts: unknown, cb: (err: unknown, result: unknown) => void) => {
+            cb(null, { stdout: '5|10240' })
+          },
+        )
+        .mockImplementationOnce(
+          (_file: string, _args: string[], _opts: unknown, cb: (err: unknown, result: unknown) => void) => {
+            cb(null, { stdout: '' })
+          },
+        )
+
+      process.argv = ['node.exe', 'script.js', '--cli', '--recycle-bin', '--clean']
+      const { runCli } = await import('./cli')
+      await runCli()
+
+      const cleanOpts = (execFile as unknown as ReturnType<typeof vi.fn>).mock.calls[1]?.[2] as
+        | { timeout?: number }
+        | undefined
+      expect(cleanOpts?.timeout).toBeGreaterThan(0)
     })
   })
 

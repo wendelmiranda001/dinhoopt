@@ -139,6 +139,40 @@ describe('winapp2-rules-store', () => {
       await expect(downloadAndCacheRules()).rejects.toThrow('HTTP 500')
     })
 
+    it('rejects and destroys the response when the stream errors mid-body', async () => {
+      const resDestroy = vi.fn()
+      mocks.httpsGet.mockImplementation((_url: string, cb: (res: unknown) => void) => {
+        cb({
+          statusCode: 200,
+          on: (ev: string, fn: (err: Error) => void) => {
+            if (ev === 'error') fn(new Error('stream reset'))
+          },
+          destroy: resDestroy,
+        })
+        return { on: vi.fn() }
+      })
+      await expect(downloadAndCacheRules()).rejects.toThrow('stream reset')
+      expect(resDestroy).toHaveBeenCalled()
+    })
+
+    it('rejects and destroys the request when the download exceeds the timeout', async () => {
+      const reqDestroy = vi.fn()
+      vi.useFakeTimers()
+      try {
+        mocks.httpsGet.mockImplementation((_url: string, cb: (res: unknown) => void) => {
+          cb({ statusCode: 200, on: vi.fn() })
+          return { on: vi.fn(), destroy: reqDestroy }
+        })
+        const promise = downloadAndCacheRules()
+        const assertion = expect(promise).rejects.toThrow('download timeout')
+        vi.advanceTimersByTime(31_000)
+        await assertion
+        expect(reqDestroy).toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
     it('propagates section warning/default flags to rules', async () => {
       const content =
         '[WarningSection]\r\nWarn=True\r\nFileKey1=%Temp%\\a|*.*|RECURSE\r\n\r\n[OptOutSection]\r\nDefault=False\r\nFileKey1=%Temp%\\b|*.log\r\n'

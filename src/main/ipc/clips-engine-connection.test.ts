@@ -1320,6 +1320,29 @@ describe('stopEngineProcess', () => {
       vi.useRealTimers()
     }
   })
+
+  it('cancels the SIGKILL grace timer when the engine exits early', async () => {
+    const child = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as never)
+    vi.mocked(existsSync).mockReturnValue(true)
+    await startEngine()
+
+    try {
+      vi.useFakeTimers()
+      stopEngineProcess()
+      expect(child.kill).toHaveBeenCalledWith('SIGTERM')
+
+      const exitHandler = (child.on as ReturnType<typeof vi.fn>).mock.calls.find(
+        (c: unknown[]) => c[0] === 'exit',
+      )?.[1] as ((code: number) => void) | undefined
+      exitHandler?.(0)
+
+      vi.advanceTimersByTime(6000)
+      expect(child.kill).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 // ─── startEngine ───────────────────────────────────────────

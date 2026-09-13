@@ -74,8 +74,19 @@ async function callApi(body: Record<string, unknown>): Promise<Record<string, un
           reject(new Error('invalid response stream'))
           return
         }
+        const onStreamError = (err: Error) => {
+          clearTimeout(timer)
+          reject(new Error(err.message || 'response stream error'))
+        }
+        const onStreamAborted = () => {
+          clearTimeout(timer)
+          reject(new Error('response aborted/stream closed'))
+        }
+        stream.on('error', onStreamError)
+        stream.on('aborted' as unknown as 'aborted', onStreamAborted)
         stream.on('data', (d: unknown) => chunks.push(Buffer.isBuffer(d) ? d : Buffer.from(d as string)))
         stream.on('end', () => {
+          clearTimeout(timer)
           resolve({ status: code, body: Buffer.concat(chunks) })
         })
       })

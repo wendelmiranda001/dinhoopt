@@ -31,6 +31,7 @@ import {
   probeVideoResolution,
 } from '../services/clips-enhance'
 import { uploadClipToGofile } from '../services/clips-publish'
+import { trackChildProcess } from '../services/exec-utf8'
 import { getFfmpegPath } from '../services/ffmpeg-path'
 import { getLogger } from '../services/logger.service'
 import { getCachedThumbnailPath, getThumbnailDataUrl } from '../services/thumbnail-generator'
@@ -710,6 +711,7 @@ export function registerClipsIpc(): void {
             resolve({ success: true, path: outPath })
           }
         })
+        trackChildProcess(proc)
         proc.on('error', (e) => {
           try {
             unlinkSync(outPath)
@@ -822,6 +824,7 @@ export function registerClipsIpc(): void {
               resolve({ success: true, path: outPath })
             }
           })
+          trackChildProcess(proc)
           proc.on('error', (e) => {
             try {
               unlinkSync(concatFile)

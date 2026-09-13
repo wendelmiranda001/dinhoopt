@@ -22,6 +22,7 @@ const ENGINE_GRACE_PERIOD = 5_000
 // ─── Engine state ─────────────────────────────────────────────
 
 let _engineProcess: ChildProcess | null = null
+let _stopEngineGraceTimer: ReturnType<typeof setTimeout> | null = null
 let _engineRunning = false
 let _engineCapturing = false
 let _engineStartTime = 0
@@ -232,6 +233,10 @@ export async function startEngine(): Promise<{ success: boolean; error?: string 
     _engineProcess.stderr?.on('data', logStderr)
 
     const cleanup = () => {
+      if (_stopEngineGraceTimer) {
+        clearTimeout(_stopEngineGraceTimer)
+        _stopEngineGraceTimer = null
+      }
       _engineRunning = false
       _engineCapturing = false
       _engineProcess = null
@@ -312,8 +317,12 @@ export function stopEngineProcess(): void {
   }
   disconnectPipe()
   try {
+    if (_stopEngineGraceTimer) {
+      clearTimeout(_stopEngineGraceTimer)
+    }
     proc.kill('SIGTERM')
-    setTimeout(() => {
+    _stopEngineGraceTimer = setTimeout(() => {
+      _stopEngineGraceTimer = null
       if (!proc.killed) {
         proc.kill('SIGKILL')
       }

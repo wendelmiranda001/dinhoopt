@@ -59,6 +59,7 @@ export async function handleMetricsServer(args: string[], ctx: CliContext): Prom
   })
 
   const shutdown = (): void => {
+    server.closeAllConnections()
     server.close()
     app.exit(ExitCode.SUCCESS)
   }

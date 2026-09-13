@@ -60,6 +60,15 @@ vi.mock('../services/logger.service', () => ({
   }),
 }))
 
+const mockTrackChildProcess = vi.hoisted(() => vi.fn(() => () => {}))
+vi.mock('../services/exec-utf8', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('../services/exec-utf8')>()
+  return {
+    ...mod,
+    trackChildProcess: mockTrackChildProcess,
+  }
+})
+
 const mockUploadClipToGofile = vi.hoisted(() => vi.fn())
 vi.mock('../services/clips-publish', () => ({
   uploadClipToGofile: mockUploadClipToGofile,
@@ -1496,6 +1505,28 @@ describe('CLIPS_TRIM_CLIP', () => {
     expect(typeof result.path).toBe('string')
   })
 
+  it('registers the ffmpeg trim process in the app-exit sweep', async () => {
+    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(execFile).mockImplementation(
+      (
+        _cmd: string,
+        _args: readonly string[],
+        _opts: unknown,
+        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+      ) => {
+        if (cb) cb(null, '', '')
+        return mockFFProc as never
+      },
+    )
+    expect(mockTrackChildProcess).not.toHaveBeenCalled()
+    const handlers = captureHandlers()
+    const handler = getAsyncHandler(handlers, IPC.CLIPS_TRIM_CLIP)
+    const result = (await handler({}, 'clip.mp4', 10, 20)) as ClipTrimResult
+    expect(result.success).toBe(true)
+    expect(mockTrackChildProcess).toHaveBeenCalledWith(mockFFProc)
+  })
+
   it('creates output directory when trimmed dir does not exist', async () => {
     vi.mocked(existsSync).mockReturnValueOnce(true) // safePath exists
     // second existsSync(outDir) → undefined → falsy → triggers mkdirSync
@@ -1941,6 +1972,28 @@ describe('CLIPS_MERGE_CLIPS', () => {
     expect(args).toContain('copy')
     expect(args).not.toContain('libx264')
     expect(args).not.toContain('-vf')
+  })
+
+  it('registers the ffmpeg merge process in the app-exit sweep', async () => {
+    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(execFile).mockImplementation(
+      (
+        _cmd: string,
+        _args: readonly string[],
+        _opts: unknown,
+        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+      ) => {
+        if (cb) cb(null, '', '')
+        return mockFFProc as never
+      },
+    )
+    expect(mockTrackChildProcess).not.toHaveBeenCalled()
+    const handlers = captureHandlers()
+    const handler = getAsyncHandler(handlers, IPC.CLIPS_MERGE_CLIPS)
+    const result = (await handler({}, ['clip1.mp4', 'clip2.mp4'])) as ClipMergeResult
+    expect(result.success).toBe(true)
+    expect(mockTrackChildProcess).toHaveBeenCalledWith(mockFFProc)
   })
 
   it('re-encodes with sr_amf vf when AMD detected and enhance set', async () => {

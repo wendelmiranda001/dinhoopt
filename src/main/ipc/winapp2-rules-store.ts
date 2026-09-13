@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { get } from 'node:https'
+import { type ClientRequest, get, type IncomingMessage } from 'node:https'
 import { join } from 'node:path'
 import { getLogger } from '../services/logger.service'
 import { convertWinapp2Vars, parseWinapp2 } from './winapp2-import.ipc'
@@ -25,17 +25,43 @@ function rulesCachePath(): string {
   return join(cacheDirPath || '', 'winapp2-rules.json')
 }
 
+const DOWNLOAD_TIMEOUT_MS = 30_000
+
 function downloadUrl(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    get(url, (res) => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let settled = false
+    let response: IncomingMessage | null = null
+    let requestRef: ClientRequest | null = null
+
+    const fail = (err: Error) => {
+      if (settled) return
+      settled = true
+      if (timer) clearTimeout(timer)
+      if (response && typeof response.destroy === 'function') response.destroy()
+      if (requestRef && typeof requestRef.destroy === 'function') requestRef.destroy()
+      reject(err)
+    }
+
+    requestRef = get(url, (res) => {
+      response = res
+      res.on('error', (err: Error) => fail(new Error(err.message || 'response stream error')))
       if (res.statusCode !== 200) {
-        reject(new Error(`HTTP ${res.statusCode}`))
+        fail(new Error(`HTTP ${res.statusCode}`))
         return
       }
       const chunks: Buffer[] = []
       res.on('data', (chunk: Buffer) => chunks.push(chunk))
-      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')))
-    }).on('error', reject)
+      res.on('end', () => {
+        if (settled) return
+        settled = true
+        if (timer) clearTimeout(timer)
+        resolve(Buffer.concat(chunks).toString('utf-8'))
+      })
+    })
+
+    timer = setTimeout(() => fail(new Error('download timeout')), DOWNLOAD_TIMEOUT_MS)
+    requestRef.on('error', (err: Error) => fail(new Error(err.message || 'request error')))
   })
 }
 

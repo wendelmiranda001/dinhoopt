@@ -237,6 +237,7 @@ export async function scanRecycleBin(): Promise<ScanResult[]> {
     const { psUtf8 } = await import('../../../services/exec-utf8')
     const rbScript = `$shell = New-Object -ComObject Shell.Application; $rb = $shell.NameSpace(0x0a); $items = $rb.Items(); $count = $items.Count; $size = ($items | Measure-Object -Property Size -Sum).Sum; Write-Output "$count|$size"`
     const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', psUtf8(rbScript)], {
+      timeout: 60_000,
       windowsHide: true,
     })
     const [countStr, sizeStr] = stdout.trim().split('|')

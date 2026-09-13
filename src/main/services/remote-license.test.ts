@@ -19,6 +19,8 @@ const mockNet = vi.hoisted(() => {
   let _status = 200
   let _body: any = { valid: false, reason: 'test-blocked' }
   let _error: string | null = null
+  let _streamError: string | null = null
+  let _streamAborted = false
   let _capturedPayload = ''
   let _callIndex = 0
   const _responses: Array<{ status?: number; body?: any; error?: string }> = []
@@ -28,16 +30,36 @@ const mockNet = vi.hoisted(() => {
       _status = status
       _body = body
       _error = null
+      _streamError = null
+      _streamAborted = false
       _responses.length = 0
       _callIndex = 0
     },
     setError: (msg: string) => {
       _error = msg
+      _streamError = null
+      _streamAborted = false
+      _responses.length = 0
+      _callIndex = 0
+    },
+    setStreamError: (msg: string) => {
+      _error = null
+      _streamError = msg
+      _streamAborted = false
+      _responses.length = 0
+      _callIndex = 0
+    },
+    setStreamAborted: () => {
+      _error = null
+      _streamError = null
+      _streamAborted = true
       _responses.length = 0
       _callIndex = 0
     },
     setSequence: (seq: Array<{ status?: number; body?: any; error?: string }>) => {
       _responses.splice(0, _responses.length, ...seq)
+      _streamError = null
+      _streamAborted = false
       _callIndex = 0
     },
     getCapturedPayload: () => _capturedPayload,
@@ -65,6 +87,8 @@ const mockNet = vi.hoisted(() => {
                   statusCode: status,
                   response: {
                     on(dEv: string, dCb: any) {
+                      if (dEv === 'error' && _streamError) dCb(new Error(_streamError))
+                      if (dEv === 'aborted' && _streamAborted) dCb(null)
                       if (dEv === 'data') dCb(Buffer.from(JSON.stringify(body)))
                       if (dEv === 'end') dCb(null)
                     },
@@ -402,6 +426,24 @@ describe('remote-license', () => {
       const result = await checkLicense()
       expect(result.valid).toBe(true)
       expect(result.expires_at).toBeNull()
+    })
+
+    it('settles (falls back offline) when the response stream errors mid-body', async () => {
+      fs.writeFileSync(path.join(testRoot, KEYFILE), 'KEY', 'utf-8')
+      mockNet.setStreamError('stream reset by peer')
+
+      const result = await checkLicense()
+      expect(result.valid).toBe(false)
+      expect(result.reason).toBe('Sem validação offline disponível')
+    })
+
+    it('settles (falls back offline) when the response stream aborts mid-body', async () => {
+      fs.writeFileSync(path.join(testRoot, KEYFILE), 'KEY', 'utf-8')
+      mockNet.setStreamAborted()
+
+      const result = await checkLicense()
+      expect(result.valid).toBe(false)
+      expect(result.reason).toBe('Sem validação offline disponível')
     })
   })
 
