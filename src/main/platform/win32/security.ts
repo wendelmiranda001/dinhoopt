@@ -288,6 +288,12 @@ if ($null -ne $reg) { $installationType = [string]$reg.InstallationType }
   return productType >= 2 || /server/i.test(installationType)
 }
 
+function unsupportedOnWindows(name: string): () => Promise<never> {
+  return async () => {
+    throw new Error(`${name} is not supported on Windows`)
+  }
+}
+
 export function createWin32Security(): PlatformSecurity {
   return {
     async isServer() {
@@ -314,23 +320,11 @@ export function createWin32Security(): PlatformSecurity {
     collectUpdateStatus,
     collectScreenLockStatus,
     collectPasswordPolicy,
-    async collectSshHardening() {
-      return null
-    },
-    async collectFail2ban() {
-      return null
-    },
-    async collectListeningPorts() {
-      return null
-    },
-    async collectAuditd() {
-      return null
-    },
-    async collectSuidSgidBinaries() {
-      return null
-    },
-    async collectLinuxFirewallStatus() {
-      return null
-    },
+    collectSshHardening: unsupportedOnWindows('collectSshHardening'),
+    collectFail2ban: unsupportedOnWindows('collectFail2ban'),
+    collectListeningPorts: unsupportedOnWindows('collectListeningPorts'),
+    collectAuditd: unsupportedOnWindows('collectAuditd'),
+    collectSuidSgidBinaries: unsupportedOnWindows('collectSuidSgidBinaries'),
+    collectLinuxFirewallStatus: unsupportedOnWindows('collectLinuxFirewallStatus'),
   }
 }

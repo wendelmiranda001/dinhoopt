@@ -407,29 +407,35 @@ describe('win32 security', () => {
     })
   })
 
-  describe('stub methods returning null', () => {
-    it('collectSshHardening returns null', async () => {
-      expect(await security.collectSshHardening()).toBeNull()
+  describe('security checks unsupported on Windows', () => {
+    it('collectSshHardening throws an explicit error', async () => {
+      await expect(security.collectSshHardening()).rejects.toThrow('collectSshHardening is not supported on Windows')
     })
 
-    it('collectFail2ban returns null', async () => {
-      expect(await security.collectFail2ban()).toBeNull()
+    it('collectFail2ban throws an explicit error', async () => {
+      await expect(security.collectFail2ban()).rejects.toThrow('collectFail2ban is not supported on Windows')
     })
 
-    it('collectListeningPorts returns null', async () => {
-      expect(await security.collectListeningPorts()).toBeNull()
+    it('collectListeningPorts throws an explicit error', async () => {
+      await expect(security.collectListeningPorts()).rejects.toThrow(
+        'collectListeningPorts is not supported on Windows',
+      )
     })
 
-    it('collectAuditd returns null', async () => {
-      expect(await security.collectAuditd()).toBeNull()
+    it('collectAuditd throws an explicit error', async () => {
+      await expect(security.collectAuditd()).rejects.toThrow('collectAuditd is not supported on Windows')
     })
 
-    it('collectSuidSgidBinaries returns null', async () => {
-      expect(await security.collectSuidSgidBinaries()).toBeNull()
+    it('collectSuidSgidBinaries throws an explicit error', async () => {
+      await expect(security.collectSuidSgidBinaries()).rejects.toThrow(
+        'collectSuidSgidBinaries is not supported on Windows',
+      )
     })
 
-    it('collectLinuxFirewallStatus returns null', async () => {
-      expect(await security.collectLinuxFirewallStatus()).toBeNull()
+    it('collectLinuxFirewallStatus throws an explicit error', async () => {
+      await expect(security.collectLinuxFirewallStatus()).rejects.toThrow(
+        'collectLinuxFirewallStatus is not supported on Windows',
+      )
     })
   })
 })

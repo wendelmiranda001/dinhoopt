@@ -211,7 +211,7 @@ export interface PlatformSecurity {
   collectUpdateStatus(): Promise<UpdateStatus>
   collectScreenLockStatus(): Promise<ScreenLockStatus>
   collectPasswordPolicy(): Promise<PasswordPolicy>
-  collectListeningPorts(): Promise<null>
+  collectListeningPorts(): Promise<never>
 }
 
 // ─── System Commands ────────────────────────────────────────
