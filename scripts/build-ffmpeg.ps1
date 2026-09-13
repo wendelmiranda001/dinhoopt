@@ -7,7 +7,7 @@
 #     mingw-w64-x86_64-x264 mingw-w64-x86_64-x265 mingw-w64-x86_64-ffnvcodec-headers
 
 param(
-    [string]$Version = "8.1.2",
+    [string]$Version = "9.0.1",
     [string]$OutputDir = "$PSScriptRoot\..\resources\ffmpeg-custom",
     [switch]$Clean
 )

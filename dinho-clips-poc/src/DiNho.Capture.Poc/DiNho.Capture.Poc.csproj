@@ -33,7 +33,7 @@
     </PackageReference>
 
     <!-- WASAPI audio capture -->
-    <PackageReference Include="NAudio" Version="3.0.1" />
+    <PackageReference Include="NAudio" Version="3.1.0" />
   </ItemGroup>
 
   <ItemGroup>
