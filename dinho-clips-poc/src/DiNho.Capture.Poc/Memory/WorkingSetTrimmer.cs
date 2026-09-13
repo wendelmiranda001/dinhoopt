@@ -13,7 +13,7 @@ namespace DiNho.Capture.Poc.Memory;
 public static class WorkingSetTrimmer
 {
     internal static Action CollectGen2Probe = () =>
-        GC.Collect(2, GCCollectionMode.Optimized, true, true);
+        GC.Collect(2, GCCollectionMode.Forced, true, true);
 
     internal static Action SetProcessWorkingSetSizeProbe = TrimWorkingSet;
 

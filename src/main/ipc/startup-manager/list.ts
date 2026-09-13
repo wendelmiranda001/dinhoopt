@@ -4,6 +4,7 @@ import type { StartupItem } from '@shared/types'
 import { app } from 'electron'
 import { getPlatform } from '../../platform'
 import { execFileAsync, execNativeUtf8, psArgs } from '../../services/exec-utf8'
+import { getLogger } from '../../services/logger.service'
 import { readDisabledEntries } from './disabled-file'
 import { mergeStartupApproved, parseRegOutput } from './registry'
 import { deriveDisplayName, estimateImpact, extractPublisher, makeStableId } from './utils'
@@ -110,8 +111,8 @@ export async function listStartupItems(): Promise<StartupItem[]> {
       { timeout: 10000 },
     )
     items.push(...parseRegOutput(stdout, 'HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run', 'registry-hkcu'))
-  } catch {
-    // Skip
+  } catch (err) {
+    getLogger().warning('startup-manager', `Failed to read registry key HKCU\\...\\Run: ${String(err)}`)
   }
 
   try {
@@ -121,8 +122,8 @@ export async function listStartupItems(): Promise<StartupItem[]> {
       { timeout: 10000 },
     )
     items.push(...parseRegOutput(stdout, 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run', 'registry-hklm'))
-  } catch {
-    // Skip
+  } catch (err) {
+    getLogger().warning('startup-manager', `Failed to read registry key HKLM\\...\\Run: ${String(err)}`)
   }
 
   try {
@@ -138,8 +139,8 @@ export async function listStartupItems(): Promise<StartupItem[]> {
         'registry-hklm',
       ),
     )
-  } catch {
-    // Skip
+  } catch (err) {
+    getLogger().warning('startup-manager', `Failed to read registry key HKLM\\...\\WOW6432Node\\Run: ${String(err)}`)
   }
 
   items.push(...getStartupFolderItems())

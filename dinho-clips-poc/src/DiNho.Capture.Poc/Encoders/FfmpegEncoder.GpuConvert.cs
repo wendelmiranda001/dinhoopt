@@ -225,7 +225,7 @@ internal partial class FfmpegEncoder
             {
                 EnsureInputCopy(texture, device);
                 ctx.CopyResource(_inputCopy, texture);
-                source = _inputCopy;
+                source = _inputCopy!;
             }
 
             var nv12Tex = _gpuConverter.Convert(source);
@@ -242,8 +242,8 @@ internal partial class FfmpegEncoder
             // como falha de conversão (evita restart loop); watchdog cobre drops sustentados.
             MappedSubresource map;
             if (!TryMapWithBusyRetry(
-                    () => ctx.Map(_nv12Staging, 0, MapMode.Read, StagingMapFlags),
-                    () => ctx.Map(_nv12Staging, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None),
+                    () => ctx.Map(_nv12Staging!, 0, MapMode.Read, StagingMapFlags),
+                    () => ctx.Map(_nv12Staging!, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None),
                     out map))
             {
                 _lastFrameBusyDrop = true;

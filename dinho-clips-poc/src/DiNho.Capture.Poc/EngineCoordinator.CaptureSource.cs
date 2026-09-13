@@ -66,7 +66,7 @@ public sealed partial class EngineCoordinator
                     }
                     catch (Exception ex) when (attempt < maxRetries)
                     {
-                        wgc.Dispose();
+                        wgc?.Dispose();
                         var innerMsg = ex.InnerException != null ? $" → {ex.InnerException.GetType().Name}: {ex.InnerException.Message}" : "";
                         Log.E("EngineCoordinator", $"WGC window tentativa {attempt}/{maxRetries} falhou: {ex.Message}{innerMsg}, retry em {retryDelayMs}ms...");
                         // Release lock during delay to avoid starving StopCapture, but re-check device on resume
@@ -77,7 +77,7 @@ public sealed partial class EngineCoordinator
                     }
                     catch (Exception ex)
                     {
-                        wgc.Dispose();
+                        wgc?.Dispose();
                         var innerMsg = ex.InnerException != null ? $" → {ex.InnerException.GetType().Name}: {ex.InnerException.Message}" : "";
                         Log.E("EngineCoordinator", $"WGC window tentativa {maxRetries}/{maxRetries} falhou: {ex.Message}{innerMsg}, fallback...");
                     }
@@ -207,7 +207,7 @@ public sealed partial class EngineCoordinator
                 }
                 catch (Exception ex)
                 {
-                    wgc.Dispose();
+                    wgc?.Dispose();
                     var inner = ex.InnerException != null ? $" → {ex.InnerException.GetType().Name}: {ex.InnerException.Message}" : "";
                     if (attempt < maxRetries)
                     {

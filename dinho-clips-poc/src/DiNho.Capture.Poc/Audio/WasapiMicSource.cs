@@ -6,7 +6,7 @@ namespace DiNho.Capture.Poc.Audio;
 
 public sealed class WasapiMicSource : IAudioSource
 {
-    private WasapiCapture? _capture;
+    private WasapiRecorder? _capture;
     private readonly MMDevice _device;
     private bool _running;
     private readonly int _sampleRate;
@@ -56,8 +56,12 @@ public sealed class WasapiMicSource : IAudioSource
     public void Start()
     {
         if (_running) return;
-        _capture = new WasapiCapture(_device, true);
-        _capture.WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(_sampleRate, 1);
+        _capture = new WasapiRecorderBuilder()
+            .WithDevice(_device)
+            .WithEventSync()
+            .WithMmcssThreadPriority("Audio")
+            .WithFormat(WaveFormat.CreateIeeeFloatWaveFormat(_sampleRate, 1))
+            .Build();
         _capture.DataAvailable += OnDataAvailable;
         _capture.RecordingStopped += (s, e) => _running = false;
         try
@@ -73,11 +77,10 @@ public sealed class WasapiMicSource : IAudioSource
         _running = true;
     }
 
-    private void OnDataAvailable(object? sender, WaveInEventArgs e)
+    private void OnDataAvailable(ReadOnlySpan<byte> buffer, AudioClientBufferFlags flags, long devicePosition, long qpcPosition)
     {
         if (OnAudioData == null) return;
-        var samples = new float[e.BytesRecorded / 4];
-        System.Buffer.BlockCopy(e.Buffer, 0, samples, 0, e.BytesRecorded);
+        var samples = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, float>(buffer).ToArray();
         OnAudioData(new AudioBuffer(samples, SampleRate, Channels));
     }
 
@@ -90,8 +93,21 @@ public sealed class WasapiMicSource : IAudioSource
 
     public void Dispose()
     {
-        Stop();
-        _capture?.Dispose();
+        _running = false;
+        var capture = _capture;
+        _capture = null;
+        if (capture != null)
+        {
+            // NAudio 3.1 race: StopRecording applied before the capture thread reaches its
+            // `captureState = Capturing` assignment is swallowed and never re-applied, leaving
+            // the thread looping forever and Dispose's Join blocked. Wait until the thread is
+            // capturing (the assignment executed) before stopping — deterministic on both sides.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            while (capture.CaptureState == CaptureState.Starting && sw.ElapsedMilliseconds < 3000)
+                Thread.Sleep(5);
+            try { capture.StopRecording(); } catch { }
+            try { capture.Dispose(); } catch { }
+        }
         _device?.Dispose();
     }
 }

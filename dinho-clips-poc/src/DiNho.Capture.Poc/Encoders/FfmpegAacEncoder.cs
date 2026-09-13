@@ -178,7 +178,7 @@ public sealed class FfmpegAacEncoder : IDisposable
             switch (result)
             {
                 case FfmpegEncoder.StdinWriteResult.Ok:
-                    _stdin.Flush();
+                    _stdin!.Flush();
                     _pcmBytesWritten += byteLen;
                     break;
                 case FfmpegEncoder.StdinWriteResult.Timeout:

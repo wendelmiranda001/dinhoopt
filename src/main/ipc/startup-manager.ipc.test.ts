@@ -692,10 +692,8 @@ describe('toggleStartupItem', () => {
 
     it('logs a warning when reading the registry raises an exception', async () => {
       mockLogger.warning.mockReset()
-      const args = ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/s']
-      const handler = setupExecFileHandler(args)
-      handler.calls[0].cb(new Error('boom'), '', '')
-      const entries = await readStartupItems('registry-hkcu')
+      // beforeEach defaults every execFile call to fail, so all registry reads throw
+      const entries = await listStartupItems()
       expect(entries).toEqual([])
       expect(mockLogger.warning).toHaveBeenCalledWith('startup-manager', expect.stringContaining('registry'))
     })

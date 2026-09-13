@@ -203,6 +203,8 @@ public sealed class WgcCaptureSource : ICaptureSource
     /// </summary>
     public void StartFramePump()
     {
+        if (_framePool is null || _session is null)
+            throw new InvalidOperationException("WGC capture not initialized — call CreateFramePoolForItem() before StartFramePump()");
         _framePool.FrameArrived += OnFrameArrived;
         _session.StartCapture();
     }
@@ -258,7 +260,7 @@ public sealed class WgcCaptureSource : ICaptureSource
             try
             {
                 var iid = typeof(IDirect3D11CaptureFrame2).GUID;
-                var hr = Marshal.QueryInterface(nativePtr, ref iid, out var ptr);
+                var hr = Marshal.QueryInterface(nativePtr, in iid, out var ptr);
                 if (hr != 0 || ptr == IntPtr.Zero) return -1;
                 try
                 {
@@ -342,7 +344,7 @@ public sealed class WgcCaptureSource : ICaptureSource
 
         // Estratégia 1: IDirect3DDxgiInterfaceAccess (abordagem oficial)
         var dxgiAccessGuid = typeof(IDirect3DDxgiInterfaceAccess).GUID;
-        hr1 = Marshal.QueryInterface(nativePtr, ref dxgiAccessGuid, out var dxgiAccessPtr);
+        hr1 = Marshal.QueryInterface(nativePtr, in dxgiAccessGuid, out var dxgiAccessPtr);
         if (hr1 == 0 && dxgiAccessPtr != IntPtr.Zero)
         {
             try
@@ -365,7 +367,7 @@ public sealed class WgcCaptureSource : ICaptureSource
         if (sourceTexture is null)
         {
             var dxgiSurfaceGuid = typeof(IDXGISurface).GUID;
-            hr2 = Marshal.QueryInterface(nativePtr, ref dxgiSurfaceGuid, out var dxgiSurfacePtr);
+            hr2 = Marshal.QueryInterface(nativePtr, in dxgiSurfaceGuid, out var dxgiSurfacePtr);
             if (hr2 == 0 && dxgiSurfacePtr != IntPtr.Zero)
             {
                 try
@@ -569,7 +571,7 @@ public sealed class WgcCaptureSource : ICaptureSource
     /// <summary>QI por IID na sessão e invoca o setter (vtable slot 7). Loga em Debug quando a interface não está disponível.</summary>
     private static void TrySetSessionBool(IntPtr nativePtr, Guid iid, string name, bool value)
     {
-        var hr = Marshal.QueryInterface(nativePtr, ref iid, out var ifacePtr);
+        var hr = Marshal.QueryInterface(nativePtr, in iid, out var ifacePtr);
         if (hr != 0 || ifacePtr == IntPtr.Zero)
         {
             Log.D("WGC", $"{name}: interface não disponível (hr=0x{hr:X8})");
@@ -593,7 +595,7 @@ public sealed class WgcCaptureSource : ICaptureSource
     /// <summary>Idem para propriedade enum (DirtyRegionMode).</summary>
     private static void TrySetSessionEnum(IntPtr nativePtr, Guid iid, string name, int value)
     {
-        var hr = Marshal.QueryInterface(nativePtr, ref iid, out var ifacePtr);
+        var hr = Marshal.QueryInterface(nativePtr, in iid, out var ifacePtr);
         if (hr != 0 || ifacePtr == IntPtr.Zero)
         {
             Log.D("WGC", $"{name}: interface não disponível (hr=0x{hr:X8})");
@@ -617,7 +619,7 @@ public sealed class WgcCaptureSource : ICaptureSource
     /// <summary>Idem para propriedade TimeSpan (Windows.Foundation.TimeSpan = long 8 bytes).</summary>
     private static void TrySetSessionTimeSpan(IntPtr nativePtr, Guid iid, string name, long durationTicks)
     {
-        var hr = Marshal.QueryInterface(nativePtr, ref iid, out var ifacePtr);
+        var hr = Marshal.QueryInterface(nativePtr, in iid, out var ifacePtr);
         if (hr != 0 || ifacePtr == IntPtr.Zero)
         {
             Log.D("WGC", $"{name}: interface não disponível (hr=0x{hr:X8})");
@@ -646,7 +648,7 @@ public sealed class WgcCaptureSource : ICaptureSource
     private static int TryGetItemDisposition(GraphicsCaptureItem item)
     {
         var itemIid = typeof(GraphicsCaptureItem).GUID;
-        var hr = Marshal.QueryInterface(Marshal.GetIUnknownForObject(item), ref itemIid, out var itemPtr);
+        var hr = Marshal.QueryInterface(Marshal.GetIUnknownForObject(item), in itemIid, out var itemPtr);
         if (hr != 0 || itemPtr == IntPtr.Zero)
         {
             Log.D("WGC", "Disposition: QI do capture item falhou (hr=0x{hr:X8})");
@@ -656,7 +658,7 @@ public sealed class WgcCaptureSource : ICaptureSource
         {
             // QI por IGraphicsCaptureItem7
             var iid7 = IID_ITEM7_DISPOSITION;
-            hr = Marshal.QueryInterface(itemPtr, ref iid7, out var iface7);
+            hr = Marshal.QueryInterface(itemPtr, in iid7, out var iface7);
             if (hr != 0 || iface7 == IntPtr.Zero)
             {
                 Log.D("WGC", $"Disposition: IGraphicsCaptureItem7 não disponível (hr=0x{hr:X8})");

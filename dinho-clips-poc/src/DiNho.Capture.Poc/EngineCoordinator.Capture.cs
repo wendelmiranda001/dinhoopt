@@ -780,7 +780,7 @@ public sealed partial class EngineCoordinator
                         // no EndNoGCRegion (padrão de serra no working set). Com o
                         // VideoPacketPool reutilizando os arrays evictados, o churn de
                         // LOH sumiu e GCs gen0/gen1 rápidos não causam frame drops.
-                        var encoded = enc.EncodeFrame(frame.Texture, capturePts);
+                        var encoded = enc.EncodeFrame(frame.Texture!, capturePts);
                         if (encoded != null)
                         {
                             _buffer.AddVideo(encoded);

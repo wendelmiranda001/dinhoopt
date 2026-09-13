@@ -161,7 +161,7 @@ internal sealed class GpuVideoConverter : IDisposable
             throw new DeviceLostException("VideoProcessorBlt failed — device removed");
         }
 
-        return _cachedOutput;
+        return _cachedOutput ?? throw new InvalidOperationException("GpuVideoConverter output texture not allocated");
     }
 
     public ID3D11Texture2D? OutputTexture => _cachedOutput;

@@ -418,7 +418,7 @@ internal sealed partial class FfmpegEncoder : IEncoder
              QSV:   veryslow + extbrc + rdo 1 + adaptive_i/b + b_strategy + mbbrc
            Cor BT.709: tagging no output → NVENC escreve VUI → atom `colr` no MP4 (players corretos).
            GOP 120 (~2s a 60fps): OBS recomenda, ~10% menos bits que GOP 60. */
-        var tune = BuildEncoderTuneArgs(_codec, _cq, _maxrateKbps, _bufsizeKbps, _bframes, _lookahead, _nvencPreset, _amfPreset, _multipass);
+        var tune = BuildEncoderTuneArgs(_codec!, _cq, _maxrateKbps, _bufsizeKbps, _bframes, _lookahead, _nvencPreset, _amfPreset, _multipass);
 
         int cw = _cropW, ch = _cropH;
         bool hasCrop = cw > 0 && ch > 0;
@@ -455,18 +455,18 @@ internal sealed partial class FfmpegEncoder : IEncoder
         }
         // D3D12VA só aceita frames no pixel format d3d12 — hwupload sobe o frame NV12
         // para o device D3D12 antes do encoder (mesmo padrão validado no probe).
-        var isD3d12va = _codec.EndsWith("_d3d12va", StringComparison.Ordinal);
+        var isD3d12va = _codec?.EndsWith("_d3d12va", StringComparison.Ordinal) == true;
         if (isD3d12va)
             vfParts.Add("hwupload=extra_hw_frames=16,format=d3d12");
         // QSV precisa de -init_hw_device qsv para criar a sessão MFX — sem isso o ffmpeg 9
         // falha com "Error creating a MFX session: -9" mesmo em máquina Intel. O encoder
         // QSV faz o upload internamente (aceita frames NV12 de sistema), não usa hwupload.
-        var isQsv = _codec.EndsWith("_qsv", StringComparison.Ordinal);
+        var isQsv = _codec?.EndsWith("_qsv", StringComparison.Ordinal) == true;
         var cropFilter = vfParts.Count > 0
             ? $" -vf \"{string.Join(",", vfParts)}\""
             : "";
 
-        var rawFmt = GetRawFormatForCodec(_codec);
+        var rawFmt = GetRawFormatForCodec(_codec!);
 
         // For AV1, use IVF container (explicit frame boundaries with 12-byte headers).
         // Raw AV1 OBU data is not parseable by our AnnexB/AVCC detector.

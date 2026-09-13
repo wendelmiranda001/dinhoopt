@@ -4,7 +4,7 @@ using NAudio.Wave;
 namespace DiNho.Capture.Poc.Audio;
 
 /// <summary>
-/// Plays short notification sounds via NAudio WaveOutEvent.
+/// Plays short notification sounds via NAudio WaveOut.
 /// All sounds are generated programmatically (no .wav files needed).
 /// </summary>
 public static class NotificationSound
@@ -85,7 +85,7 @@ public static class NotificationSound
         wavStream.Position = 0;
 
         using var reader = new WaveFileReader(wavStream);
-        using var player = new WaveOutEvent();
+        using var player = new WaveOut();
         player.Init(reader);
         player.Play();
 

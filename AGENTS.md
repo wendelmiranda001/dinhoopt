@@ -105,8 +105,9 @@ Commit format: `<type>: <description>` — Types: feat, fix, refactor, docs, tes
   | 10 | `src/main/{rules,platform,constants,index.ts}` + triagem/closeout | ✅ Concluída e commitada |
 - G3 completa (S4–S10): suíte final 238 files, 2 failed pré-existentes (environment-cleaner.ipc.test.ts:536, startup-manager.ipc.test.ts:697) | 6988 passed | 1 skipped; Biome 0 erros. Detalhes em `SESSION-HISTORY.md` (2026-09-13).
 
-**Planejado, não iniciado — Multi-Track Audio** (registrado 2026-07-23, esforço estimado ~1-2 semanas):
-Gravar tracks de áudio independentes no clipe (jogo, Discord, mic) para edição pós-gravação. Já existe: captura por PID (`CppLoopbackSource`), captura geral (`WasapiLoopbackSource`), captura de mic (`WasapiMicSource`), enumeração/filtro de sessões de áudio, `AudioMixer`+`FfmpegAacEncoder` (só para 1 stream). Falta: múltiplos mixers/encoders em paralelo, `ClipExporter` aceitando N streams de áudio, UI de seleção de tracks, separação no player/editor.
+**GREEN (corte vertical puro commitado) — Multi-Track Audio** (Item 5, commit `14d939b: MultiTrackAudioPolicy + AudioTrackKind 5/5 + corte puro GREEN; depois colei `MultiTrackAudioPolicyTests.cs` com mais seams de teste):
+- **O que cortou GREEN:** política PURA `MultiTrackAudioPolicy.ResolveTracks` (ranking estável `AudioTrackKind`: Game default rank 0 > Discord rank 1 só com config explícita > Mic rank 2) + fails com erro claro se NENHUMA trilha disponível (nunca sessão muda). 5 testes verdes via `--filter "FullyQualifiedName~MultiTrackAudioPolicyTests"`, dll 5/5 GREEN, EXIT 0.
+- **Pendente (fora do corte TDD — exige WASAPI multi-stream/GPU real):** `AudioMixer` multi-track (mixers WASAPI paralelos, 1 por track), `FfmpegAacEncoder` N encoders, `ClipExporter` N streams ADTS→MKV — NÃO toca HW sem novo pedido explícito (mesma regra do Item 2).
 
 **Rejeitado pelo usuário — não reabrir sem novo pedido explícito:**
 AI auto-clipping (detecção de eventos), clip por comando de voz, gravação de sessão completa + bookmarks, compilação automática de highlights, compartilhamento/links instantâneos, cloud storage, app mobile.

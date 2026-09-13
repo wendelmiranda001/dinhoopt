@@ -94,7 +94,7 @@ namespace DiNho.Capture.Poc.Capture
             {
                 // QI the activation factory for IGraphicsCaptureItemInterop
                 var interopGuid = IGraphicsCaptureItemInteropGuid;
-                var qiHr = Marshal.QueryInterface(factoryPtr, ref interopGuid, out interopPtr);
+                var qiHr = Marshal.QueryInterface(factoryPtr, in interopGuid, out interopPtr);
                 if (qiHr != 0 || interopPtr == IntPtr.Zero)
                     throw new COMException($"QI for IGraphicsCaptureItemInterop failed: HRESULT=0x{qiHr:X8}", qiHr);
 

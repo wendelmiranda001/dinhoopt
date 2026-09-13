@@ -15,12 +15,14 @@ public sealed class MasterClockTests
     }
 
     [Fact]
-    public void Now_100ms_WithinTolerance()
+    public void Now_TracksStopwatch_WithinTolerance()
     {
         using var clock = new MasterClock();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         Thread.Sleep(100);
-        var elapsed = clock.Now.TotalMilliseconds;
-        Assert.InRange(elapsed, 90, 115);
+        var realElapsed = sw.Elapsed.TotalMilliseconds;
+        var clockElapsed = clock.Now.TotalMilliseconds;
+        Assert.InRange(clockElapsed, realElapsed - 15, realElapsed + 15);
     }
 
     [Fact]

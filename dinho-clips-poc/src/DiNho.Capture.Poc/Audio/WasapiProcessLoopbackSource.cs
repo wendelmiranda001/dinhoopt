@@ -30,6 +30,7 @@ public sealed class WasapiProcessLoopbackSource : IAudioSource
                 : ProcessLoopbackMode.ExcludeTargetProcessTree;
             var task = new WasapiRecorderBuilder()
                 .WithProcessLoopback(pid, mode)
+                .WithMmcssThreadPriority("Audio")
                 .WithFormat(WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, ChannelsCount))
                 .BuildAsync();
             return task.GetAwaiter().GetResult();

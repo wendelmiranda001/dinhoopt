@@ -9,6 +9,7 @@ public sealed partial class EngineCoordinator
 {
     private AudioMixer CreateAudioMixer()
     {
+        Interlocked.Increment(ref _audioMixerGeneration);
         _audioFallback = false;
         var cfg = _config.Config;
         var sampleRate = cfg.AudioSampleRate is 44100 or 48000 or 96000 ? cfg.AudioSampleRate : 48000;

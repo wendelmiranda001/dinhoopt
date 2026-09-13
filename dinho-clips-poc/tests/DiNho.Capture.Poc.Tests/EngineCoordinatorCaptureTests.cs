@@ -1745,13 +1745,26 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
     private sealed class RecordingLogger : ILogger
     {
+        private readonly int _threadId = Environment.CurrentManagedThreadId;
+        private readonly object _gate = new();
         public List<(LogLevel Level, string Source, string Message)> Entries { get; } = new();
 
-        public void Debug(string source, string message) => Entries.Add((LogLevel.Debug, source, message));
-        public void Info(string source, string message) => Entries.Add((LogLevel.Info, source, message));
-        public void Warning(string source, string message) => Entries.Add((LogLevel.Warning, source, message));
-        public void Error(string source, string message) => Entries.Add((LogLevel.Error, source, message));
-        public void Log(LogLevel level, string source, string message) => Entries.Add((level, source, message));
+        private void Add(LogLevel level, string source, string message)
+        {
+            // Log.Instance é global e classes xUnit rodam em paralelo: ignora
+            // entradas de threads de fundo para as asserções serem determinísticas.
+            if (Environment.CurrentManagedThreadId != _threadId) return;
+            lock (_gate)
+            {
+                Entries.Add((level, source, message));
+            }
+        }
+
+        public void Debug(string source, string message) => Add(LogLevel.Debug, source, message);
+        public void Info(string source, string message) => Add(LogLevel.Info, source, message);
+        public void Warning(string source, string message) => Add(LogLevel.Warning, source, message);
+        public void Error(string source, string message) => Add(LogLevel.Error, source, message);
+        public void Log(LogLevel level, string source, string message) => Add(level, source, message);
     }
 
     private static ILogger InstallLogger(RecordingLogger logger)

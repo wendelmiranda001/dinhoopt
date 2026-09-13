@@ -238,15 +238,15 @@ internal partial class FfmpegEncoder
         {
             if (_rawLen < 32) return;
 
-            _ivfTimebaseDen = BitConverter.ToUInt32(_rawBuf, 16);
-            _ivfTimebaseNum = BitConverter.ToUInt32(_rawBuf, 20);
+            _ivfTimebaseDen = BitConverter.ToUInt32(_rawBuf!, 16);
+            _ivfTimebaseNum = BitConverter.ToUInt32(_rawBuf!, 20);
             if (_ivfTimebaseDen == 0) _ivfTimebaseDen = (uint)_frameRate;
             if (_ivfTimebaseNum == 0) _ivfTimebaseNum = 1;
 
             _ivfHeaderParsed = true;
             int tail = _rawLen - 32;
             if (tail > 0)
-                System.Buffer.BlockCopy(_rawBuf, 32, _rawBuf, 0, tail);
+                System.Buffer.BlockCopy(_rawBuf!, 32, _rawBuf!, 0, tail);
             _rawLen = tail;
 
             Log.I("FfmpegEncoder", $"IVF header parsed: tb={_ivfTimebaseNum}/{_ivfTimebaseDen} rawFmt={_codec}");
@@ -254,8 +254,8 @@ internal partial class FfmpegEncoder
 
         while (_rawLen >= 12)
         {
-            int frameSize = BitConverter.ToInt32(_rawBuf, 0);
-            long ptsIvf = BitConverter.ToInt64(_rawBuf, 4);
+            int frameSize = BitConverter.ToInt32(_rawBuf!, 0);
+            long ptsIvf = BitConverter.ToInt64(_rawBuf!, 4);
             int totalFrame = 12 + frameSize;
 
             if (_rawLen < totalFrame) break;
@@ -264,7 +264,7 @@ internal partial class FfmpegEncoder
             long durTicks = _ivfTimebaseNum * 10_000_000L / _ivfTimebaseDen;
 
             byte[] data = VideoPacketPool.Rent(frameSize);
-            System.Buffer.BlockCopy(_rawBuf, 12, data, 0, frameSize);
+            System.Buffer.BlockCopy(_rawBuf!, 12, data, 0, frameSize);
 
             // M2: detecta keyframe no payload AV1 (IVF). O payload é uma sequência
             // de OBUs; keyframes são precedidos por um OBU SEQUENCE_HEADER (type 1).
@@ -284,7 +284,7 @@ internal partial class FfmpegEncoder
 
             int remaining = _rawLen - totalFrame;
             if (remaining > 0)
-                System.Buffer.BlockCopy(_rawBuf, totalFrame, _rawBuf, 0, remaining);
+                System.Buffer.BlockCopy(_rawBuf!, totalFrame, _rawBuf!, 0, remaining);
             _rawLen = remaining;
         }
     }

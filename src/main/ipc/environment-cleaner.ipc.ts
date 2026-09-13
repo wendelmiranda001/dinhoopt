@@ -107,7 +107,7 @@ interface EnvEntry {
 
 // ── Windows: read environment variables from the registry ──
 
-async function readWinRegistryEnv(scope: 'user' | 'system'): Promise<Map<string, string>> {
+async function readWinRegistryEnv(scope: 'user' | 'system', strict = false): Promise<Map<string, string>> {
   const key =
     scope === 'user' ? 'HKCU\\Environment' : 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment'
 
@@ -127,6 +127,7 @@ async function readWinRegistryEnv(scope: 'user' | 'system'): Promise<Map<string,
   } catch (err) {
     getLogger().warning('environment-cleaner', `Failed to read registry env var for scope '${scope}': ${String(err)}`)
     // Scope not accessible (e.g. HKLM without admin)
+    if (strict) throw err
   }
   return vars
 }
@@ -194,7 +195,7 @@ async function removeWindowsPathEntry(entry: EnvEntry): Promise<void> {
       : 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment'
 
   // Re-read current PATH to avoid stale data
-  const vars = await readWinRegistryEnv(entry.scope)
+  const vars = await readWinRegistryEnv(entry.scope, true)
   const currentPath = vars.get('Path') || vars.get('PATH') || vars.get('path') || ''
   const sep = ';'
   const entries = (currentPath.match(/(?:[^";]|"[^"]*")+/g) ?? []).map((e) => e.trim()).filter(Boolean)
@@ -225,7 +226,7 @@ async function removeWindowsEnvVar(entry: EnvEntry): Promise<void> {
       ? 'HKCU\\Environment'
       : 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment'
 
-  const vars = await readWinRegistryEnv(entry.scope)
+  const vars = await readWinRegistryEnv(entry.scope, true)
   if (!vars.get(entry.variable)) return
 
   await execNativeUtf8('reg', ['delete', key, '/v', entry.variable, '/f'], { timeout: 10000 })

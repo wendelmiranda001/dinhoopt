@@ -349,7 +349,7 @@ public sealed class DiskSpillBuffer : IDisposable
                     lastSeg = entry.Segment;
                 }
 
-                segStream.Seek(entry.Offset, SeekOrigin.Begin);
+                segStream!.Seek(entry.Offset, SeekOrigin.Begin);
                 var buf = entry.Type == MediaType.Video
                     ? VideoPacketPool.Rent(entry.Length)
                     : new byte[entry.Length];
