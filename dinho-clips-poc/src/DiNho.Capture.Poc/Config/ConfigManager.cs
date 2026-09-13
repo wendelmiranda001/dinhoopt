@@ -40,6 +40,11 @@ public sealed class AppConfig
     // "hybrid" = RAM com cap de 2 min fixo + excedente vai pro disco (spill vídeo-only).
     public string ReplayBufferMode { get; set; } = "hybrid";
 
+    // Item 2: fallback p/ Hybrid (sem textura = fundo branco e manchas) é EXPLÍCITO.
+    // Default false → se AllowHybridFallback==false e nenhuma textura funcionar,
+    // a captura FALHA com erro claro (nunca regressa silenciosamente pra Hybrid).
+    public bool AllowHybridFallback { get; set; } = false;
+
     // Post-clip buffer: continua gravando N segundos após o save trigger
     // para garantir que o momento não seja cortado (ex: Medal/ShadowPlay)
     public int PostClipDurationSeconds { get; set; } = 5;
