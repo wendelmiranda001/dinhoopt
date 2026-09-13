@@ -60,6 +60,11 @@ internal static class FfmpegPathResolver
                 if (p != null)
                 {
                     var exited = p.WaitForExit(2000);
+                    if (!exited)
+                    {
+                        try { p.Kill(entireProcessTree: true); } catch { }
+                        exited = p.WaitForExit(2000);
+                    }
                     if (exited)
                     {
                         var outLen = p.StandardOutput.ReadToEnd().Length;
@@ -362,7 +367,11 @@ public sealed class EncoderManager : IDisposable
                 }
             });
 
-            process.WaitForExit(10000);
+            if (!process.WaitForExit(10000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { }
+                process.WaitForExit(3000);
+            }
             Task.WaitAll(new[] { stdoutTask, stderrTask }, 5000);
 
             outputBytes = stdoutTask.Result;
@@ -504,7 +513,11 @@ public sealed class EncoderManager : IDisposable
             });
             var stderrTask = Task.Run(() => { while (process.StandardError.ReadLine() != null) { } });
 
-            process.WaitForExit(15000);
+            if (!process.WaitForExit(15000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { }
+                process.WaitForExit(3000);
+            }
             Task.WaitAll(new[] { drainTask, stderrTask }, 5000);
             sw.Stop();
 
@@ -582,8 +595,13 @@ public sealed class EncoderManager : IDisposable
                 }
             };
             process.Start();
-            var output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit(3000);
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            if (!process.WaitForExit(3000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { }
+                process.WaitForExit(2000);
+            }
+            var output = outputTask.Result;
 
             if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(output))
             {
@@ -799,7 +817,11 @@ public sealed class EncoderManager : IDisposable
             // (4KB) antes de sair — ler um pipe até EOF antes do outro dá deadlock.
             var encOutTask = proc.StandardOutput.ReadToEndAsync();
             var encErrTask = proc.StandardError.ReadToEndAsync();
-            proc.WaitForExit(2000);
+            if (!proc.WaitForExit(2000))
+            {
+                try { proc.Kill(entireProcessTree: true); } catch { }
+                proc.WaitForExit(2000);
+            }
             _ = encOutTask.Result;
             _ = encErrTask.Result;
             return proc.ExitCode == 0;
@@ -819,7 +841,11 @@ public sealed class EncoderManager : IDisposable
             // Leitura concorrente (ver CheckFfmpegAvailable) — evita deadlock de pipe.
             var outTask = p.StandardOutput.ReadToEndAsync();
             var errTask = p.StandardError.ReadToEndAsync();
-            p.WaitForExit(2000);
+            if (!p.WaitForExit(2000))
+            {
+                try { p.Kill(entireProcessTree: true); } catch { }
+                p.WaitForExit(2000);
+            }
             var o = outTask.Result;
             _ = errTask.Result;
             return o.Contains(enc, StringComparison.OrdinalIgnoreCase);

@@ -86,6 +86,7 @@ public sealed partial class EngineCoordinator
 
         // 2) WGC desktop (full monitor via DWM) — funciona para qualquer janela
         //    No multi-monitor, captura o monitor onde o jogo está
+        WgcCaptureSource? wgcDesktop = null;
         try
         {
             var gameMonitor = gameHwnd != IntPtr.Zero
@@ -94,20 +95,21 @@ public sealed partial class EngineCoordinator
 
             _wgcPump ??= new WindowsMessagePump();
 
-            var wgc = new WgcCaptureSource();
+            wgcDesktop = new WgcCaptureSource();
             _wgcPump.Invoke(() =>
             {
-                wgc.Initialize(_sharedDevice, IntPtr.Zero, gameMonitor);
-                wgc.SetCaptureFrameRate(_config.Config.Fps);
-                wgc.StartFramePump();
+                wgcDesktop.Initialize(_sharedDevice, IntPtr.Zero, gameMonitor);
+                wgcDesktop.SetCaptureFrameRate(_config.Config.Fps);
+                wgcDesktop.StartFramePump();
             });
-            _capture = wgc;
+            _capture = wgcDesktop;
             _status.Update(s => s.CaptureBackend = "WGC");
             Log.I("EngineCoordinator", "Captura: Windows Graphics Capture (desktop)");
             goto multiMonitor;
         }
         catch (Exception wgcEx)
         {
+            wgcDesktop?.Dispose();
             var innerMsg = wgcEx.InnerException != null ? $" → {wgcEx.InnerException.GetType().Name}: {wgcEx.InnerException.Message}" : "";
             Log.E("EngineCoordinator", $"WGC desktop falhou: {wgcEx.GetType().Name}: {wgcEx.Message}{innerMsg}");
         }

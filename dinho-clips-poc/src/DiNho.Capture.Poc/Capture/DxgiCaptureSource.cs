@@ -79,84 +79,95 @@ public sealed class DxgiCaptureSource : ICaptureSource
 
         for (uint i = 0; adapter.EnumOutputs(i, out var output).Success; i++)
         {
-            IDXGIOutput1? output1 = null;
-            try
+            using (output)
             {
-                // Tentar IDXGIOutput5.DuplicateOutput1() primeiro (Win10 1703+)
-                // Suporta formatos modernos (BGRA1010102, RGBA16Float)
-                var output5 = output.QueryInterface<IDXGIOutput5>();
-                if (output5 != null)
+                IDXGIOutput1? output1 = null;
+                try
                 {
-                    try
+                    // Tentar IDXGIOutput5.DuplicateOutput1() primeiro (Win10 1703+)
+                    // Suporta formatos modernos (BGRA1010102, RGBA16Float)
+                    var output5 = output.QueryInterface<IDXGIOutput5>();
+                    if (output5 != null)
                     {
-                        var formats = new[] { Format.B8G8R8A8_UNorm };
-                        var duplication = output5.DuplicateOutput1(_device, formats);
-                        var desc = output5.Description;
-                        var outputBounds = desc.DesktopCoordinates;
-                        var outputMidX = (outputBounds.Left + outputBounds.Right) / 2;
-                        var outputMidY = (outputBounds.Top + outputBounds.Bottom) / 2;
-                        var outputMonitor = MonitorHelper.MonitorFromPoint(outputMidX, outputMidY);
+                        try
+                        {
+                            var formats = new[] { Format.B8G8R8A8_UNorm };
+                            var duplication = output5.DuplicateOutput1(_device, formats);
+                            var desc = output5.Description;
+                            var outputBounds = desc.DesktopCoordinates;
+                            var outputMidX = (outputBounds.Left + outputBounds.Right) / 2;
+                            var outputMidY = (outputBounds.Top + outputBounds.Bottom) / 2;
+                            var outputMonitor = MonitorHelper.MonitorFromPoint(outputMidX, outputMidY);
 
-                        if (outputMonitor == monitorHwnd)
-                        {
-                            selectedDesc = desc;
-                            _duplication = duplication;
-                            _outputWidth = selectedDesc.DesktopCoordinates.Right - selectedDesc.DesktopCoordinates.Left;
-                            _outputHeight = selectedDesc.DesktopCoordinates.Bottom - selectedDesc.DesktopCoordinates.Top;
-                            _texturePool = new TexturePool(_device, poolSize: 3);
-                            return;
-                        }
+                            if (outputMonitor == monitorHwnd)
+                            {
+                                selectedOutput?.Dispose();
+                                selectedOutput = null;
+                                _duplication?.Dispose();
+                                selectedDesc = desc;
+                                _duplication = duplication;
+                                _outputWidth = selectedDesc.DesktopCoordinates.Right - selectedDesc.DesktopCoordinates.Left;
+                                _outputHeight = selectedDesc.DesktopCoordinates.Bottom - selectedDesc.DesktopCoordinates.Top;
+                                _texturePool = new TexturePool(_device, poolSize: 3);
+                                output5.Dispose();
+                                return;
+                            }
 
-                        if (selectedOutput is null)
-                        {
-                            selectedOutput = output5;
-                            selectedDesc = desc;
-                            _duplication = duplication;
+                            if (selectedOutput is null)
+                            {
+                                selectedOutput = output5;
+                                selectedDesc = desc;
+                                _duplication = duplication;
+                            }
+                            else
+                            {
+                                duplication.Dispose();
+                                output5.Dispose();
+                            }
+                            continue;
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            duplication.Dispose();
-                            output5.Dispose();
+                            Log.D("DxgiCaptureSource", $"DuplicateOutput1 not supported on output {i}: {ex.Message}");
                         }
-                        continue;
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.D("DxgiCaptureSource", $"DuplicateOutput1 not supported on output {i}: {ex.Message}");
+                        output5.Dispose();
                     }
                 }
-            }
-            catch (Exception ex) { Log.D("DxgiCaptureSource", $"IDXGIOutput5 QI failed on output {i}: {ex.Message}"); }
+                catch (Exception ex) { Log.D("DxgiCaptureSource", $"IDXGIOutput5 QI failed on output {i}: {ex.Message}"); }
 
-            // Fallback: IDXGIOutput1.DuplicateOutput() (Win8+)
-            output1 = output.QueryInterface<IDXGIOutput1>();
-            var desc1 = output1.Description;
+                // Fallback: IDXGIOutput1.DuplicateOutput() (Win8+)
+                output1 = output.QueryInterface<IDXGIOutput1>();
+                var desc1 = output1.Description;
 
-            var outputBounds1 = desc1.DesktopCoordinates;
-            var outputMidX1 = (outputBounds1.Left + outputBounds1.Right) / 2;
-            var outputMidY1 = (outputBounds1.Top + outputBounds1.Bottom) / 2;
-            var outputMonitor1 = MonitorHelper.MonitorFromPoint(outputMidX1, outputMidY1);
+                var outputBounds1 = desc1.DesktopCoordinates;
+                var outputMidX1 = (outputBounds1.Left + outputBounds1.Right) / 2;
+                var outputMidY1 = (outputBounds1.Top + outputBounds1.Bottom) / 2;
+                var outputMonitor1 = MonitorHelper.MonitorFromPoint(outputMidX1, outputMidY1);
 
-            if (outputMonitor1 == monitorHwnd)
-            {
-                selectedDesc = desc1;
-                _duplication = output1.DuplicateOutput(_device);
-                _outputWidth = selectedDesc.DesktopCoordinates.Right - selectedDesc.DesktopCoordinates.Left;
-                _outputHeight = selectedDesc.DesktopCoordinates.Bottom - selectedDesc.DesktopCoordinates.Top;
-                output1.Dispose();
-                _texturePool = new TexturePool(_device, poolSize: 3);
-                return;
-            }
+                if (outputMonitor1 == monitorHwnd)
+                {
+                    selectedOutput?.Dispose();
+                    selectedOutput = null;
+                    _duplication?.Dispose();
+                    selectedDesc = desc1;
+                    _duplication = output1.DuplicateOutput(_device);
+                    _outputWidth = selectedDesc.DesktopCoordinates.Right - selectedDesc.DesktopCoordinates.Left;
+                    _outputHeight = selectedDesc.DesktopCoordinates.Bottom - selectedDesc.DesktopCoordinates.Top;
+                    output1.Dispose();
+                    _texturePool = new TexturePool(_device, poolSize: 3);
+                    return;
+                }
 
-            // Fallback: first output if no match
-            if (selectedOutput is null)
-            {
-                selectedOutput = output1;
-                selectedDesc = desc1;
-            }
-            else
-            {
-                output1.Dispose();
+                // Fallback: first output if no match
+                if (selectedOutput is null)
+                {
+                    selectedOutput = output1;
+                    selectedDesc = desc1;
+                }
+                else
+                {
+                    output1.Dispose();
+                }
             }
         }
 

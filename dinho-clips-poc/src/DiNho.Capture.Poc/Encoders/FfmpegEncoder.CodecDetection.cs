@@ -131,7 +131,11 @@ internal partial class FfmpegEncoder
             // Leitura concorrente — evita deadlock de pipe (-encoders enche o stdout).
             var outTask = p.StandardOutput.ReadToEndAsync();
             var errTask = p.StandardError.ReadToEndAsync();
-            p.WaitForExit(2000);
+            if (!p.WaitForExit(2000))
+            {
+                try { p.Kill(entireProcessTree: true); } catch { }
+                p.WaitForExit(2000);
+            }
             var o = outTask.Result;
             _ = errTask.Result;
             return o.Contains(enc, StringComparison.OrdinalIgnoreCase);

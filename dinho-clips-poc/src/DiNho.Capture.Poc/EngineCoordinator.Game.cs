@@ -223,20 +223,26 @@ public sealed partial class EngineCoordinator
             // 2) Fuzzy match: strip build-number segments (e.g. _b3258_) then compare
             //    "FiveM_b3258_GTAProcess" → "FiveM_GTAProcess" after normalization
             var normalizedBase = System.Text.RegularExpressions.Regex.Replace(baseName, @"_b\d+_", "_", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            foreach (var proc in System.Diagnostics.Process.GetProcesses())
+            var allProcesses = System.Diagnostics.Process.GetProcesses();
+            try
             {
-                try
+                foreach (var proc in allProcesses)
                 {
-                    var normalizedProc = System.Text.RegularExpressions.Regex.Replace(proc.ProcessName, @"_b\d+_", "_", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                    if (normalizedProc.Contains(normalizedBase, StringComparison.OrdinalIgnoreCase))
+                    try
                     {
-                        var info = BuildGameInfoFromProcess(proc);
-                        proc.Dispose();
-                        return info;
+                        var normalizedProc = System.Text.RegularExpressions.Regex.Replace(proc.ProcessName, @"_b\d+_", "_", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        if (normalizedProc.Contains(normalizedBase, StringComparison.OrdinalIgnoreCase))
+                        {
+                            var info = BuildGameInfoFromProcess(proc);
+                            return info;
+                        }
                     }
-                    proc.Dispose();
+                    catch (Exception ex) { Log.D("EngineCoordinator", $"ResolveProcessByName: error inspecting process '{proc.ProcessName}': {ex.Message}"); }
                 }
-                    catch (Exception ex) { Log.D("EngineCoordinator", $"ResolveProcessByName: error inspecting process '{proc.ProcessName}': {ex.Message}"); try { proc.Dispose(); } catch { /* dispose failure is non-critical */ } }
+            }
+            finally
+            {
+                foreach (var proc in allProcesses) proc.Dispose();
             }
         }
         catch (Exception ex) { Log.D("EngineCoordinator", $"ResolveProcessByName failed for '{processName}': {ex.Message}"); }

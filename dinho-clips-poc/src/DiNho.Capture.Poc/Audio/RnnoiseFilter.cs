@@ -169,6 +169,7 @@ public sealed class RnnoiseFilter : IDisposable
         if (_disposed) return;
         _disposed = true;
         _cts.Cancel();
+        _cts.Dispose();
 
         try { _stdin?.Dispose(); } catch (Exception ex) { Log.D("RnnoiseFilter", $"stdin dispose error: {ex.Message}"); }
 

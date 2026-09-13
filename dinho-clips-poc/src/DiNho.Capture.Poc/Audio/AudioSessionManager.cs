@@ -18,7 +18,14 @@ public sealed class AudioSessionManager : IDisposable
     public AudioSessionManager()
     {
         var enumerator = new MMDeviceEnumerator();
-        _device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+        try
+        {
+            _device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+        }
+        finally
+        {
+            enumerator.Dispose();
+        }
     }
 
     public List<AudioSessionInfo> EnumerateSessions()
@@ -35,7 +42,7 @@ public sealed class AudioSessionManager : IDisposable
                 if (pid == 0) continue;
 
                 string name;
-                try { name = System.Diagnostics.Process.GetProcessById(pid).ProcessName; }
+                try { using var proc = System.Diagnostics.Process.GetProcessById(pid); name = proc.ProcessName; }
                 catch { name = $"pid:{pid}"; }
 
                 var info = new AudioSessionInfo
@@ -47,6 +54,7 @@ public sealed class AudioSessionManager : IDisposable
                 list.Add(info);
             }
             catch { }
+            finally { session.Dispose(); }
         }
 
         list.Sort((a, b) => string.Compare(a.ProcessName, b.ProcessName, StringComparison.OrdinalIgnoreCase));

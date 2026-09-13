@@ -148,6 +148,7 @@ public sealed class WgcCaptureSource : ICaptureSource
             }
             if (item is null)
                 throw new InvalidOperationException("WGC CreateForWindow: TryCreateFromWindowId retornou null.");
+            DisposeCaptureItem();
             _captureItem = item;
         }
         else
@@ -166,6 +167,7 @@ public sealed class WgcCaptureSource : ICaptureSource
             }
             if (item is null)
                 throw new InvalidOperationException("WGC CreateForMonitor retornou null — WGC pode não estar disponível.");
+            DisposeCaptureItem();
             _captureItem = item;
             _disposition = TryGetItemDisposition(item);
         }
@@ -699,6 +701,13 @@ public sealed class WgcCaptureSource : ICaptureSource
         }
     }
 
+    private void DisposeCaptureItem()
+    {
+        if (_captureItem is not IWinRTObject winrtObj) return;
+        (winrtObj.NativeObject as IDisposable)?.Dispose();
+        _captureItem = null;
+    }
+
     public void Dispose()
     {
         _disposed = true;
@@ -713,6 +722,7 @@ public sealed class WgcCaptureSource : ICaptureSource
         // 3. Now safe to dispose signal (no more callbacks possible)
         _frameSignal.Dispose();
         _latestFrame?.Dispose();
+        DisposeCaptureItem();
         _texturePool?.Dispose();
         _winrtDevice?.Dispose();
         if (_ownsDevice) _device?.Dispose();

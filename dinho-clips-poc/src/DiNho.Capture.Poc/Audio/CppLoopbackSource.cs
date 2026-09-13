@@ -71,19 +71,29 @@ public sealed class CppLoopbackSource : IAudioSource
             throw;
         }
 
-        _captureThread = new Thread(CaptureThreadProc)
+        try
         {
-            Name = $"CppLoopback-{_processId}",
-            IsBackground = true
-        };
-        _captureThread.Start();
+            _captureThread = new Thread(CaptureThreadProc)
+            {
+                Name = $"CppLoopback-{_processId}",
+                IsBackground = true
+            };
+            _captureThread.Start();
 
-        _pumpThread = new Thread(PumpThreadProc)
+            _pumpThread = new Thread(PumpThreadProc)
+            {
+                Name = $"CppLoopbackPump-{_processId}",
+                IsBackground = true
+            };
+            _pumpThread.Start();
+        }
+        catch
         {
-            Name = $"CppLoopbackPump-{_processId}",
-            IsBackground = true
-        };
-        _pumpThread.Start();
+            _running = false;
+            if (_callbackHandle.IsAllocated)
+                _callbackHandle.Free();
+            throw;
+        }
 
         Log.I("CppLoopbackSource", $"PID={_processId} includeTree={_includeTree} — thread iniciada");
     }

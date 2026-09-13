@@ -488,7 +488,7 @@ public sealed class GameDetector : IDisposable
         string executablePath = "";
         try
         {
-            var proc = Process.GetProcessById((int)pid);
+            using var proc = Process.GetProcessById((int)pid);
             processName = proc.ProcessName;
             executablePath = proc.MainModule?.FileName ?? "";
         }
