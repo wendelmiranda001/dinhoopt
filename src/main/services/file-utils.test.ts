@@ -9,6 +9,7 @@ vi.mock('fs/promises', () => {
     readdir: vi.fn(),
     open: vi.fn(),
     writeFile: vi.fn(),
+    rename: vi.fn(),
   }
 })
 
@@ -28,6 +29,17 @@ vi.mock('crypto', () => ({
     return buf
   },
 }))
+
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warning: vi.fn(),
+  error: vi.fn(),
+}))
+
+vi.mock('./logger.service', () => ({
+  getLogger: () => mockLogger,
+}))
+
 let mockSettings: any
 
 vi.mock('./settings-store', () => ({
@@ -38,8 +50,8 @@ vi.mock('./scan-cache', () => ({
   getCachedItems: vi.fn(),
 }))
 
-import { existsSync, constants as fsConstants, renameSync } from 'node:fs'
-import { open, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { existsSync, constants as fsConstants } from 'node:fs'
+import { open, readdir, rename, rm, stat } from 'node:fs/promises'
 
 import { CleanerType } from '../../shared/enums'
 import {
@@ -63,8 +75,7 @@ const mockedStat = vi.mocked(stat)
 const mockedReaddir = vi.mocked(readdir)
 const mockedOpen = vi.mocked(open)
 const mockedExistsSync = vi.mocked(existsSync)
-const mockedRenameSync = vi.mocked(renameSync)
-const mockedWriteFile = vi.mocked(writeFile)
+const mockedRename = vi.mocked(rename)
 const mockedGetSettings = vi.mocked(getSettings)
 const mockedGetCachedItems = vi.mocked(getCachedItems)
 
@@ -158,32 +169,68 @@ describe('isExcluded', () => {
 // overwriteFile
 // ─────────────────────────────────────────────
 describe('overwriteFile', () => {
-  it('writes content to tmp file then renames atomically', async () => {
+  function mockTmpFd() {
+    return {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      sync: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    }
+  }
+
+  it('writes to a unique tmp file, fsyncs, then renames atomically', async () => {
+    const fd = mockTmpFd()
+    mockedOpen.mockResolvedValue(fd as any)
+    mockedRename.mockResolvedValue(undefined)
+
     await overwriteFile('C:\\data\\config.json', '{"key":"value"}')
 
-    expect(mockedWriteFile).toHaveBeenCalledWith('C:\\data\\config.json.tmp', '{"key":"value"}', 'utf-8')
-    expect(mockedRenameSync).toHaveBeenCalledWith('C:\\data\\config.json.tmp', 'C:\\data\\config.json')
+    const tmpPath = mockedOpen.mock.calls[0]![0] as string
+    expect(tmpPath).toMatch(/^C:\\data\\config\.json\.\d+\.\d+\.tmp$/)
+    expect(mockedOpen).toHaveBeenCalledWith(tmpPath, 'w')
+    expect(fd.writeFile).toHaveBeenCalledWith('{"key":"value"}')
+    expect(fd.sync).toHaveBeenCalled()
+    expect(mockedRename).toHaveBeenCalledWith(tmpPath, 'C:\\data\\config.json')
   })
 
   it('supports Buffer content', async () => {
+    const fd = mockTmpFd()
+    mockedOpen.mockResolvedValue(fd as any)
+    mockedRename.mockResolvedValue(undefined)
     const buf = Buffer.from('binary data')
+
     await overwriteFile('C:\\data\\file.bin', buf)
 
-    expect(mockedWriteFile).toHaveBeenCalledWith('C:\\data\\file.bin.tmp', buf, 'utf-8')
-    expect(mockedRenameSync).toHaveBeenCalledWith('C:\\data\\file.bin.tmp', 'C:\\data\\file.bin')
+    expect(fd.writeFile).toHaveBeenCalledWith(buf)
+    expect(fd.close).toHaveBeenCalled()
   })
 
-  it('propagates writeFile errors', async () => {
-    mockedWriteFile.mockRejectedValueOnce(new Error('disk full'))
+  it('generates a different tmp name per invocation (no collisions)', async () => {
+    const fd = mockTmpFd()
+    mockedOpen.mockResolvedValue(fd as any)
+    mockedRename.mockResolvedValue(undefined)
+
+    await overwriteFile('C:\\data\\config.json', 'a')
+    await overwriteFile('C:\\data\\config.json', 'b')
+
+    const first = mockedOpen.mock.calls[0]![0] as string
+    const second = mockedOpen.mock.calls[1]![0] as string
+    expect(first).not.toBe(second)
+  })
+
+  it('closes the handle and does not rename when writing fails', async () => {
+    const fd = mockTmpFd()
+    fd.writeFile.mockRejectedValueOnce(new Error('disk full'))
+    mockedOpen.mockResolvedValue(fd as any)
 
     await expect(overwriteFile('C:\\data\\config.json', 'data')).rejects.toThrow('disk full')
-    expect(mockedRenameSync).not.toHaveBeenCalled()
+    expect(fd.close).toHaveBeenCalled()
+    expect(mockedRename).not.toHaveBeenCalled()
   })
 
-  it('propagates renameSync errors', async () => {
-    mockedRenameSync.mockImplementationOnce(() => {
-      throw new Error('access denied')
-    })
+  it('propagates rename errors', async () => {
+    const fd = mockTmpFd()
+    mockedOpen.mockResolvedValue(fd as any)
+    mockedRename.mockRejectedValueOnce(new Error('access denied'))
 
     await expect(overwriteFile('C:\\data\\config.json', 'data')).rejects.toThrow('access denied')
   })
@@ -193,20 +240,40 @@ describe('overwriteFile', () => {
 // safeDelete
 // ─────────────────────────────────────────────
 describe('safeDelete', () => {
-  it('deletes a file successfully', async () => {
+  it('deletes a file successfully (without the recursive flag)', async () => {
+    mockedStat.mockResolvedValue(mockFileStats(1024))
     mockedRm.mockResolvedValue(undefined)
     const result = await safeDelete('C:\\temp\\file.tmp')
     expect(result).toEqual({ path: 'C:\\temp\\file.tmp', success: true })
-    expect(mockedRm).toHaveBeenCalledWith('C:\\temp\\file.tmp', { force: true, recursive: true })
+    expect(mockedRm).toHaveBeenCalledWith('C:\\temp\\file.tmp', { force: true, recursive: false })
+  })
+
+  it('keeps recursive removal only when the target is a directory', async () => {
+    mockedStat.mockResolvedValue(mockDirStats())
+    mockedRm.mockResolvedValue(undefined)
+
+    const result = await safeDelete('C:\\cache\\app')
+    expect(result.success).toBe(true)
+    expect(mockedRm).toHaveBeenCalledWith('C:\\cache\\app', { force: true, recursive: true })
+  })
+
+  it('still deletes when the path cannot be statted', async () => {
+    mockedStat.mockRejectedValue(new Error('ENOENT'))
+    mockedRm.mockResolvedValue(undefined)
+
+    const result = await safeDelete('C:\\temp\\gone.tmp')
+    expect(result.success).toBe(true)
+    expect(mockedRm).toHaveBeenCalledWith('C:\\temp\\gone.tmp', { force: true, recursive: false })
   })
 
   it('calls secureOverwrite when secureDelete is enabled', async () => {
     mockSettings.cleaner.secureDelete = true
     mockedStat.mockResolvedValue(mockFileStats(1024))
     const mockFd = {
-      write: vi.fn(),
-      datasync: vi.fn(),
-      close: vi.fn(),
+      write: vi.fn().mockResolvedValue(undefined),
+      datasync: vi.fn().mockResolvedValue(undefined),
+      stat: vi.fn().mockResolvedValue({ size: 1024 }),
+      close: vi.fn().mockResolvedValue(undefined),
     }
     mockedOpen.mockResolvedValue(mockFd as any)
     mockedRm.mockResolvedValue(undefined)
@@ -219,13 +286,32 @@ describe('safeDelete', () => {
     expect(mockFd.close).toHaveBeenCalled()
   })
 
-  it('still deletes if secureOverwrite fails', async () => {
+  it('still deletes if secureOverwrite fails, but logs a warning', async () => {
     mockSettings.cleaner.secureDelete = true
     mockedStat.mockRejectedValue(new Error('permission'))
     mockedRm.mockResolvedValue(undefined)
 
     const result = await safeDelete('C:\\temp\\file.tmp')
     expect(result.success).toBe(true)
+    expect(mockLogger.warning).toHaveBeenCalledWith('file-utils', expect.stringContaining('Secure overwrite failed'))
+  })
+
+  it('re-stats the open file handle before overwriting (size after open)', async () => {
+    mockSettings.cleaner.secureDelete = true
+    mockedStat.mockResolvedValue(mockFileStats(100))
+    const mockFd = {
+      write: vi.fn().mockResolvedValue(undefined),
+      datasync: vi.fn().mockResolvedValue(undefined),
+      stat: vi.fn().mockResolvedValue({ size: 300 }),
+      close: vi.fn().mockResolvedValue(undefined),
+    }
+    mockedOpen.mockResolvedValue(mockFd as any)
+    mockedRm.mockResolvedValue(undefined)
+
+    await safeDelete('C:\\temp\\file.tmp')
+
+    expect(mockFd.stat).toHaveBeenCalled()
+    expect(mockFd.write).toHaveBeenCalledWith(expect.any(Buffer), 0, 300, 0)
   })
 
   it('returns in-use for EBUSY error', async () => {
@@ -301,6 +387,12 @@ describe('cleanItems', () => {
     mockedGetCachedItems.mockReturnValue([])
     await cleanItems([1, 'valid'] as any)
     expect(mockedGetCachedItems).toHaveBeenCalledWith(['valid'])
+  })
+
+  it('logs an info when non-string IDs are discarded', async () => {
+    mockedGetCachedItems.mockReturnValue([])
+    await cleanItems([1, 2, 'valid'] as any)
+    expect(mockLogger.info).toHaveBeenCalledWith('file-utils', expect.stringContaining('2'))
   })
 
   it('handles non-array input', async () => {
@@ -444,6 +536,13 @@ describe('scanDirectory', () => {
     expect(result.totalSize).toBe(0)
   })
 
+  it('logs a warning when the root directory cannot be read', async () => {
+    mockedReaddir.mockRejectedValue(new Error('no such dir'))
+
+    await scanDirectory('C:\\gone', CleanerType.System, 'temp')
+    expect(mockLogger.warning).toHaveBeenCalledWith('file-utils', expect.stringContaining('C:\\gone'))
+  })
+
   it('respects skipRecentMinutes cutoff', async () => {
     mockedReaddir.mockResolvedValue([mockDirEntry('recent.txt', false)])
     mockedStat.mockResolvedValue(mockFileStats(50, Date.now()))
@@ -459,6 +558,23 @@ describe('scanDirectory', () => {
 
     const result = await scanDirectory('C:\\bulk', CleanerType.System, 'bulk')
     expect(result.items).toHaveLength(5000)
+  })
+
+  it('logs a warning when the MAX_ITEMS cap truncates the scan', async () => {
+    const entries = Array.from({ length: 6000 }, (_, i) => mockDirEntry(`f${i}.txt`, false))
+    mockedReaddir.mockResolvedValue(entries)
+    mockedStat.mockResolvedValue(mockFileStats(10, OLD))
+
+    await scanDirectory('C:\\bulk', CleanerType.System, 'bulk')
+    expect(mockLogger.warning).toHaveBeenCalledWith('file-utils', expect.stringContaining('5000'))
+  })
+
+  it('logs a debug count when individual entries fail to scan', async () => {
+    mockedReaddir.mockResolvedValue([mockDirEntry('secret.tmp', false)])
+    mockedStat.mockRejectedValue(new Error('access denied'))
+
+    await scanDirectory('C:\\temp', CleanerType.System, 'temp')
+    expect(mockLogger.info).toHaveBeenCalledWith('file-utils', expect.stringContaining('1'))
   })
 
   it('sizes symlinks via lstat (does not follow into the target)', async () => {
@@ -617,9 +733,10 @@ describe('secureOverwrite (via safeDelete)', () => {
       .mockResolvedValueOnce(mockDirStats()) // lstat(dir) → isDirectory
       .mockResolvedValueOnce(mockFileStats(50)) // lstat(dir/child.dat)
     const fileFd = {
-      write: vi.fn(),
-      datasync: vi.fn(),
-      close: vi.fn(),
+      write: vi.fn().mockResolvedValue(undefined),
+      datasync: vi.fn().mockResolvedValue(undefined),
+      stat: vi.fn().mockResolvedValue({ size: 50 }),
+      close: vi.fn().mockResolvedValue(undefined),
     }
     mockedOpen.mockResolvedValue(fileFd as any)
     mockedRm.mockResolvedValue(undefined)

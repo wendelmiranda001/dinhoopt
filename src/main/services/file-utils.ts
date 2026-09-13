@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto'
-import { existsSync, constants as fsConstants, renameSync } from 'node:fs'
-import { lstat, open, readdir, rm, writeFile } from 'node:fs/promises'
+import { existsSync, constants as fsConstants } from 'node:fs'
+import { lstat, open, readdir, rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { CleanerType } from '@shared/enums'
 import type { CleanResult, ScanItem, ScanResult } from '@shared/types'
+import { getLogger } from './logger.service'
 import { getCachedItems } from './scan-cache'
 import { getSettings } from './settings-store'
 
@@ -70,7 +71,7 @@ async function secureOverwrite(filePath: string): Promise<void> {
 
   const fh = await open(filePath, fsConstants.O_RDWR | fsConstants.O_NOFOLLOW)
   try {
-    const size = stats.size
+    const { size } = await fh.stat()
     const CHUNK = 1024 * 1024 // 1 MB chunks
 
     // Pass 1: random data
@@ -104,13 +105,21 @@ async function secureOverwrite(filePath: string): Promise<void> {
 
 /**
  * Atomically overwrite a file with new content using a temporary file + rename.
- * Writes content to {filePath}.tmp then renames it over the original.
- * This prevents partial writes and race conditions from concurrent readers.
+ * Writes content to a unique temporary file ({path}.{pid}.{n}.tmp), fsyncs it,
+ * then renames it over the original. The unique name prevents concurrent callers
+ * from colliding on the same temp file, and the fsync guarantees the data reaches
+ * disk before the rename swaps it in place.
  */
 export async function overwriteFile(filePath: string, content: string | Buffer): Promise<void> {
-  const tmpPath = `${filePath}.tmp`
-  await writeFile(tmpPath, content, 'utf-8')
-  renameSync(tmpPath, filePath)
+  const tmpPath = `${filePath}.${process.pid}.${nextItemId()}.tmp`
+  const fh = await open(tmpPath, 'w')
+  try {
+    await fh.writeFile(content)
+    await fh.sync()
+  } finally {
+    await fh.close()
+  }
+  await rename(tmpPath, filePath)
 }
 
 export async function safeDelete(filePath: string): Promise<DeleteResult> {
@@ -119,11 +128,23 @@ export async function safeDelete(filePath: string): Promise<DeleteResult> {
     if (settings.cleaner.secureDelete) {
       try {
         await secureOverwrite(filePath)
-      } catch {
-        // If overwrite fails (e.g. permission), still attempt normal deletion
+      } catch (err) {
+        getLogger().warning('file-utils', `Secure overwrite failed for ${filePath}: ${String(err)}`)
       }
     }
-    await rm(filePath, { force: true, recursive: true })
+
+    // Send the recursive flag only for directories: some callers intentionally
+    // feed directories (e.g. launcher/GPU caches scanned via scanDirectoriesAsItems),
+    // so a blanket `recursive: true` for plain files would be wasteful. lstat keeps
+    // symlinks from being followed into arbitrary targets.
+    let isDirectory = false
+    try {
+      isDirectory = Boolean((await lstat(filePath))?.isDirectory?.())
+    } catch {
+      // Path missing/unreadable — force removal handles it
+    }
+
+    await rm(filePath, { force: true, recursive: isDirectory })
     return { path: filePath, success: true }
   } catch (err: unknown) {
     const nodeErr = err as { code?: string; message?: string }
@@ -149,6 +170,9 @@ export async function cleanItems(
 ): Promise<CleanResult> {
   // Validate input is a string array
   const validIds = Array.isArray(itemIds) ? itemIds.filter((v): v is string => typeof v === 'string') : []
+  if (Array.isArray(itemIds) && itemIds.length > validIds.length) {
+    getLogger().info('file-utils', `Ignored ${itemIds.length - validIds.length} non-string item id(s)`)
+  }
   const items = getCachedItems(validIds)
   let totalCleaned = 0
   let filesDeleted = 0
@@ -189,17 +213,25 @@ export async function scanDirectory(
 ): Promise<ScanResult> {
   const items: ScanItem[] = []
   let totalSize = 0
+  let entryErrors = 0
+  let truncated = false
   const cutoff = Date.now() - skipRecentMinutes * 60 * 1000
   const MAX_ITEMS = 5000
   const exclusions = getSettings().exclusions
 
-  try {
-    const entries = await readdir(dirPath, { withFileTypes: true })
+  const entries = await readdir(dirPath, { withFileTypes: true }).catch((err: unknown) => {
+    getLogger().warning('file-utils', `Could not read directory ${dirPath}: ${String(err)}`)
+    return null
+  })
 
+  if (entries) {
     const CONCURRENCY = 50
 
     async function processEntry(entry: import('fs').Dirent): Promise<void> {
-      if (items.length >= MAX_ITEMS) return
+      if (items.length >= MAX_ITEMS) {
+        truncated = true
+        return
+      }
       const fullPath = join(dirPath, entry.name)
 
       // Check exclusions
@@ -226,6 +258,7 @@ export async function scanDirectory(
         totalSize += item.size
       } catch {
         // Skip inaccessible files
+        entryErrors += 1
       }
     }
 
@@ -233,8 +266,13 @@ export async function scanDirectory(
       const batch = entries.slice(i, i + CONCURRENCY)
       await Promise.all(batch.map(processEntry))
     }
-  } catch {
-    // Directory doesn't exist or is inaccessible
+  }
+
+  if (truncated) {
+    getLogger().warning('file-utils', `Scan of ${dirPath} capped at ${MAX_ITEMS} items`)
+  }
+  if (entryErrors > 0) {
+    getLogger().info('file-utils', `Skipped ${entryErrors} unreadable item(s) in ${dirPath}`)
   }
 
   return {
