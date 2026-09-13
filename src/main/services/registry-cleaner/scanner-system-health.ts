@@ -11,8 +11,8 @@ export async function scanSystemHealth(signal?: AbortSignal): Promise<RegistryEn
     if (signal?.aborted) throw new Error('Operation cancelled')
   }
 
+  checkAborted()
   try {
-    checkAborted()
     const { stdout } = await execReg(['query', 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths', '/s'], {
       timeout: 15000,
       ...(signal ? { signal } : {}),

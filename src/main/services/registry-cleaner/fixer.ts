@@ -56,12 +56,13 @@ export async function fixRegistryEntries(
           await execReg(['delete', key, '/f'], { timeout: 10000, ...(signal ? { signal } : {}) })
           break
         case 'set-value':
-          if (fix.regType && fix.data !== undefined) {
-            await execReg(['add', key, '/v', value, '/t', fix.regType, '/d', fix.data, '/f'], {
-              timeout: 10000,
-              ...(signal ? { signal } : {}),
-            })
+          if (!fix.regType || fix.data === undefined) {
+            throw new Error(`Missing regType or data for set-value on ${value}`)
           }
+          await execReg(['add', key, '/v', value, '/t', fix.regType, '/d', fix.data, '/f'], {
+            timeout: 10000,
+            ...(signal ? { signal } : {}),
+          })
           break
         case 'disable-task': {
           const disableParts = splitTaskPath(entry.keyPath)

@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import type { RegistryEntry } from '@shared/types'
+import { getLogger } from '../logger.service'
 import { execReg } from './utils'
+
+function errorMessage(err: unknown): string {
+  const e = err as { stderr?: string; message?: string }
+  return e?.stderr ? e.stderr.trim().split(/\r?\n/)[0]! : (e?.message ?? 'unknown error')
+}
 
 export async function scanSecurity(signal?: AbortSignal): Promise<RegistryEntry[]> {
   const entries: RegistryEntry[] = []
@@ -94,7 +100,9 @@ export async function scanSecurity(signal?: AbortSignal): Promise<RegistryEntry[
         fix: { op: 'set-value', regType: 'REG_DWORD', data: '255' },
       })
     }
-  } catch {
+  } catch (err: unknown) {
+    if (signal?.aborted) throw new Error('Operation cancelled')
+    getLogger().warning('registry-scanner', `Failed to query AutoRun policy: ${errorMessage(err)}`)
     entries.push({
       id: randomUUID(),
       type: 'vulnerability',

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = {
-  execNativeUtf8: vi.fn(),
+  execTracked: vi.fn(),
   existsSync: vi.fn(),
   randomUUID: vi.fn(),
   expandEnvVars: vi.fn(),
@@ -17,7 +17,9 @@ vi.mock('node:fs', () => ({
 }))
 
 vi.mock('../exec-utf8', () => ({
-  execNativeUtf8: (...a: unknown[]) => mocks.execNativeUtf8(...a),
+  execNativeUtf8: (...a: unknown[]) => mocks.execTracked(...a),
+  execTracked: (...a: unknown[]) => mocks.execTracked(...a),
+  psArgs: (script: string) => ['-NoProfile', '-NonInteractive', '-Command', script],
 }))
 
 vi.mock('./utils', () => ({
@@ -36,7 +38,7 @@ describe('scanScheduledTasks', () => {
 
   describe('first pass — missing executable tasks', () => {
     it('pushes an entry for a task whose exe does not exist', async () => {
-      mocks.execNativeUtf8.mockResolvedValueOnce({
+      mocks.execTracked.mockResolvedValueOnce({
         stdout: JSON.stringify([
           { TaskName: 'BadTask', TaskPath: '\\Root\\', Execute: 'C:\\Program Files\\Gone\\tool.exe --arg' },
         ]),
@@ -53,16 +55,28 @@ describe('scanScheduledTasks', () => {
       expect(entries[0]!.risk).toBe('low')
       expect(entries[0]!.selected).toBe(true)
       expect(entries[0]!.fix).toEqual({ op: 'delete-task' })
-      expect(mocks.execNativeUtf8).toHaveBeenNthCalledWith(
+      expect(mocks.execTracked).toHaveBeenNthCalledWith(
         1,
-        'powershell.exe',
+        'powershell',
         expect.any(Array),
         expect.objectContaining({ timeout: 20000 }),
       )
     })
 
+    it('spawns powershell via execTracked so it bypasses the exec-utf8 tool allowlist', async () => {
+      mocks.execTracked.mockResolvedValueOnce({ stdout: JSON.stringify([]), stderr: '' })
+      mocks.execTracked.mockResolvedValueOnce({ stdout: JSON.stringify([]), stderr: '' })
+      const entries = await scanScheduledTasks()
+      expect(entries).toEqual([])
+      expect(mocks.execTracked).toHaveBeenCalledTimes(2)
+      for (const call of mocks.execTracked.mock.calls) {
+        expect(call[0]).toBe('powershell')
+        expect(call[1]).toContain('-NoProfile')
+      }
+    })
+
     it('skips tasks whose exe exists', async () => {
-      mocks.execNativeUtf8.mockResolvedValueOnce({
+      mocks.execTracked.mockResolvedValueOnce({
         stdout: JSON.stringify([{ TaskName: 'Ok', TaskPath: '\\', Execute: 'C:\\Windows\\System32\\x.exe' }]),
         stderr: '',
       })
@@ -73,7 +87,7 @@ describe('scanScheduledTasks', () => {
     })
 
     it('skips tasks with empty, N/A or COM-handler Execute', async () => {
-      mocks.execNativeUtf8.mockResolvedValueOnce({
+      mocks.execTracked.mockResolvedValueOnce({
         stdout: JSON.stringify([
           { TaskName: 'A', TaskPath: '\\', Execute: '' },
           { TaskName: 'B', TaskPath: '\\', Execute: 'N/A' },
@@ -86,7 +100,7 @@ describe('scanScheduledTasks', () => {
     })
 
     it('dedupes tasks with identical TaskPath+TaskName', async () => {
-      mocks.execNativeUtf8.mockResolvedValueOnce({
+      mocks.execTracked.mockResolvedValueOnce({
         stdout: JSON.stringify([
           { TaskName: 'Dup', TaskPath: '\\', Execute: 'C:\\x.exe' },
           { TaskName: 'Dup', TaskPath: '\\', Execute: 'C:\\x.exe' },
@@ -100,7 +114,7 @@ describe('scanScheduledTasks', () => {
     })
 
     it('skips exes under c:\\windows even when missing', async () => {
-      mocks.execNativeUtf8.mockResolvedValueOnce({
+      mocks.execTracked.mockResolvedValueOnce({
         stdout: JSON.stringify([{ TaskName: 'Win', TaskPath: '\\', Execute: 'C:\\Windows\\System32\\w.exe' }]),
         stderr: '',
       })
@@ -111,7 +125,7 @@ describe('scanScheduledTasks', () => {
     })
 
     it('skips exes that start with % (env var) when unexpanded check fails to exist', async () => {
-      mocks.execNativeUtf8.mockResolvedValueOnce({
+      mocks.execTracked.mockResolvedValueOnce({
         stdout: JSON.stringify([{ TaskName: 'Env', TaskPath: '\\', Execute: '%ProgramFiles%\\x.exe' }]),
         stderr: '',
       })
@@ -122,7 +136,7 @@ describe('scanScheduledTasks', () => {
     })
 
     it('skips tasks whose exe has no backslash (no path to validate)', async () => {
-      mocks.execNativeUtf8.mockResolvedValueOnce({
+      mocks.execTracked.mockResolvedValueOnce({
         stdout: JSON.stringify([{ TaskName: 'NoSlash', TaskPath: '\\', Execute: 'notepad.exe' }]),
         stderr: '',
       })
@@ -131,15 +145,15 @@ describe('scanScheduledTasks', () => {
       expect(entries).toHaveLength(0)
     })
 
-    it('returns [] when execNativeUtf8 throws', async () => {
-      mocks.execNativeUtf8.mockRejectedValueOnce(new Error('boom'))
-      mocks.execNativeUtf8.mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+    it('returns [] when powershell query throws', async () => {
+      mocks.execTracked.mockRejectedValueOnce(new Error('boom'))
+      mocks.execTracked.mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       const entries = await scanScheduledTasks()
       expect(entries).toEqual([])
     })
 
     it('handles a single-object JSON response (not an array)', async () => {
-      mocks.execNativeUtf8.mockResolvedValueOnce({
+      mocks.execTracked.mockResolvedValueOnce({
         stdout: JSON.stringify({ TaskName: 'Solo', TaskPath: '\\', Execute: 'C:\\missing.exe' }),
         stderr: '',
       })
@@ -149,13 +163,13 @@ describe('scanScheduledTasks', () => {
       expect(entries).toHaveLength(1)
     })
 
-    it('passes an abort signal through to execNativeUtf8', async () => {
+    it('passes an abort signal through to execTracked', async () => {
       const controller = new AbortController()
-      mocks.execNativeUtf8.mockResolvedValueOnce({ stdout: '[]', stderr: '' })
-      mocks.execNativeUtf8.mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      mocks.execTracked.mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      mocks.execTracked.mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       await scanScheduledTasks(controller.signal)
-      expect(mocks.execNativeUtf8).toHaveBeenCalledWith(
-        'powershell.exe',
+      expect(mocks.execTracked).toHaveBeenCalledWith(
+        'powershell',
         expect.any(Array),
         expect.objectContaining({ signal: controller.signal }),
       )
@@ -168,8 +182,8 @@ describe('scanScheduledTasks', () => {
     }
 
     it('pushes an entry for a matching third-party task whose exe is missing', async () => {
-      mocks.execNativeUtf8.mockResolvedValueOnce({ stdout: '[]', stderr: '' })
-      mocks.execNativeUtf8.mockResolvedValueOnce({
+      mocks.execTracked.mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      mocks.execTracked.mockResolvedValueOnce({
         stdout: tasksJson(['Adobe Acrobat Update Scheduler']),
         stderr: '',
       })
@@ -179,17 +193,17 @@ describe('scanScheduledTasks', () => {
       expect(entries).toHaveLength(1)
       expect(entries[0]!.issue).toContain('Adobe Acrobat Update')
       expect(entries[0]!.valueName).toBe('Scheduled Task')
-      expect(mocks.execNativeUtf8).toHaveBeenNthCalledWith(
+      expect(mocks.execTracked).toHaveBeenNthCalledWith(
         2,
-        'powershell.exe',
+        'powershell',
         expect.any(Array),
         expect.objectContaining({ timeout: 15000 }),
       )
     })
 
     it('skips third-party tasks whose exe exists', async () => {
-      mocks.execNativeUtf8.mockResolvedValueOnce({ stdout: '[]', stderr: '' })
-      mocks.execNativeUtf8.mockResolvedValueOnce({
+      mocks.execTracked.mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      mocks.execTracked.mockResolvedValueOnce({
         stdout: tasksJson(['GoogleUpdate TaskMachineUA']),
         stderr: '',
       })
@@ -200,8 +214,8 @@ describe('scanScheduledTasks', () => {
     })
 
     it('matches multiple third-party patterns in one pass', async () => {
-      mocks.execNativeUtf8.mockResolvedValueOnce({ stdout: '[]', stderr: '' })
-      mocks.execNativeUtf8.mockResolvedValueOnce({
+      mocks.execTracked.mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      mocks.execTracked.mockResolvedValueOnce({
         stdout: tasksJson(['CCleaner Update', 'JavaUpdateSched']),
         stderr: '',
       })
@@ -212,8 +226,8 @@ describe('scanScheduledTasks', () => {
     })
 
     it('returns [] when the third-party pass throws', async () => {
-      mocks.execNativeUtf8.mockResolvedValueOnce({ stdout: '[]', stderr: '' })
-      mocks.execNativeUtf8.mockRejectedValueOnce(new Error('boom'))
+      mocks.execTracked.mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      mocks.execTracked.mockRejectedValueOnce(new Error('boom'))
       const entries = await scanScheduledTasks()
       expect(entries).toEqual([])
     })

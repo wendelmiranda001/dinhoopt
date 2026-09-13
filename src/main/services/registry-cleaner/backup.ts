@@ -3,7 +3,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { RegistryEntry } from '@shared/types'
 import { execNativeUtf8 } from '../exec-utf8'
+import { getLogger } from '../logger.service'
 import { execReg, splitTaskPath, stripRegHeader } from './utils'
+
+async function exportHive(hive: string, backupPath: string, timeout: number, signal?: AbortSignal): Promise<void> {
+  try {
+    await execReg(['export', hive, backupPath, '/y'], { timeout, ...(signal ? { signal } : {}) })
+  } catch (err: unknown) {
+    const detail = (err as { stderr?: string; message?: string })?.stderr
+      ? (err as { stderr: string }).stderr.trim()
+      : ((err as { message?: string })?.message ?? 'unknown error')
+    getLogger().warning('registry-backup', `Failed to export ${hive}: ${detail}`)
+  }
+}
 
 function pruneOldBackups(backupDir: string, keep: number): void {
   try {
@@ -38,31 +50,17 @@ function pruneOldBackups(backupDir: string, keep: number): void {
 
 async function createFullBackup(backupDir: string, timestamp: string, signal?: AbortSignal): Promise<void> {
   const backupPath = join(backupDir, `registry-backup-${timestamp}.reg`)
-  await execReg(['export', 'HKLM\\SOFTWARE', backupPath, '/y'], { timeout: 30000, ...(signal ? { signal } : {}) })
   const hkcuBackupPath = join(backupDir, `registry-backup-HKCU-${timestamp}.reg`)
-  await execReg(['export', 'HKCU\\SOFTWARE', hkcuBackupPath, '/y'], {
-    timeout: 30000,
-    ...(signal ? { signal } : {}),
-  }).catch(() => {})
   const systemBackupPath = join(backupDir, `registry-backup-SYSTEM-${timestamp}.reg`)
-  await execReg(['export', 'HKLM\\SYSTEM\\CurrentControlSet\\Services', systemBackupPath, '/y'], {
-    timeout: 60000,
-    ...(signal ? { signal } : {}),
-  }).catch(() => {})
   const hkcrClsidPath = join(backupDir, `registry-backup-HKCR-CLSID-${timestamp}.reg`)
-  await execReg(['export', 'HKCR\\CLSID', hkcrClsidPath, '/y'], {
-    timeout: 60000,
-    ...(signal ? { signal } : {}),
-  }).catch(() => {})
   const hkcrIfacePath = join(backupDir, `registry-backup-HKCR-Interface-${timestamp}.reg`)
-  await execReg(['export', 'HKCR\\Interface', hkcrIfacePath, '/y'], {
-    timeout: 60000,
-    ...(signal ? { signal } : {}),
-  }).catch(() => {})
   const hkcrMimePath = join(backupDir, `registry-backup-HKCR-MIME-${timestamp}.reg`)
-  await execReg(['export', 'HKCR\\MIME', hkcrMimePath, '/y'], { timeout: 30000, ...(signal ? { signal } : {}) }).catch(
-    () => {},
-  )
+  await exportHive('HKLM\\SOFTWARE', backupPath, 30000, signal)
+  await exportHive('HKCU\\SOFTWARE', hkcuBackupPath, 30000, signal)
+  await exportHive('HKLM\\SYSTEM\\CurrentControlSet\\Services', systemBackupPath, 60000, signal)
+  await exportHive('HKCR\\CLSID', hkcrClsidPath, 60000, signal)
+  await exportHive('HKCR\\Interface', hkcrIfacePath, 60000, signal)
+  await exportHive('HKCR\\MIME', hkcrMimePath, 30000, signal)
   const shellRoots = [
     { key: '*', file: 'AllFileTypes' },
     { key: 'Directory', file: 'Directory' },
@@ -70,10 +68,7 @@ async function createFullBackup(backupDir: string, timestamp: string, signal?: A
   ]
   for (const { key, file } of shellRoots) {
     const shellPath = join(backupDir, `registry-backup-HKCR-${file}-shellex-${timestamp}.reg`)
-    await execReg(['export', `HKCR\\${key}\\shellex`, shellPath, '/y'], {
-      timeout: 30000,
-      ...(signal ? { signal } : {}),
-    }).catch(() => {})
+    await exportHive(`HKCR\\${key}\\shellex`, shellPath, 30000, signal)
   }
 }
 
@@ -142,8 +137,12 @@ async function createTargetedBackup(
             ...(signal ? { signal } : {}),
           })
           writeFileSync(join(taskDir, `${safeName}.xml`), stdout, 'utf-8')
-        } catch {
-          /* Task may already be gone */
+        } catch (err: unknown) {
+          if (signal?.aborted) throw err
+          const detail = (err as { stderr?: string; message?: string })?.stderr
+            ? (err as { stderr: string }).stderr.trim()
+            : ((err as { message?: string })?.message ?? 'unknown error')
+          getLogger().warning('registry-backup', `Failed to back up scheduled task ${fullName}: ${detail}`)
         }
       }
     }

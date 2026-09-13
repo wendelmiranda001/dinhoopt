@@ -1,25 +1,20 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import type { RegistryEntry } from '@shared/types'
-import { execNativeUtf8 } from '../exec-utf8'
+import { execTracked, psArgs } from '../exec-utf8'
 import { expandEnvVars, extractExePath } from './utils'
 
 export async function scanScheduledTasks(signal?: AbortSignal): Promise<RegistryEntry[]> {
   const entries: RegistryEntry[] = []
 
   try {
-    const { stdout } = await execNativeUtf8(
-      'powershell.exe',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        `Get-ScheduledTask | Where-Object { $_.State -ne 'Disabled' } | ForEach-Object {
+    const { stdout } = await execTracked(
+      'powershell',
+      psArgs(`Get-ScheduledTask | Where-Object { $_.State -ne 'Disabled' } | ForEach-Object {
         $action = if ($_.Actions) { $_.Actions | Select-Object -First 1 } else { $null }
         $execute = if ($action -and $action.Execute) { $action.Execute } else { '' }
         [PSCustomObject]@{ TaskName = $_.TaskName; TaskPath = $_.TaskPath; Execute = $execute }
-      } | ConvertTo-Json -Compress`,
-      ],
+      } | ConvertTo-Json -Compress`),
       { timeout: 20000, ...(signal ? { signal } : {}) },
     )
     const tasks: Array<{ TaskName: string; TaskPath: string; Execute: string }> = JSON.parse(stdout)
@@ -63,18 +58,13 @@ export async function scanScheduledTasks(signal?: AbortSignal): Promise<Registry
     { pattern: 'CCleaner', exe: 'CCleaner' },
   ]
   try {
-    const { stdout } = await execNativeUtf8(
-      'powershell.exe',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        `Get-ScheduledTask | ForEach-Object {
+    const { stdout } = await execTracked(
+      'powershell',
+      psArgs(`Get-ScheduledTask | ForEach-Object {
         $action = if ($_.Actions) { $_.Actions | Select-Object -First 1 } else { $null }
         $execute = if ($action -and $action.Execute) { $action.Execute } else { '' }
         [PSCustomObject]@{ TaskName = $_.TaskName; TaskPath = $_.TaskPath; Execute = $execute }
-      } | ConvertTo-Json -Compress`,
-      ],
+      } | ConvertTo-Json -Compress`),
       { timeout: 15000, ...(signal ? { signal } : {}) },
     )
     const tasks: Array<{ TaskName: string; TaskPath: string; Execute: string }> = JSON.parse(stdout)
