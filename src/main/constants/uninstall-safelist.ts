@@ -2,6 +2,10 @@
  * Comprehensive safelist of folder names that must NEVER be flagged as uninstall leftovers.
  * All entries are lowercase. Lookups must normalize to lowercase before checking.
  */
+
+/** R language runtime installation folder. */
+export const R_LANGUAGE_RUNTIME_FOLDER = 'r'
+
 export const SAFE_FOLDER_NAMES = new Set([
   // ── Windows core & system ───────────────────────────────────────────
   'microsoft',
@@ -113,7 +117,7 @@ export const SAFE_FOLDER_NAMES = new Set([
   'ruby',
   'perl',
   'php',
-  'r',
+  R_LANGUAGE_RUNTIME_FOLDER,
   'julia',
   'erlang',
   'elixir',
