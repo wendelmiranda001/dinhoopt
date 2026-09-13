@@ -83,7 +83,7 @@ internal static class ProgramBenchmark
         Console.WriteLine();
 
         // Se não há jogo detectado, usa o foreground diretamente
-        var detector = new GameDetection.GameDetector();
+        using var detector = new GameDetection.GameDetector();
         detector.Start();
         await Task.Delay(500);
         var game = detector.CurrentGame;
@@ -107,15 +107,18 @@ internal static class ProgramBenchmark
 
         for (uint i = 0; adapter.EnumOutputs(i, out var output).Success; i++)
         {
-            using var output1 = output.QueryInterface<IDXGIOutput1>();
-            var desc = output1.Description;
-            var bounds = desc.DesktopCoordinates;
-            var midX = (bounds.Left + bounds.Right) / 2;
-            var midY = (bounds.Top + bounds.Bottom) / 2;
-            var outputMonitor = MonitorHelper.MonitorFromPoint(midX, midY);
-            var isMatch = outputMonitor == gameMonitor ? " ← JOGO" :
-                          outputMonitor == primaryMonitor ? " ← PRIMÁRIO" : "";
-            Console.WriteLine($"  Output[{i}]: {bounds.Right - bounds.Left}x{bounds.Bottom - bounds.Top} @({bounds.Left},{bounds.Top}) HMONITOR=0x{outputMonitor:X8}{isMatch}");
+            using (output)
+            {
+                using var output1 = output.QueryInterface<IDXGIOutput1>();
+                var desc = output1.Description;
+                var bounds = desc.DesktopCoordinates;
+                var midX = (bounds.Left + bounds.Right) / 2;
+                var midY = (bounds.Top + bounds.Bottom) / 2;
+                var outputMonitor = MonitorHelper.MonitorFromPoint(midX, midY);
+                var isMatch = outputMonitor == gameMonitor ? " ← JOGO" :
+                              outputMonitor == primaryMonitor ? " ← PRIMÁRIO" : "";
+                Console.WriteLine($"  Output[{i}]: {bounds.Right - bounds.Left}x{bounds.Bottom - bounds.Top} @({bounds.Left},{bounds.Top}) HMONITOR=0x{outputMonitor:X8}{isMatch}");
+            }
         }
         Console.WriteLine();
 
@@ -181,6 +184,10 @@ internal static class ProgramBenchmark
         {
             var adapters = ListAdapters();
             var best = PickBestAdapter(adapters);
+            foreach (var adapter in adapters)
+            {
+                if (!ReferenceEquals(adapter, best)) adapter.Dispose();
+            }
             if (best == null)
             {
                 Console.Error.WriteLine("  Nenhum adaptador D3D11 disponível");
@@ -193,6 +200,8 @@ internal static class ProgramBenchmark
                 new[] { FeatureLevel.Level_11_1, FeatureLevel.Level_11_0 },
                 out ID3D11Device device, out var featureLevel, out _).CheckError();
 
+            best.Dispose();
+
             using (device)
             {
                 using var dxgiDevice = device.QueryInterface<IDXGIDevice>();
@@ -202,11 +211,12 @@ internal static class ProgramBenchmark
                 Console.WriteLine($"  Device: {desc.Description} (FL {featureLevel})");
 
                 ICaptureSource capture;
+                WgcCaptureSource? wgc = null;
                 WindowsMessagePump? pump = null;
                 try
                 {
                     Console.WriteLine("  (TEMP WGC-FIRST SMOKE)");
-                    var wgc = new WgcCaptureSource();
+                    wgc = new WgcCaptureSource();
                     pump = new WindowsMessagePump();
                     pump.Invoke(() => { wgc.Initialize(); wgc.StartFramePump(); });
                     capture = wgc;
@@ -215,6 +225,8 @@ internal static class ProgramBenchmark
                 }
                 catch (Exception ex)
                 {
+                    wgc?.Dispose();
+                    pump?.Dispose();
                     Console.WriteLine($"  WGC falhou: {ex.Message}, tentando DXGI...");
                     var dxgi = new DxgiCaptureSource();
                     dxgi.Initialize(device);
@@ -465,6 +477,7 @@ internal static class ProgramBenchmark
                 Console.WriteLine($"  DXGI indisponível: {ex2.Message}");
                 Console.WriteLine("  Pulando benchmark de captura.");
                 capture?.Dispose();
+                pump?.Dispose();
                 return;
             }
         }
@@ -682,7 +695,7 @@ internal static class ProgramBenchmark
 
             if (videoPackets.Count > 0)
             {
-                var exporter = new ClipExporter();
+                using var exporter = new ClipExporter();
                 var outputPath = ClipExporter.GenerateOutputPath(Path.GetTempPath());
                 var result = exporter.ExportToMp4(outputPath, videoPackets, [], 640, 480, 30);
                 Console.WriteLine($"  Exportado: {result} ({new FileInfo(result).Length / 1024} KB)");
