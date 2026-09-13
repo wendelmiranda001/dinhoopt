@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { readdir, stat } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import type { InstalledProgram, ScanItem } from '@shared/types'
-import { SAFE_FOLDER_NAMES, SAFE_PREFIXES } from '../constants/uninstall-safelist'
+import { isSafeFolder } from '../constants/uninstall-safelist'
 import { getPlatform } from '../platform'
 import { execFileAsync, execNativeUtf8, psUtf8 } from './exec-utf8'
 import { getDirectorySize } from './file-utils'
@@ -351,16 +351,7 @@ export async function deleteRegistryKey(registryKey: string): Promise<boolean> {
 
 // ─── Targeted leftover scanning ─────────────────────────────
 
-export function isSafeFolder(folderName: string): boolean {
-  const lower = folderName.toLowerCase()
-  if (SAFE_FOLDER_NAMES.has(lower)) return true
-  for (const prefix of SAFE_PREFIXES) {
-    if (lower.startsWith(prefix)) return true
-  }
-  if (lower.startsWith('.')) return true
-  if (/^\{[0-9a-f-]+\}$/i.test(folderName)) return true
-  return false
-}
+export { isSafeFolder }
 
 export function folderMatchesProgram(folderName: string, program: InstalledProgram): boolean {
   const lower = folderName.toLowerCase()

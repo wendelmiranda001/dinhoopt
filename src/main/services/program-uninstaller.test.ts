@@ -78,10 +78,21 @@ const mockGetPlatform = vi.fn().mockReturnValue({
 })
 vi.mock('../platform', () => ({ getPlatform: () => mockGetPlatform() }))
 
-vi.mock('../constants/uninstall-safelist', () => ({
-  SAFE_FOLDER_NAMES: new Set(['windows', 'program files', 'system32', 'microsoft']),
-  SAFE_PREFIXES: ['microsoft.', 'windows.'],
-}))
+vi.mock('../constants/uninstall-safelist', () => {
+  const SAFE_FOLDER_NAMES = new Set(['windows', 'program files', 'system32', 'microsoft'])
+  const SAFE_PREFIXES = ['microsoft.', 'windows.']
+  const isSafeFolder = (folderName: string): boolean => {
+    const lower = folderName.toLowerCase()
+    if (SAFE_FOLDER_NAMES.has(lower)) return true
+    for (const prefix of SAFE_PREFIXES) {
+      if (lower.startsWith(prefix)) return true
+    }
+    if (lower.startsWith('.')) return true
+    if (/^\{[0-9a-f-]+\}$/i.test(lower)) return true
+    return false
+  }
+  return { SAFE_FOLDER_NAMES, SAFE_PREFIXES, isSafeFolder }
+})
 
 import type { InstalledProgram } from '@shared/types'
 import {

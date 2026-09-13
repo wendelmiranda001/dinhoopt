@@ -4,7 +4,7 @@ import { basename, join } from 'node:path'
 import { IPC } from '@shared/channels'
 import { CleanerType } from '@shared/enums'
 import type { ScanItem, ScanResult } from '@shared/types'
-import { SAFE_FOLDER_NAMES, SAFE_PREFIXES } from '../constants/uninstall-safelist'
+import { isSafeFolder } from '../constants/uninstall-safelist'
 import type { WindowGetter } from '../ipc/index'
 import { getPlatform } from '../platform'
 import { execFileAsync, execNativeUtf8, psUtf8 } from './exec-utf8'
@@ -202,29 +202,6 @@ async function hasRunningProcesses(folderPaths: string[]): Promise<Set<string>> 
   }
 
   return running
-}
-
-/**
- * Check if a folder name is safe based on the safelist.
- */
-function isSafeFolder(folderName: string): boolean {
-  const lower = folderName.toLowerCase()
-
-  // Exact match in safelist
-  if (SAFE_FOLDER_NAMES.has(lower)) return true
-
-  // Prefix match
-  for (const prefix of SAFE_PREFIXES) {
-    if (lower.startsWith(prefix)) return true
-  }
-
-  // Skip hidden folders (starting with .)
-  if (lower.startsWith('.')) return true
-
-  // Skip GUID-style folders {xxxxxxxx-xxxx-...}
-  if (/^\{[0-9a-f-]+\}$/i.test(folderName)) return true
-
-  return false
 }
 
 /**

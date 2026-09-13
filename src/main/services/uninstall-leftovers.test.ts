@@ -48,23 +48,12 @@ vi.mock('electron', () => ({
   BrowserWindow: class {},
 }))
 
-import { SAFE_FOLDER_NAMES, SAFE_PREFIXES } from '../constants/uninstall-safelist'
+import { isSafeFolder } from '../constants/uninstall-safelist'
 // ─── Import after mocks are set up ────────────────────────────────
 import { scanForLeftovers } from './uninstall-leftovers'
 
 // ─── Replicas of internal pure functions (not exported) ──────────
 // These are safety-critical — they decide what gets flagged vs protected.
-
-function isSafeFolder(folderName: string): boolean {
-  const lower = folderName.toLowerCase()
-  if (SAFE_FOLDER_NAMES.has(lower)) return true
-  for (const prefix of SAFE_PREFIXES) {
-    if (lower.startsWith(prefix)) return true
-  }
-  if (lower.startsWith('.')) return true
-  if (/^\{[0-9a-f-]+\}$/i.test(folderName)) return true
-  return false
-}
 
 interface InstalledProgram {
   displayName: string

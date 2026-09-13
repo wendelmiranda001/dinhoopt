@@ -411,6 +411,26 @@ export const SAFE_PREFIXES = [
   'windowsapps',
   'program',
   'system',
-  '{', // GUID-style folders like {12345-...}
-  'kb', // Windows KB update folders
 ]
+
+/**
+ * Precise checks for special folder shapes that are always safe.
+ * GUID-style folders {xxxxxxxx-...} and Windows KB update folders (KBnnnnnn).
+ */
+export function isSafeFolder(folderName: string): boolean {
+  const lower = folderName.toLowerCase()
+
+  if (SAFE_FOLDER_NAMES.has(lower)) return true
+
+  for (const prefix of SAFE_PREFIXES) {
+    if (lower.startsWith(prefix)) return true
+  }
+
+  if (lower.startsWith('.')) return true
+
+  if (/^\{[0-9a-f-]+\}$/i.test(lower)) return true
+
+  if (/^kb\d{4,}(-\d+)*$/i.test(lower)) return true
+
+  return false
+}
