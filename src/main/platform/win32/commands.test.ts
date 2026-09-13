@@ -330,6 +330,58 @@ describe('win32 commands', () => {
       expect(result!.status).toBe('unknown')
     })
 
+    it('returns clean for pt-BR output', async () => {
+      execFileMock.mockResolvedValue({
+        stdout: JSON.stringify({
+          exitCode: 0,
+          output: 'A Verificação de Recursos do Windows não encontrou nenhuma violação de integridade.',
+        }),
+        stderr: '',
+      })
+
+      const result = await cmds.runSystemFileCheck()
+      expect(result!.status).toBe('clean')
+    })
+
+    it('returns repaired for pt-BR output', async () => {
+      execFileMock.mockResolvedValue({
+        stdout: JSON.stringify({
+          exitCode: 0,
+          output: 'A Verificação de Recursos do Windows encontrou arquivos corrompidos e os reparou com êxito.',
+        }),
+        stderr: '',
+      })
+
+      const result = await cmds.runSystemFileCheck()
+      expect(result!.status).toBe('repaired')
+    })
+
+    it('returns corrupt_unrepairable for pt-BR output', async () => {
+      execFileMock.mockResolvedValue({
+        stdout: JSON.stringify({
+          exitCode: 1,
+          output: 'A Verificação de Recursos do Windows não conseguiu reparar alguns deles.',
+        }),
+        stderr: '',
+      })
+
+      const result = await cmds.runSystemFileCheck()
+      expect(result!.status).toBe('corrupt_unrepairable')
+    })
+
+    it('returns failed for pt-BR output', async () => {
+      execFileMock.mockResolvedValue({
+        stdout: JSON.stringify({
+          exitCode: 1,
+          output: 'A Verificação de Recursos do Windows não pôde executar a operação solicitada.',
+        }),
+        stderr: '',
+      })
+
+      const result = await cmds.runSystemFileCheck()
+      expect(result!.status).toBe('failed')
+    })
+
     it('returns failed on error', async () => {
       execFileMock.mockRejectedValue(new Error('timeout'))
       const result = await cmds.runSystemFileCheck()
@@ -386,6 +438,45 @@ describe('win32 commands', () => {
 
       const result = await cmds.runSystemImageRepair()
       expect(result!.status).toBe('unknown')
+    })
+
+    it('returns success for pt-BR restore completion', async () => {
+      execFileMock.mockResolvedValue({
+        stdout: JSON.stringify({
+          exitCode: 0,
+          output: 'A operação de restauração foi concluída com êxito.',
+        }),
+        stderr: '',
+      })
+
+      const result = await cmds.runSystemImageRepair()
+      expect(result!.status).toBe('success')
+    })
+
+    it('returns clean for pt-BR no-corruption output', async () => {
+      execFileMock.mockResolvedValue({
+        stdout: JSON.stringify({
+          exitCode: 0,
+          output: 'Não foi detectada corrupção do repositório de componentes.',
+        }),
+        stderr: '',
+      })
+
+      const result = await cmds.runSystemImageRepair()
+      expect(result!.status).toBe('clean')
+    })
+
+    it('returns corrupt for pt-BR corruption output', async () => {
+      execFileMock.mockResolvedValue({
+        stdout: JSON.stringify({
+          exitCode: 1,
+          output: 'Foi detectada corrupção do repositório de componentes.',
+        }),
+        stderr: '',
+      })
+
+      const result = await cmds.runSystemImageRepair()
+      expect(result!.status).toBe('corrupt')
     })
 
     it('returns failed on error', async () => {

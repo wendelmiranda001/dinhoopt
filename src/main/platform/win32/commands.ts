@@ -14,6 +14,18 @@ import type {
 
 const execFileAsync = promisify(execFile)
 
+const SFC_CLEAN_HINTS = ['did not find any integrity violations', 'não encontrou nenhuma violação de integridade']
+const SFC_REPAIRED_HINTS = ['successfully repaired', 'reparou com êxito', 'reparadas com êxito']
+const SFC_UNREPAIRABLE_HINTS = ['found corrupt files but was unable', 'não conseguiu reparar']
+const SFC_FAILED_HINTS = ['could not perform', 'não pôde executar']
+
+const DISM_SUCCESS_HINTS = [
+  'the restore operation completed successfully',
+  'operação de restauração foi concluída com êxito',
+]
+const DISM_CLEAN_HINTS = ['no component store corruption detected', 'não foi detectada corrupção do repositório']
+const DISM_CORRUPT_HINTS = ['component store corruption', 'corrupção do repositório de componentes']
+
 export function createWin32Commands(): PlatformCommands {
   return {
     async shutdown(delaySec: number): Promise<void> {
@@ -223,12 +235,12 @@ export function createWin32Commands(): PlatformCommands {
         )
 
         const data = JSON.parse(stdout.trim())
-        const output = (data.output ?? '') as string
+        const normalized = String(data.output ?? '').toLowerCase()
         let status = 'unknown'
-        if (output.includes('did not find any integrity violations')) status = 'clean'
-        else if (output.includes('successfully repaired')) status = 'repaired'
-        else if (output.includes('found corrupt files but was unable')) status = 'corrupt_unrepairable'
-        else if (output.includes('could not perform')) status = 'failed'
+        if (SFC_CLEAN_HINTS.some((h) => normalized.includes(h))) status = 'clean'
+        else if (SFC_REPAIRED_HINTS.some((h) => normalized.includes(h))) status = 'repaired'
+        else if (SFC_UNREPAIRABLE_HINTS.some((h) => normalized.includes(h))) status = 'corrupt_unrepairable'
+        else if (SFC_FAILED_HINTS.some((h) => normalized.includes(h))) status = 'failed'
 
         return { exitCode: data.exitCode ?? -1, status }
       } catch {
@@ -255,11 +267,11 @@ export function createWin32Commands(): PlatformCommands {
         )
 
         const data = JSON.parse(stdout.trim())
-        const output = (data.output ?? '') as string
+        const normalized = String(data.output ?? '').toLowerCase()
         let status = 'unknown'
-        if (output.includes('The restore operation completed successfully')) status = 'success'
-        else if (output.includes('No component store corruption detected')) status = 'clean'
-        else if (output.includes('component store corruption')) status = 'corrupt'
+        if (DISM_SUCCESS_HINTS.some((h) => normalized.includes(h))) status = 'success'
+        else if (DISM_CLEAN_HINTS.some((h) => normalized.includes(h))) status = 'clean'
+        else if (DISM_CORRUPT_HINTS.some((h) => normalized.includes(h))) status = 'corrupt'
         else if (data.exitCode === 0) status = 'success'
 
         return { exitCode: data.exitCode ?? -1, status }
