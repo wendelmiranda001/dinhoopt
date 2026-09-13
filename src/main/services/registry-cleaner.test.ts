@@ -10,6 +10,12 @@ vi.mock('./exec-utf8', () => ({
   execTracked: (...args: unknown[]) => mockExecTracked(...args),
   execFileAsync: (...args: unknown[]) => mockExecFileAsync(...args),
   psUtf8: (s: string) => s,
+  psArgs: (s: string) => ['-NoProfile', '-NonInteractive', '-Command', s],
+}))
+
+// --- Mock logger ---
+vi.mock('./logger.service', () => ({
+  getLogger: () => ({ warning: vi.fn(), info: vi.fn(), error: vi.fn() }),
 }))
 
 // --- Mock backup-dir ---
@@ -509,9 +515,11 @@ describe('fixRegistryEntries', () => {
     expect(result.failures[0]!.reason).toContain('Access denied')
   })
 
-  it('handles set-value without regType or data gracefully', async () => {
+  it('handles set-value without regType or data as a failure', async () => {
     const result = await fixRegistryEntries([defaultEntry({ fix: { op: 'set-value' } }) as never])
-    expect(result.fixed).toBe(1)
+    expect(result.fixed).toBe(0)
+    expect(result.failed).toBe(1)
+    expect(result.failures[0]!.reason).toContain('regType or data')
   })
 
   it('handles full backup mode with export failures', async () => {
