@@ -52,10 +52,14 @@ export async function applyPrivacySettings(ids: string[]): Promise<PrivacyApplyR
   const settingDefs = getSettingsForPlatform()
   let succeeded = 0
   let failed = 0
+  let skipped = 0
   const errors: PrivacyApplyResult['errors'] = []
   for (const id of ids) {
     const def = settingDefs.find((s) => s.id === id)
-    if (!def) continue
+    if (!def) {
+      skipped++
+      continue
+    }
     try {
       await def.apply()
       succeeded++
@@ -64,19 +68,20 @@ export async function applyPrivacySettings(ids: string[]): Promise<PrivacyApplyR
       errors.push({ id: def.id, label: def.label, reason: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
-  return { succeeded, failed, errors }
+  return { succeeded, failed, skipped, errors }
 }
 
 export async function revertPrivacySettings(ids: string[]): Promise<PrivacyApplyResult> {
   const settingDefs = getSettingsForPlatform()
   let succeeded = 0
   let failed = 0
+  const skipped = 0
   const errors: PrivacyApplyResult['errors'] = []
   for (const id of ids) {
     const def = settingDefs.find((s) => s.id === id)
     if (!def?.revert) {
       failed++
-      errors.push({ id, label: id, reason: 'Revert not supported for this setting' })
+      errors.push({ id, label: def?.label ?? id, reason: 'Revert not supported for this setting' })
       continue
     }
     try {
@@ -87,5 +92,5 @@ export async function revertPrivacySettings(ids: string[]): Promise<PrivacyApply
       errors.push({ id: def.id, label: def.label, reason: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
-  return { succeeded, failed, errors }
+  return { succeeded, failed, skipped, errors }
 }

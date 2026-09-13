@@ -113,51 +113,37 @@ const KNOWN_SERVICE_DEFAULTS: Record<string, number> = {
 }
 
 export async function disableService(serviceName: string): Promise<void> {
+  const serviceKey = `HKLM\\SYSTEM\\CurrentControlSet\\Services\\${serviceName}`
   if (!originalServiceStartType.has(serviceName)) {
-    const startVal = await regQueryDword(`HKLM\\SYSTEM\\CurrentControlSet\\Services\\${serviceName}`, 'Start')
-    if (startVal !== null && startVal !== 4) {
+    const startVal = await regQueryDword(serviceKey, 'Start')
+    if (startVal === null) {
+      throw new Error(`Service '${serviceName}' does not exist`)
+    }
+    if (startVal !== 4) {
       originalServiceStartType.set(serviceName, startVal)
       saveServiceStartTypes(originalServiceStartType)
     }
   }
-  await execNativeUtf8(
-    'reg',
-    [
-      'add',
-      `HKLM\\SYSTEM\\CurrentControlSet\\Services\\${serviceName}`,
-      '/v',
-      'Start',
-      '/t',
-      'REG_DWORD',
-      '/d',
-      '4',
-      '/f',
-    ],
-    { timeout: 5000, windowsHide: true },
-  )
+  await execNativeUtf8('reg', ['add', serviceKey, '/v', 'Start', '/t', 'REG_DWORD', '/d', '4', '/f'], {
+    timeout: 5000,
+    windowsHide: true,
+  })
 }
 
 export async function enableService(serviceName: string): Promise<void> {
+  const serviceKey = `HKLM\\SYSTEM\\CurrentControlSet\\Services\\${serviceName}`
   let original = originalServiceStartType.get(serviceName)
   if (original === undefined) {
-    const current = await regQueryDword(`HKLM\\SYSTEM\\CurrentControlSet\\Services\\${serviceName}`, 'Start')
-    original = current !== null && current !== 4 ? current : (KNOWN_SERVICE_DEFAULTS[serviceName] ?? 3)
+    const current = await regQueryDword(serviceKey, 'Start')
+    if (current === null) {
+      throw new Error(`Service '${serviceName}' does not exist`)
+    }
+    original = current !== 4 ? current : (KNOWN_SERVICE_DEFAULTS[serviceName] ?? 3)
   }
-  await execNativeUtf8(
-    'reg',
-    [
-      'add',
-      `HKLM\\SYSTEM\\CurrentControlSet\\Services\\${serviceName}`,
-      '/v',
-      'Start',
-      '/t',
-      'REG_DWORD',
-      '/d',
-      String(original),
-      '/f',
-    ],
-    { timeout: 5000, windowsHide: true },
-  )
+  await execNativeUtf8('reg', ['add', serviceKey, '/v', 'Start', '/t', 'REG_DWORD', '/d', String(original), '/f'], {
+    timeout: 5000,
+    windowsHide: true,
+  })
   originalServiceStartType.delete(serviceName)
   saveServiceStartTypes(originalServiceStartType)
 }

@@ -357,25 +357,25 @@ describe('disableService edge cases', () => {
 // ─── enableService — KNOWN_SERVICE_DEFAULTS and fallbacks ────────
 
 describe('enableService edge cases', () => {
-  it('uses KNOWN_SERVICE_DEFAULTS when no cache and current value is 4', async () => {
+  it('rejects revert when the service key cannot be queried (no phantom write)', async () => {
     mocks.execNativeUtf8Mock.mockImplementation(async (tool: string, args: string[]) => {
-      if (tool === 'reg' && args[0] === 'query' && args.includes('AiHost') && args.includes('Start')) {
-        return { stdout: '    Start    REG_DWORD    0x4', stderr: '' }
-      }
       if (tool === 'reg' && args[0] === 'add') {
         return { stdout: '', stderr: '' }
       }
       throw new Error('Unexpected')
     })
 
-    await revertPrivacySettings(['ai-service-autostart'])
+    vi.resetModules()
+    const { revertPrivacySettings: revertPriv } = await import('./privacy-shield.service')
+
+    const result = await revertPriv(['ai-service-autostart'])
+    expect(result.failed).toBe(1)
+    expect(result.errors[0]!.reason).toBe("Service 'AiHost' does not exist")
 
     const addCalls = mocks.execNativeUtf8Mock.mock.calls.filter(
       (c) => (c[0] as string) === 'reg' && (c[1] as string[])[0] === 'add',
     )
-    const lastAdd = addCalls[addCalls.length - 1] as [string, string[]]
-    const dataIdx = lastAdd[1].indexOf('/d')
-    expect(lastAdd[1][dataIdx + 1]).toBe('3')
+    expect(addCalls).toHaveLength(0)
   })
 
   it('uses fallback 3 for unknown service when no cache and current is 4', async () => {
@@ -553,7 +553,7 @@ describe('service start type cache', () => {
   it('loadServiceStartTypes filters out non-number values', async () => {
     mocks.readFileSyncMock.mockReturnValue(JSON.stringify({ DiagTrack: 2, AiHost: 'invalid' }))
     mocks.execNativeUtf8Mock.mockImplementation(async (tool: string, args: string[]) => {
-      if (tool === 'reg' && args[0] === 'query' && args.includes('AiHost') && args.includes('Start')) {
+      if (tool === 'reg' && args[0] === 'query' && (args[1] as string).includes('AiHost') && args.includes('Start')) {
         return { stdout: '    Start    REG_DWORD    0x4', stderr: '' }
       }
       if (tool === 'reg' && args[0] === 'add') {
@@ -650,6 +650,7 @@ describe('applyPrivacySettings edge cases', () => {
     const result = await applyPrivacySettings(['telemetry-level', 'nonexistent', 'advertising-id'])
     expect(result.succeeded).toBe(2)
     expect(result.failed).toBe(0)
+    expect(result.skipped).toBe(1)
   })
 
   it('handles service apply (disableService) with reg add failure', async () => {
@@ -962,7 +963,7 @@ describe('enableService additional branches', () => {
     expect(lastAdd[1][dataIdx + 1]).toBe('2')
   })
 
-  it('falls back to 3 when reg query fails and no cache', async () => {
+  it('rejects revert when the service cannot be queried (no phantom write)', async () => {
     vi.resetModules()
     const { revertPrivacySettings: revertPriv } = await import('./privacy-shield.service')
 
@@ -976,14 +977,14 @@ describe('enableService additional branches', () => {
       throw new Error('Unexpected')
     })
 
-    await revertPriv(['ai-service-autostart'])
+    const result = await revertPriv(['ai-service-autostart'])
+    expect(result.failed).toBe(1)
+    expect(result.errors[0]!.reason).toBe("Service 'AiHost' does not exist")
 
     const addCalls = mocks.execNativeUtf8Mock.mock.calls.filter(
       (c) => (c[0] as string) === 'reg' && (c[1] as string[])[0] === 'add',
     )
-    const lastAdd = addCalls[addCalls.length - 1] as [string, string[]]
-    const dataIdx = lastAdd[1].indexOf('/d')
-    expect(lastAdd[1][dataIdx + 1]).toBe('3')
+    expect(addCalls).toHaveLength(0)
   })
 })
 
@@ -1086,6 +1087,7 @@ describe('revertPrivacySettings non-existent ID', () => {
     const result = await revertPrivacySettings(['non-existent-setting'])
     expect(result.succeeded).toBe(0)
     expect(result.failed).toBe(1)
+    expect(result.skipped).toBe(0)
     expect(result.errors[0]!.reason).toBe('Revert not supported for this setting')
   })
 })
@@ -1098,6 +1100,7 @@ describe('applyPrivacySettings non-existent ID', () => {
     const result = await applyPrivacySettings(['non-existent-setting'])
     expect(result.succeeded).toBe(0)
     expect(result.failed).toBe(0)
+    expect(result.skipped).toBe(1)
   })
 })
 

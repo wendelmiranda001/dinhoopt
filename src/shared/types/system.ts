@@ -285,5 +285,6 @@ export interface PrivacyScanProgress {
 export interface PrivacyApplyResult {
   succeeded: number
   failed: number
+  skipped: number
   errors: { id: string; label: string; reason: string }[]
 }
