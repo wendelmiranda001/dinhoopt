@@ -31,13 +31,13 @@ export async function handleUpdates(args: string[], ctx: CliContext): Promise<nu
     const toUpdate = allFlag
       ? check.apps.map((a) => a.id)
       : (() => {
-          const idArg = args.find((a) => a !== 'run' && !a.startsWith('--'))
-          return idArg
-            ? idArg
-                .split(',')
-                .map((s) => s.trim())
-                .filter(Boolean)
-            : []
+          const idArgs = args.filter((a) => a !== 'run' && !a.startsWith('--'))
+          return idArgs.flatMap((a) =>
+            a
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean),
+          )
         })()
     if (toUpdate.length === 0) {
       cliUsage(ctx, 'dinho --cli updates run <id,...> or --all')
@@ -48,6 +48,7 @@ export async function handleUpdates(args: string[], ctx: CliContext): Promise<nu
       cliLog(ctx, `  [${progress.current}/${progress.total}] ${progress.currentApp}: ${progress.status}`)
     })
     cliOut(ctx, result)
+    return ExitCode.SUCCESS
   } else {
     cliUsage(ctx, 'dinho --cli updates <check|run> [ids|--all]')
     return ExitCode.INVALID_ARGS

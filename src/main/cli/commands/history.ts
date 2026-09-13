@@ -8,13 +8,13 @@ export async function handleHistory(args: string[], ctx: CliContext): Promise<nu
 
   if (sub === 'list') {
     const history = getHistory()
+    if (history.length === 0) {
+      cliOut(ctx, ctx.json ? { message: 'No scan history' } : 'No scan history.')
+      return ExitCode.NOTHING_FOUND
+    }
     if (ctx.json) {
       cliOut(ctx, history)
     } else {
-      if (history.length === 0) {
-        cliLog(ctx, '  No scan history.')
-        return
-      }
       for (const entry of history) {
         cliLog(
           ctx,
@@ -22,9 +22,11 @@ export async function handleHistory(args: string[], ctx: CliContext): Promise<nu
         )
       }
     }
+    return ExitCode.SUCCESS
   } else if (sub === 'clear') {
     clearHistory()
     cliOut(ctx, ctx.json ? { message: 'History cleared' } : 'Scan history cleared.')
+    return ExitCode.SUCCESS
   } else {
     cliUsage(ctx, 'dinho --cli history <list|clear>')
     return ExitCode.INVALID_ARGS

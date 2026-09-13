@@ -21,18 +21,21 @@ export async function handleDrivers(args: string[], ctx: CliContext): Promise<nu
       for (const p of result.packages) cliLog(ctx, `  ${p.publishedName} — ${p.className} — ${p.version}`)
     }
   } else if (sub === 'clean') {
-    const nameArg = args.find((a) => a !== 'clean' && !a.startsWith('--'))
-    if (!nameArg) {
+    const nameArgs = args.filter((a) => a !== 'clean' && !a.startsWith('--'))
+    if (nameArgs.length === 0) {
       cliUsage(ctx, 'dinho --cli drivers clean <name1,name2,...>')
       return ExitCode.INVALID_ARGS
     }
-    const names = nameArg
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
+    const names = nameArgs.flatMap((a) =>
+      a
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    )
     cliLog(ctx, `Removing ${names.length} driver packages...`)
     const result = await cleanDrivers(names)
     cliOut(ctx, result)
+    return ExitCode.SUCCESS
   } else if (sub === 'check-updates') {
     cliLog(ctx, 'Checking for driver updates...')
     const updateResult = await scanDriverUpdates((progress) => {
@@ -55,13 +58,13 @@ export async function handleDrivers(args: string[], ctx: CliContext): Promise<nu
     const toInstall = args.includes('--all')
       ? updateResult.updates.map((u) => u.updateId)
       : (() => {
-          const idArg = args.find((a) => a !== 'update' && !a.startsWith('--'))
-          return idArg
-            ? idArg
-                .split(',')
-                .map((s) => s.trim())
-                .filter(Boolean)
-            : []
+          const idArgs = args.filter((a) => a !== 'update' && !a.startsWith('--'))
+          return idArgs.flatMap((a) =>
+            a
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean),
+          )
         })()
     if (toInstall.length === 0) {
       cliUsage(ctx, 'dinho --cli drivers update <id,...> or --all')

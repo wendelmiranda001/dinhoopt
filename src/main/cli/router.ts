@@ -142,7 +142,8 @@ export async function runCli(): Promise<void> {
         break
       case 'metrics-server':
         await handleMetricsServer(parsed.commandArgs, ctx)
-        return
+        exitCode = ExitCode.SUCCESS
+        break
       default:
         if (ctx.json) log(JSON.stringify({ error: 'unknown_command', command: parsed.command }))
         else {
