@@ -8,7 +8,9 @@ vi.mock('child_process', () => ({
   execFile: execFileMockFn,
 }))
 
-const { psUtf8, psArgs, execNativeUtf8, execTracked, killAllChildren, execFileAsync } = await import('./exec-utf8')
+const { psUtf8, psArgs, execNativeUtf8, execTracked, killAllChildren, execFileAsync, trackChildProcess } = await import(
+  './exec-utf8'
+)
 
 describe('psUtf8', () => {
   it('prepends UTF-8 preamble to a command', () => {
@@ -182,8 +184,89 @@ describe('execTracked', () => {
 })
 
 describe('execFileAsync export', () => {
+  let fakeChild: { pid: number; once: ReturnType<typeof vi.fn>; kill: ReturnType<typeof vi.fn> }
+
+  beforeEach(() => {
+    execFileAsyncMock.mockReset()
+    execFileMockFn.mockReset()
+    fakeChild = { pid: 55, once: vi.fn(), kill: vi.fn() }
+  })
+
   it('is a function', () => {
     expect(typeof execFileAsync).toBe('function')
+  })
+
+  it('registers its child so killAllChildren sweeps it on app exit', async () => {
+    const p = Object.assign(Promise.resolve({ stdout: '', stderr: '' }), { child: fakeChild })
+    execFileAsyncMock.mockReturnValue(p)
+
+    await execFileAsync('powershell.exe', ['-Command', 'echo test'])
+
+    expect(fakeChild.once).toHaveBeenCalledWith('exit', expect.any(Function))
+    killAllChildren()
+    expect(execFileMockFn).toHaveBeenCalledWith(
+      'taskkill',
+      ['/T', '/F', '/PID', '55'],
+      expect.anything(),
+      expect.any(Function),
+    )
+  })
+
+  it('does nothing when the promise has no child (mocks)', async () => {
+    execFileAsyncMock.mockResolvedValue({ stdout: '', stderr: '' })
+
+    await execFileAsync('reg', ['query'])
+
+    expect(execFileMockFn).not.toHaveBeenCalledWith(
+      'taskkill',
+      expect.anything(),
+      expect.anything(),
+      expect.any(Function),
+    )
+  })
+})
+
+describe('trackChildProcess', () => {
+  let fakeChild: { pid: number; once: ReturnType<typeof vi.fn>; kill: ReturnType<typeof vi.fn> }
+
+  beforeEach(() => {
+    execFileMockFn.mockReset()
+    fakeChild = { pid: 99, once: vi.fn(), kill: vi.fn() }
+  })
+
+  it('registers the child and removes it automatically on exit', () => {
+    trackChildProcess(fakeChild)
+    expect(fakeChild.once).toHaveBeenCalledWith('exit', expect.any(Function))
+    const exitHandler = fakeChild.once.mock.calls.find((c) => c[0] === 'exit')?.[1]
+
+    killAllChildren()
+    expect(execFileMockFn).toHaveBeenCalledWith(
+      'taskkill',
+      ['/T', '/F', '/PID', '99'],
+      expect.anything(),
+      expect.any(Function),
+    )
+
+    // Once the child exits, it is removed and no longer swept.
+    exitHandler?.()
+    execFileMockFn.mockReset()
+    killAllChildren()
+    expect(execFileMockFn).not.toHaveBeenCalled()
+  })
+
+  it('untrack() removes the child from the sweep set immediately', () => {
+    const untrack = trackChildProcess(fakeChild)
+    untrack()
+    execFileMockFn.mockReset()
+    killAllChildren()
+    expect(execFileMockFn).not.toHaveBeenCalled()
+  })
+
+  it('is a safe no-op for undefined or eventless children', () => {
+    expect(() => trackChildProcess(undefined)).not.toThrow()
+    expect(trackChildProcess(undefined)).toBeTypeOf('function')
+    expect(() => trackChildProcess({ pid: 1 } as never)).not.toThrow()
+    expect(trackChildProcess({ pid: 1 } as never)).toBeTypeOf('function')
   })
 })
 

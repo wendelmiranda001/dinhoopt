@@ -96,7 +96,7 @@ import {
   startEngine,
   stopEngineProcess,
 } from './clips-engine-connection'
-import { connectPipe, disconnectPipe } from './clips-pipe'
+import { connectPipe, disconnectPipe, getPipeSocket } from './clips-pipe'
 
 const ORIG_ENV = { ...process.env }
 
@@ -109,6 +109,31 @@ function makeMockChild() {
     stdout: { on: vi.fn(), removeAllListeners: vi.fn() },
     stderr: { on: vi.fn(), removeAllListeners: vi.fn() },
     on: vi.fn(),
+    removeAllListeners: vi.fn(),
+  }
+}
+
+function makeFakeSocket() {
+  return {
+    on: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
+      if (event === 'connect') {
+        _connectHandler = cb as () => void
+        cb()
+      } else if (event === 'data') {
+        dataHandlers.push(cb as (chunk: Buffer) => void)
+      } else if (event === 'error') {
+        errorHandlers.push(cb as (err: Error) => void)
+      } else if (event === 'close') {
+        closeHandlers.push(cb as () => void)
+      } else if (event === 'timeout') {
+        timeoutHandlers.push(cb as () => void)
+      }
+      return undefined as never
+    }),
+    destroy: vi.fn(),
+    write: vi.fn().mockReturnValue(true),
+    end: vi.fn(),
+    setTimeout: vi.fn(),
     removeAllListeners: vi.fn(),
   }
 }
@@ -967,6 +992,88 @@ describe('connectPipe event handlers', () => {
   })
 })
 
+// ─── connectPipe socket lifetime guards ───────────────────
+describe('connectPipe socket lifetime guards', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetMockSocket()
+    vi.mocked(connect).mockReturnValue(mockSocket as never)
+  })
+
+  it('removes listeners and destroys the superseded socket on reconnect', () => {
+    const sockA = makeFakeSocket()
+    const sockB = makeFakeSocket()
+    vi.mocked(connect)
+      .mockReturnValueOnce(sockA as never)
+      .mockReturnValueOnce(sockB as never)
+
+    connectPipe()
+    expect(getPipeSocket()).toBe(sockA)
+
+    connectPipe()
+    expect(sockA.removeAllListeners).toHaveBeenCalled()
+    expect(sockA.destroy).toHaveBeenCalled()
+    expect(connect).toHaveBeenCalledTimes(2)
+    expect(getPipeSocket()).toBe(sockB)
+  })
+
+  it('ignores close events from a superseded socket', () => {
+    const sockA = makeFakeSocket()
+    const sockB = makeFakeSocket()
+    vi.mocked(connect)
+      .mockReturnValueOnce(sockA as never)
+      .mockReturnValueOnce(sockB as never)
+
+    connectPipe()
+    connectPipe()
+    expect(getPipeSocket()).toBe(sockB)
+
+    // sockA's close fires late (already queued before being superseded) — must
+    // not clobber the active socket nor schedule a spurious reconnect.
+    const staleClose = closeHandlers[0]!
+    staleClose()
+
+    expect(getPipeSocket()).toBe(sockB)
+    expect(isPipeConnected()).toBe(true)
+  })
+
+  it('ignores timeout events from a superseded socket', () => {
+    const sockA = makeFakeSocket()
+    const sockB = makeFakeSocket()
+    vi.mocked(connect)
+      .mockReturnValueOnce(sockA as never)
+      .mockReturnValueOnce(sockB as never)
+
+    connectPipe()
+    connectPipe()
+    const staleTimeout = timeoutHandlers[0]!
+    staleTimeout()
+
+    expect(getPipeSocket()).toBe(sockB)
+    expect(isPipeConnected()).toBe(true)
+  })
+
+  it('disables the socket idle timeout once connected', () => {
+    connectPipe()
+    // Initial connect timeout is armed, then disabled on connect
+    expect(mockSocket.setTimeout).toHaveBeenCalledWith(10_000)
+    expect(mockSocket.setTimeout).toHaveBeenCalledWith(0)
+  })
+
+  it('does not schedule a reconnect from a close event after disconnectPipe', () => {
+    const child = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as never)
+    vi.mocked(existsSync).mockReturnValue(true)
+    disconnectPipe()
+    connectPipe()
+
+    const activeClose = closeHandlers[closeHandlers.length - 1]!
+    activeClose()
+
+    expect(getPipeSocket()).toBeNull()
+  })
+})
+
 // ─── sendWithFallback ──────────────────────────────────────
 describe('sendWithFallback', () => {
   it('returns not-connected when pipe is not connected', async () => {
@@ -1425,6 +1532,7 @@ describe('startEngine', () => {
       const result = await enginePromise
       expect(result.success).toBe(false)
       expect(result.error).toContain('pipe not connected')
+      expect(child.kill).toHaveBeenCalled()
     } finally {
       dateNowSpy?.mockRestore()
       vi.useRealTimers()

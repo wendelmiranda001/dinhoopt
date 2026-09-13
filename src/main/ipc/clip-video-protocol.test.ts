@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createReadStream, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +10,12 @@ import {
 } from './clip-video-protocol'
 
 const tempDir = mkdtempSync(join(tmpdir(), 'clip-video-protocol-'))
+
+// Wrap the real createReadStream so we can observe stream teardown.
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+  return { ...actual, createReadStream: vi.fn(actual.createReadStream) }
+})
 
 vi.mock('../services/clips-config-manager', () => ({
   clipPathInOutputDir: (inputPath: string) => {
@@ -162,5 +168,19 @@ describe('clip-video-protocol', () => {
     writeFileSync(unknown, Buffer.alloc(10, 0x41))
     const res = await handleClipVideoRequest(makeRequest(buildClipVideoUrl(unknown)))
     expect(res.headers.get('Content-Type')).toBe('application/octet-stream')
+  })
+
+  it('destroys the file stream when the request is aborted mid-body', async () => {
+    vi.mocked(createReadStream).mockClear()
+    const controller = new AbortController()
+    const req = new Request(buildClipVideoUrl(sample), { signal: controller.signal })
+    const res = await handleClipVideoRequest(req)
+    expect(res.status).toBe(200)
+
+    controller.abort()
+
+    const created = vi.mocked(createReadStream).mock.results[0]?.value as { destroyed: boolean } | undefined
+    expect(created).toBeDefined()
+    expect(created!.destroyed).toBe(true)
   })
 })

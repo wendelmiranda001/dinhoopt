@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { createReadStream, type Dirent } from 'node:fs'
+import { createReadStream, type Dirent, type ReadStream } from 'node:fs'
 import { readdir, rm, stat } from 'node:fs/promises'
 import { extname, isAbsolute, join } from 'node:path'
 import { IPC } from '@shared/channels'
@@ -17,6 +17,10 @@ import { getLogger } from '../services/logger.service'
 import type { WindowGetter } from './index'
 
 let cancelled = false
+
+// Hash streams currently being read. A cancel must tear these down so their
+// file descriptors are released immediately instead of waiting for EOF.
+const activeHashStreams = new Set<ReadStream>()
 
 // ── Progress helpers ──
 
@@ -121,13 +125,34 @@ function groupBySize(files: DuplicateFile[]): Map<number, DuplicateFile[]> {
 
 // ── Phase 3: Hashing ──
 
+function trackActiveStream(stream: ReadStream): () => void {
+  activeHashStreams.add(stream)
+  const done = () => {
+    activeHashStreams.delete(stream)
+  }
+  stream.on('close', done)
+  return done
+}
+
 function hashFilePartial(filePath: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const hash = createHash('sha256')
     const stream = createReadStream(filePath, { start: 0, end: 4095 })
+    const onStreamDone = trackActiveStream(stream)
     stream.on('data', (chunk) => hash.update(chunk))
-    stream.on('end', () => resolve(hash.digest('hex')))
-    stream.on('error', reject)
+    stream.on('end', () => {
+      onStreamDone()
+      resolve(hash.digest('hex'))
+    })
+    stream.on('error', (err) => {
+      onStreamDone()
+      reject(err)
+    })
+    stream.on('close', () => {
+      // A destroyed (cancelled) stream emits close without end/error —
+      // settle the pending hash instead of leaving the batch hanging.
+      if (cancelled) reject(new Error('Scan cancelled'))
+    })
   })
 }
 
@@ -135,9 +160,19 @@ function hashFileFull(filePath: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const hash = createHash('sha256')
     const stream = createReadStream(filePath, { highWaterMark: 65536 })
+    const onStreamDone = trackActiveStream(stream)
     stream.on('data', (chunk) => hash.update(chunk))
-    stream.on('end', () => resolve(hash.digest('hex')))
-    stream.on('error', reject)
+    stream.on('end', () => {
+      onStreamDone()
+      resolve(hash.digest('hex'))
+    })
+    stream.on('error', (err) => {
+      onStreamDone()
+      reject(err)
+    })
+    stream.on('close', () => {
+      if (cancelled) reject(new Error('Scan cancelled'))
+    })
   })
 }
 
@@ -281,6 +316,12 @@ export function registerDuplicateFinderIpc(getWindow: WindowGetter): void {
   ipcMain.handle(IPC.DUPLICATES_CANCEL, () => {
     getLogger().info('duplicate-finder', 'Scan cancelled by user')
     cancelled = true
+    // Abort in-flight hashes immediately so their file descriptors are
+    // released instead of being held until each stream reaches EOF.
+    for (const stream of activeHashStreams) {
+      stream.destroy()
+    }
+    activeHashStreams.clear()
   })
 
   // Scan

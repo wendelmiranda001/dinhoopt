@@ -198,9 +198,12 @@ export function registerWinSxSCleanerIpc(getWindow: WindowGetter): void {
       const timeout = setTimeout(() => {
         logger.error('winsxs-cleaner', 'DISM cleanup timed out after 10 minutes — killing process')
         child.kill()
-        // Give it a moment to die, then force-kill the whole process tree via taskkill
+        // Give it a moment to die, then force-kill the whole process tree via
+        // taskkill. child.killed only means the signal was *sent* — the cmd
+        // wrapper can linger owning the DISM grandchild, so only an actual exit
+        // (exitCode set) cancels the tree kill.
         setTimeout(() => {
-          if (child.killed || child.exitCode !== null) return
+          if (child.exitCode !== null) return
           try {
             execSync(`taskkill /T /F /PID ${child.pid}`, { windowsHide: true })
           } catch {
@@ -212,6 +215,16 @@ export function registerWinSxSCleanerIpc(getWindow: WindowGetter): void {
       const cleanup = () => {
         clearTimeout(timeout)
       }
+
+      // Drain DISM's stderr — if it is never consumed, the ~64KB pipe buffer
+      // fills and the process stalls silently before the timeout can fire.
+      const errDecoder = new StringDecoder('utf-8')
+      child.stderr?.on('data', (chunk: Buffer) => {
+        const text = errDecoder.write(chunk).trim()
+        if (text) {
+          logger.warning('winsxs-cleaner', `DISM stderr: ${text.slice(0, 200)}`)
+        }
+      })
 
       child.stdout?.on('data', (chunk: Buffer) => {
         const text = decoder.write(chunk)

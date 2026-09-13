@@ -348,6 +348,10 @@ export function setOnEngineRunning(cb: () => boolean): void {
 
 export function connectPipe(): void {
   if (_pipeSocket) {
+    // A superseded socket may still emit close/error/timeout events queued
+    // before destroy(). Detach its handlers and destroy it so a stale event
+    // cannot clobber the newly created socket below.
+    _pipeSocket.removeAllListeners()
     _pipeSocket.destroy()
     _pipeSocket = null
   }
@@ -360,6 +364,10 @@ export function connectPipe(): void {
   sock.setTimeout(PIPE_CONNECT_TIMEOUT)
 
   sock.on('connect', () => {
+    if (_pipeSocket !== sock) return
+    // setTimeout value only guards the *connect* phase — disable it so an idle
+    // but healthy pipe does not churn with destroy/reconnect every ~10s.
+    sock.setTimeout(0)
     _pipeConnected = true
     _handshakeError = null
     getLogger().info('clips-pipe', 'Connected to engine pipe')
@@ -367,20 +375,25 @@ export function connectPipe(): void {
     _onReconnect?.()
   })
 
-  sock.on('data', onPipeData)
+  sock.on('data', (chunk: Buffer) => {
+    if (_pipeSocket === sock) onPipeData(chunk)
+  })
 
   sock.on('error', (err) => {
+    if (_pipeSocket !== sock) return
     getLogger().warning('clips-pipe', `Pipe error: ${err.message}`)
     _pipeConnected = false
   })
 
   sock.on('close', () => {
+    if (_pipeSocket !== sock) return
     _pipeConnected = false
     _pipeSocket = null
     scheduleReconnect()
   })
 
   sock.on('timeout', () => {
+    if (_pipeSocket !== sock) return
     getLogger().warning('clips-pipe', 'Pipe connect timeout')
     sock.destroy()
     _pipeConnected = false

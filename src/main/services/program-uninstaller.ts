@@ -5,7 +5,7 @@ import { basename, extname, join } from 'node:path'
 import type { InstalledProgram, ScanItem } from '@shared/types'
 import { isSafeFolder } from '../constants/uninstall-safelist'
 import { getPlatform } from '../platform'
-import { execFileAsync, execNativeUtf8, psUtf8 } from './exec-utf8'
+import { execFileAsync, execNativeUtf8, psUtf8, trackChildProcess } from './exec-utf8'
 import { getDirectorySize } from './file-utils'
 import { REGISTRY_UNINSTALL_PATHS } from './registry-utils'
 
@@ -297,9 +297,23 @@ export function runUninstaller(program: InstalledProgram): Promise<number | null
         stdio: 'ignore',
         windowsHide: false,
       })
+      // Sweep the uninstaller tree on app exit so its helper processes
+      // (msiexec chains, inseng, etc.) don't survive the app.
+      trackChildProcess(child)
 
       const timeout = setTimeout(
         () => {
+          const pid = child.pid
+          if (pid != null) {
+            try {
+              // Force-kill the entire tree: uninstallers spawn children
+              spawn('taskkill', ['/T', '/F', '/PID', String(pid)], { windowsHide: true, stdio: 'ignore' })
+              resolve(null)
+              return
+            } catch {
+              // fall through to a direct kill
+            }
+          }
           try {
             child.kill()
           } catch {

@@ -4,7 +4,7 @@ import { IPC } from '@shared/channels'
 import type { TrimDriveInfo, TrimMediaType, TrimProgress, TrimRunResult, TrimStatus } from '@shared/types'
 import { ipcMain } from 'electron'
 import { isAdmin } from '../services/elevation'
-import { execFileAsync, psUtf8 } from '../services/exec-utf8'
+import { execFileAsync, psUtf8, trackChildProcess } from '../services/exec-utf8'
 import { getLogger } from '../services/logger.service'
 import { getLastTrimAt, isThrottled, setLastTrimAt } from '../services/trim-history-store'
 import type { WindowGetter } from './index'
@@ -269,6 +269,7 @@ async function runTrimWindows(letter: string, getWindow: WindowGetter): Promise<
     const child = spawn('cmd', ['/c', `chcp 65001 >nul & powershell.exe -NoProfile -Command "${psCmd}"`], {
       windowsHide: true,
     })
+    trackChildProcess(child)
     let log = ''
     const out = new StringDecoder('utf-8')
     const err = new StringDecoder('utf-8')

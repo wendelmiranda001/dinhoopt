@@ -23,6 +23,27 @@ function toWebStream(stream: import('node:stream').Readable): ReadableStream<Uin
   return Readable.toWeb(stream)
 }
 
+/**
+ * Wrap a bounded file stream in a Web stream that is torn down when the
+ * request's AbortSignal fires (seek scrubbing, tab close, etc). Without this,
+ * an abandoned range request keeps its file descriptor open until EOF.
+ */
+function toAbortableWebStream(
+  filePath: string,
+  signal: AbortSignal,
+  options?: { start?: number; end?: number },
+): ReadableStream<Uint8Array> {
+  const stream = createReadStream(filePath, options)
+  const onAbort = () => stream.destroy()
+  if (!signal.aborted) {
+    signal.addEventListener('abort', onAbort, { once: true })
+    stream.once('close', () => signal.removeEventListener('abort', onAbort))
+  } else {
+    stream.destroy()
+  }
+  return toWebStream(stream)
+}
+
 function baseHeaders(contentType: string): Record<string, string> {
   return {
     'Content-Type': contentType,
@@ -79,7 +100,7 @@ export async function handleClipVideoRequest(request: Request): Promise<Response
       'Content-Length': String(chunk),
     }
     if (isHead) return new Response(null, { status: 206, headers })
-    return new Response(toWebStream(createReadStream(filePath, { start, end: clampedEnd })), {
+    return new Response(toAbortableWebStream(filePath, request.signal, { start, end: clampedEnd }), {
       status: 206,
       headers,
     })
@@ -87,5 +108,5 @@ export async function handleClipVideoRequest(request: Request): Promise<Response
 
   const headers = { ...baseHeaders(contentType), 'Content-Length': String(size) }
   if (isHead) return new Response(null, { status: 200, headers })
-  return new Response(toWebStream(createReadStream(filePath)), { status: 200, headers })
+  return new Response(toAbortableWebStream(filePath, request.signal), { status: 200, headers })
 }

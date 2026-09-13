@@ -265,6 +265,13 @@ export async function startEngine(): Promise<{ success: boolean; error?: string 
     if (!connected) {
       const msg = `Engine pipe not connected after timeout (engineRunning=${_engineRunning}, pid=${_engineProcess?.pid})`
       getLogger().error('clips', msg)
+      // Do not leave the engine orphaned waiting on a pipe that never came up —
+      // kill it so a later startEngine can spawn a fresh instance.
+      try {
+        _engineProcess?.kill()
+      } catch {
+        /* already exited */
+      }
       cleanup()
       return { success: false, error: msg }
     }

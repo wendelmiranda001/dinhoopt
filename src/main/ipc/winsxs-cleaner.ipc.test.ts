@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // ── Mocks ──
@@ -14,29 +15,47 @@ vi.mock('electron', () => ({
 let spawnEventCallbacks: Record<string, (chunk: Buffer) => void> = {}
 let spawnCloseCallback: ((code: number) => void) | null = null
 let spawnErrorCallback: ((err: Error) => void) | null = null
+let lastSpawnedChild: {
+  pid: number
+  killed: boolean
+  exitCode: number | null
+  kill: ReturnType<typeof vi.fn>
+  stderr: { on: ReturnType<typeof vi.fn> }
+} | null = null
 
 function resetSpawnMocks(): void {
   spawnEventCallbacks = {}
   spawnCloseCallback = null
   spawnErrorCallback = null
+  lastSpawnedChild = null
 }
 
-vi.mock('child_process', () => ({
-  spawn: (...args: unknown[]) => {
+vi.mock('child_process', () => {
+  const spawn = (...args: unknown[]) => {
     mockSpawn(...args)
-    return {
+    const child = {
+      pid: 1234,
+      killed: false,
+      exitCode: null,
       stdout: {
         on: (_event: string, cb: (chunk: Buffer) => void) => {
           spawnEventCallbacks.data = cb
         },
       },
+      stderr: { on: vi.fn() },
       on: (event: string, cb: unknown) => {
         if (event === 'close') spawnCloseCallback = cb as (code: number) => void
         if (event === 'error') spawnErrorCallback = cb as (err: Error) => void
       },
+      kill: vi.fn(() => {
+        child.killed = true
+      }),
     }
-  },
-}))
+    lastSpawnedChild = child
+    return child
+  }
+  return { spawn, execSync: vi.fn() }
+})
 
 const mockExecFileAsync = vi.fn()
 vi.mock('../services/exec-utf8', () => ({
@@ -443,6 +462,48 @@ describe('WINSXS_CLEAN handler', () => {
       filesDeleted: 0,
       errors: [{ path: 'WinSxS', reason: 'DISM timed out after 10 minutes' }],
     })
+  })
+
+  it('consumes stderr output to avoid pipe buffer deadlock', async () => {
+    mockIsAdmin.mockReturnValue(true)
+    registerWinSxSCleanerIpc(() => mockWindow())
+
+    const handler = getHandler('winsxs:clean')
+    const promise = (handler as () => Promise<unknown>)()
+
+    expect(lastSpawnedChild?.stderr.on).toHaveBeenCalledWith('data', expect.any(Function))
+
+    if (spawnCloseCallback) spawnCloseCallback(0)
+    await promise
+  })
+
+  it('force-kills the DISM process tree when the child lingers after timeout', async () => {
+    vi.useFakeTimers()
+    try {
+      mockIsAdmin.mockReturnValue(true)
+      registerWinSxSCleanerIpc(() => mockWindow())
+
+      const handler = getHandler('winsxs:clean')
+      const promise = (handler as () => Promise<unknown>)()
+
+      // Advance past the 10-minute DISM_TIMEOUT
+      await vi.advanceTimersByTimeAsync(600_000)
+      // Root cmd child is killed first
+      expect(lastSpawnedChild?.kill).toHaveBeenCalled()
+
+      // Even though killed flag is set, the process tree still owns the DISM
+      // grandchild (exitCode null) → taskkill /T must still run
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(vi.mocked(execSync)).toHaveBeenCalledWith('taskkill /T /F /PID 1234', {
+        windowsHide: true,
+      })
+
+      // Resolve the still-pending promise to avoid dangling timers
+      if (spawnCloseCallback) spawnCloseCallback(null)
+      await promise
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('handles destroyed window in clean progress', async () => {

@@ -22,9 +22,13 @@ function execFileAsync(
   options?: import('node:child_process').ExecFileOptions,
 ): ReturnType<typeof _execFileAsync> & { child?: import('node:child_process').ChildProcess } {
   getLogger().info('exec-utf8', `execFileAsync: ${file} ${args.slice(0, 4).join(' ')}${args.length > 4 ? ' ...' : ''}`)
-  return _execFileAsync(file, args, options) as ReturnType<typeof _execFileAsync> & {
+  const promise = _execFileAsync(file, args, options) as ReturnType<typeof _execFileAsync> & {
     child?: import('node:child_process').ChildProcess
   }
+  // Register the process so the app-exit sweep (killAllChildren) can also
+  // kill the whole tree of raw execFile calls.
+  trackChildProcess(promise.child)
+  return promise
 }
 
 export { execFileAsync }
@@ -85,6 +89,30 @@ export function killAllChildren(): void {
     killTree(child)
   }
   activeChildren.clear()
+}
+
+/**
+ * Register a raw spawned child process in the app-exit sweep set.
+ *
+ * Use this for direct `spawn()` callers that don't go through
+ * execNativeUtf8/execTracked — they get the same guarantee: on app exit
+ * killAllChildren() force-kills the whole process tree (taskkill /T /F),
+ * so no cmd.exe / powershell.exe grandchildren are left orphaned.
+ *
+ * The child is removed automatically on 'exit' or 'error'. Returns an
+ * untrack function for explicit removal.
+ */
+export function trackChildProcess(child: ChildProcess | undefined): () => void {
+  if (!child || typeof child.once !== 'function') {
+    return () => {}
+  }
+  activeChildren.add(child)
+  const done = () => {
+    activeChildren.delete(child)
+  }
+  child.once('exit', done)
+  child.once('error', done)
+  return done
 }
 
 /**

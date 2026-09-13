@@ -520,6 +520,7 @@ export async function fetchAndCacheRules(url: string): Promise<{
 // ─── Periodic rule updates ───────────────────────────────────
 
 let _checkInterval: ReturnType<typeof setInterval> | null = null
+let _initialCheckTimer: ReturnType<typeof setTimeout> | null = null
 let _onRulesUpdated: (() => void) | null = null
 
 /**
@@ -554,11 +555,15 @@ export function startPeriodicRuleChecks(
 
   // Run first check shortly after launch so rules are available quickly.
   // Rules are no longer bundled — they must be downloaded from the server.
-  setTimeout(check, 5_000)
+  _initialCheckTimer = setTimeout(check, 5_000)
   _checkInterval = setInterval(check, intervalMs)
 }
 
 export function stopPeriodicRuleChecks(): void {
+  if (_initialCheckTimer) {
+    clearTimeout(_initialCheckTimer)
+    _initialCheckTimer = null
+  }
   if (_checkInterval) {
     clearInterval(_checkInterval)
     _checkInterval = null

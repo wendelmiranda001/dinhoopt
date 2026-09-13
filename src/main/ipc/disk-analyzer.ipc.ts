@@ -6,7 +6,7 @@ import { IPC } from '@shared/channels'
 import type { DiskNode, DiskRepairProgress, DiskRepairResult, DriveInfo, FileTypeInfo } from '@shared/types'
 import { type BrowserWindow, ipcMain } from 'electron'
 import { isAdmin } from '../services/elevation'
-import { execFileAsync, psUtf8 } from '../services/exec-utf8'
+import { execFileAsync, psUtf8, trackChildProcess } from '../services/exec-utf8'
 import { getLogger } from '../services/logger.service'
 import type { WindowGetter } from './index'
 
@@ -242,6 +242,7 @@ async function runSfc(drive: string, getWindow: WindowGetter): Promise<DiskRepai
     let lastPercent = 0
     const decoder = new StringDecoder('utf-8')
     const stderrDecoder = new StringDecoder('utf-8')
+    trackChildProcess(child)
 
     child.stdout?.on('data', (chunk: Buffer) => {
       const text = decoder.write(chunk)
@@ -342,6 +343,7 @@ async function runDism(getWindow: WindowGetter): Promise<DiskRepairResult> {
     let lastPercent = 0
     const dismDecoder = new StringDecoder('utf-8')
     const dismStderrDecoder = new StringDecoder('utf-8')
+    trackChildProcess(child)
 
     child.stdout?.on('data', (chunk: Buffer) => {
       const text = dismDecoder.write(chunk)
@@ -435,6 +437,7 @@ async function runChkdsk(drive: string, getWindow: WindowGetter): Promise<DiskRe
     let lastPercent = 0
     const decoder = new StringDecoder('utf-8')
     const stderrDecoder = new StringDecoder('utf-8')
+    trackChildProcess(child)
 
     child.stdout?.on('data', (chunk: Buffer) => {
       const text = decoder.write(chunk)

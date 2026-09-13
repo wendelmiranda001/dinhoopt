@@ -397,6 +397,44 @@ describe('registerDuplicateFinderIpc', () => {
       expect(result.groups).toHaveLength(0)
     })
 
+    it('destroys in-flight hash streams when cancelled', async () => {
+      mockReaddir.mockResolvedValue([makeDirent('file1.txt', 'file'), makeDirent('file2.txt', 'file')])
+      mockStat.mockResolvedValue({ size: 2_000_000, mtimeMs: 1000 })
+      mockCreateHash.mockReturnValue(makeHashObj('a'.repeat(64)))
+
+      type MockStream = EventEmitter & { destroy: ReturnType<typeof vi.fn> }
+      const streams: MockStream[] = []
+      mockCreateReadStream.mockImplementation(() => {
+        const stream = new EventEmitter() as MockStream
+        stream.destroy = vi.fn(() => {
+          stream.emit('close')
+        })
+        streams.push(stream)
+        // Emit data but never 'end' — the stream stays open, holding its fd
+        process.nextTick(() => {
+          stream.emit('data', Buffer.from('test'))
+        })
+        return stream
+      })
+
+      const scanHandler = getHandler(IPC.DUPLICATES_SCAN) as (_e: unknown, opts: unknown) => Promise<unknown>
+      const cancelHandler = getHandler(IPC.DUPLICATES_CANCEL) as () => void
+
+      const scanPromise = scanHandler(null, defaultScanOptions())
+      // Give the hashing phase time to open its streams
+      await new Promise((r) => setTimeout(r, 30))
+      cancelHandler()
+
+      const result = (await scanPromise) as Record<string, unknown>
+      expect(result.cancelled).toBe(true)
+      expect(result.groups).toHaveLength(0)
+
+      expect(streams.length).toBeGreaterThan(0)
+      for (const s of streams) {
+        expect(s.destroy).toHaveBeenCalled()
+      }
+    })
+
     it('excludes directories matching excludePatterns', async () => {
       mockReaddir.mockImplementation((path: string) => {
         if (path.includes('node_modules')) return [makeDirent('dep.js', 'file')]

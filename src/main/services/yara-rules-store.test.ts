@@ -1124,12 +1124,12 @@ describe('yara-rules-store integration', () => {
       const mod = await import('./yara-rules-store')
       const onUpdated = vi.fn()
       mod.startPeriodicRuleChecks('https://example.com', onUpdated, 60_000)
-      // Second start clears first interval but both setTimeout(5000) fire
+      // Second start must cancel the first start's pending 5s initial check
       mod.startPeriodicRuleChecks('https://example.com', onUpdated, 60_000)
 
       await vi.advanceTimersByTimeAsync(5_000)
-      // Both timeouts fire (stop/start doesn't clear first setTimeout)
-      expect(fetchMock).toHaveBeenCalledTimes(2)
+      // Only the latest start's initial check runs — no double fetch
+      expect(fetchMock).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -1151,8 +1151,8 @@ describe('yara-rules-store integration', () => {
       mod.startPeriodicRuleChecks('https://example.com', onUpdated, 60_000)
       mod.stopPeriodicRuleChecks()
 
-      // Advance 4999ms — before the 5s setTimeout fires
-      await vi.advanceTimersByTimeAsync(4_999)
+      // The 5s initial check must also be cancelled by stop
+      await vi.advanceTimersByTimeAsync(5_000)
       expect(fetchMock).not.toHaveBeenCalled()
     })
 

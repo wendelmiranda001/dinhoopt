@@ -60,6 +60,7 @@ vi.mock('./exec-utf8', () => ({
     })
   },
   psUtf8: (cmd: string) => cmd,
+  trackChildProcess: () => () => {},
 }))
 
 const mockReaddir = vi.fn()
@@ -544,9 +545,9 @@ describe('runUninstaller', () => {
     expect(result).toBeNull()
   })
 
-  it('resolves with null on timeout (10 minutes)', async () => {
+  it('resolves with null and force-kills the process tree on timeout', async () => {
     const child = new EventEmitter()
-    ;(child as any).kill = vi.fn()
+    ;(child as any).pid = 123
     mockSpawn.mockReturnValue(child)
 
     const promise = runUninstaller(
@@ -556,6 +557,30 @@ describe('runUninstaller', () => {
     )
 
     // Advance past the 10-minute timeout
+    vi.advanceTimersByTime(10 * 60 * 1000)
+
+    const result = await promise
+    expect(result).toBeNull()
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'taskkill',
+      ['/T', '/F', '/PID', '123'],
+      expect.objectContaining({ windowsHide: true }),
+    )
+  })
+
+  it('falls back to child.kill() when the tree-kill spawn fails on timeout', async () => {
+    const child = new EventEmitter()
+    ;(child as any).kill = vi.fn()
+    mockSpawn.mockReturnValueOnce(child).mockImplementation(() => {
+      throw new Error('spawn failed')
+    })
+
+    const promise = runUninstaller(
+      makeProgram({
+        uninstallString: 'C:\\App\\uninstall.exe',
+      }),
+    )
+
     vi.advanceTimersByTime(10 * 60 * 1000)
 
     const result = await promise
