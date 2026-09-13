@@ -226,9 +226,9 @@ export function createWin32Network(): PlatformNetwork {
     },
 
     async setDnsServer(primary: string, secondary?: string, iface?: string): Promise<boolean> {
+      const interfaces = iface ? [iface] : await getNetworkInterfaces()
+      if (interfaces.length === 0) return false
       try {
-        const interfaces = iface ? [iface] : await getNetworkInterfaces()
-
         for (const int of interfaces) {
           await execFileAsync(
             'netsh',

@@ -324,4 +324,47 @@ describe('win32 network', () => {
       expect(result).toBe(false)
     })
   })
+
+  describe('setDnsServer', () => {
+    it('returns false and applies nothing when no interface matches the filter', async () => {
+      execFileMock.mockResolvedValue({ stdout: '', stderr: '' })
+      const result = await network.setDnsServer!('8.8.8.8', '1.1.1.1')
+      expect(result).toBe(false)
+      const netshCalls = execFileMock.mock.calls.filter((c) => c[0] === 'netsh')
+      expect(netshCalls).toHaveLength(0)
+    })
+
+    it('returns true and configures dns on every matched interface', async () => {
+      execFileMock.mockResolvedValue({ stdout: 'Wi-Fi\nEthernet\n', stderr: '' })
+      const result = await network.setDnsServer!('8.8.8.8', '1.1.1.1')
+      expect(result).toBe(true)
+      const netshCalls = execFileMock.mock.calls.filter((c) => c[0] === 'netsh')
+      expect(netshCalls).toHaveLength(4)
+    })
+
+    it('configures only the primary dns when secondary is omitted', async () => {
+      execFileMock.mockResolvedValue({ stdout: 'Wi-Fi\n', stderr: '' })
+      const result = await network.setDnsServer!('8.8.8.8')
+      expect(result).toBe(true)
+      const netshCalls = execFileMock.mock.calls.filter((c) => c[0] === 'netsh')
+      expect(netshCalls).toHaveLength(1)
+    })
+
+    it('uses the explicit interface and skips interface enumeration', async () => {
+      execFileMock.mockResolvedValue({ stdout: '', stderr: '' })
+      const result = await network.setDnsServer!('8.8.8.8', undefined, 'Wi-Fi')
+      expect(result).toBe(true)
+      const netshEither = execFileMock.mock.calls.filter((c) => c[0] === 'netsh' || c[0] === 'powershell.exe')
+      expect(netshEither).toHaveLength(1)
+      expect(String(netshEither[0][1])).toContain('Wi-Fi')
+    })
+
+    it('returns false when netsh fails', async () => {
+      execFileMock
+        .mockResolvedValueOnce({ stdout: 'Wi-Fi\n', stderr: '' })
+        .mockRejectedValueOnce(new Error('access denied'))
+      const result = await network.setDnsServer!('8.8.8.8')
+      expect(result).toBe(false)
+    })
+  })
 })
