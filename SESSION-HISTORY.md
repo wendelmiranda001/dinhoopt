@@ -1,0 +1,316 @@
+# DiNho Optimizer — Changelog Condensado de Sessões
+
+Versão higienizada do histórico de sessões: cada entrada foi reduzida a uma linha de resumo + (quando existiam) as decisões técnicas registradas. Números de teste, listas de arquivos alterados e passos-a-passo de implementação foram removidos — isso está preservado, sem edição, em `SESSION-HISTORY-FULL.md`, caso seja necessário investigar um bug específico a fundo.
+
+---
+
+- **2026-06-15** — **malware-store.test.ts**: Expanded from 17 to 78 tests covering all store methods
+- **2026-06-18** — **scheduler.test.ts**: Expanded from 39 to 54 tests covering previously uncovered branches in `isDueEntry`, `triggerScheduleEntry`, `notifyScheduledScanComplete`, and `completeScheduleRun`
+- **2026-06-20** — **cli.test.ts**: Expanded from 65 to 89 tests covering 4 previously untested handlers
+- **2026-06-20b** — **Fase 5 — Unificar Loggers**: Migrated all 3 usages of `logger.ts` (Logger B — sync, plain text) to `logger.service.ts` (Logger A — async, JSONL)
+- **2026-06-20c** — **Fase 5 — MAX_CACHE_SIZE configurável**: `scan-cache.ts`
+- **2026-06-20d** — **Fase 5 — steam libs dinâmicas**: `gaming-cleaner.ipc.ts`
+- **2026-06-20e** — **file-shredder.ipc.test.ts**: +5 tests covering previously uncovered branches
+- **2026-06-20f** — **Import bug fix**: `ScannerPanel.tsx` importava `canAllowlistThreat` de `scanner-panel-constants` mas a função estava em `scanner-panel-utils` — corrigido separando os imports
+- **2026-06-21** — **Vulnerability E2E tests fixed** (6/6 passing)
+- **2026-06-21b** — **malware-scanner.service**: Exported 17 internal functions for direct unit testing and added 92 new test cases (173 total)
+- **2026-06-21c** — **Backend-frontend wiring gaps closed** (8 items)
+- **2026-06-21d** — **ScanResultSummary layout refactored**
+- **2026-06-21e** — **cli.test.ts**: Expanded from 89 to **178 tests** (+89) covering the 13 previously untested CLI handlers
+- **2026-06-21f** — **Coverage expansion para 79.57% branches** (+118 testes, +1 arquivo)
+- **2026-06-21g** — **CLI refactoring — extracted router and command handlers from monolithic cli.ts**
+- **2026-06-21h** — **F1-C1**: `FALLBACK_TOKEN` mantido com `logger.warning` quando usado como fallback — remote auth preservado
+    - Decisão: `FALLBACK_TOKEN` mantido como fallback com warning em vez de removido, para preservar remote auth sem `LICENSE_API_TOKEN`
+    - Decisão: Arquivos grandes quebrados extraindo helpers puros, mantendo o arquivo orquestrador como re-export fino para compatibilidade de imports de teste
+    - Decisão: Renderer logging usa canal IPC `RENDERER_LOG` em vez de importar `getLogger()` (main-process only)
+    - Decisão: UX4/UX5/P2/P3 avaliados e mantidos como estão (ErrorBoundary router-level já mitiga, framer-motion é decorativo, better-sqlite3 é esperado em Electron)
+- **2026-06-21i** — **Build error fix**: `export { AllowlistEntry, ... }` → `export type { ... }` para interfaces TS que o Rollup não conseguia resolver (AllowlistEntry, RegistryPersistenceResult, LOLBinPattern, QuarantineEntry)
+    - Decisão: Suspense fallback removido porque cada rota já tem `PageTransition` com `initial={{ opacity: 0, y: 12 }}` — não precisa de skeleton intermediário
+- **2026-06-22** — **Per-App Audio Filtering — conexão Electron → Engine**
+- **2026-06-22b** — **Root cause das falhas de game detection/captura encontrada no NamedPipeServer**
+    - Decisão: **`Task.WhenAny` com 500ms polling**: evita thread-safety issues do StreamWriter, responsivo o suficiente para status broadcasts de 2s
+    - Decisão: **`ConcurrentQueue<string>`**: thread-safe, produtor (timer) e consumidor (loop) não bloqueiam
+    - Decisão: **`_lastDetectedGame` + `ResolveProcessByName()`**: fallback em 3 níveis — custom game → foreground atual → último jogo detectado
+- **2026-06-22c** — **Crash root cause identified**: `HotkeyManager.KeyboardHookCallback` (native Windows hook callback) sem try-catch — exceção do `ToggleCapture` → `StopCapture` → `_pipelineTask.Wait(2000)` crashava o processo inteiro
+    - Decisão: **try-catch no native callback**: essencial porque Windows low-level keyboard hooks rodam no message loop nativo — exceções não tratadas crasham o processo .NET sem chance de recovery
+    - Decisão: **Retry no Electron em vez de no C#**: mais simples e não requer mudança no protocolo pipe; o pipe já tem reconnect automático a cada 3s
+- **2026-06-23** — **Root cause analysis — WGC per-window não produz frames no sistema RTX 5050 / FiveM**
+    - Decisão: **WGC desktop antes do DXGI**: WGC desktop captura o monitor inteiro via DWM, funciona mesmo se per-window falhar por `WS_EX_NOREDIRECTIONBITMAP` — e tem qualidade superior ao DXGI Desktop Duplication
+    - Decisão: **Cold-start timeout de 500ms**: valor empírico; WGC pode levar 50-200ms para primeira frame (enumeração DWM, criação de buffers). 500ms cobre folga sem atrasar perceptivelmente o início da captura
+    - Decisão: **Verificação de `WS_EX_NOREDIRECTIONBITMAP`**: BattlEye pode injetar esse estilo em janelas de jogos FiveM para proteção anti-screenshot; checagem evita tentativa fútil de WGC per-window sem perder tempo com catch exception
+- **2026-06-23b** — Teste FiveM: root cause Message Pump
+- **2026-06-23b** — Fix WGC + hotkeys Mouse4/Mouse5
+- **2026-06-23c** — **Áudio do jogo FUNCIONA nos clips!**
+- **2026-06-23d** — **PTT + microfone funcionando nos clips!**
+- **2026-06-23e** — **Session muting implemented — `AudioSessionMuteManager.cs`**
+- **2026-06-24** — **Per-process audio via C++ DLL (`qH0sT/ApplicationLoopback`)**: Session muting rejected (usuario rejeitou). `CppLoopbackSource.cs` criado — P/Invoke wrapper que chama `ApplicationLoopback.dll` via `SetAudioCallback`/...
+    - Decisão: **C++ DLL P/Invoke** sobre NAudio wrapper (COM nativo VAD falhou: `E_NOTIMPL` no vtable slot 14)
+    - Decisão: `Thread.Interrupt()` usado para desbloquear `Sleep(4294967295)` interno do DLL — capture thread `IsBackground=true`
+    - Decisão: Só o primeiro PID de `SelectedAudioSessions` é usado em INCLUDE mode; `includeProcessTree=true` captura filhos automaticamente (FiveM → GTA5.exe)
+- **2026-06-24b** — **Volume sliders fix**: `getCurrentConfigPayload()` estava faltando `gameVolume`, `micVolume`, `selectedAudioSessions`, `useExcludeMode`, `excludeProcessId`. Quando o frontend chamava `refreshConfig()` após mudar o vo...
+- **2026-06-24c** — **Thumbnail PATH resolution fix**: `scanFfmpeg()` em `thumbnail-generator.ts` só procurava `ffmpeg.exe` em 9 diretórios fixos — nunca em `%PATH%`. C# engine funciona via `Process.Start("ffmpeg", ...)` (resolve PATH),...
+- **2026-06-24d** — **AutoCleanup + favorites mismatch corrigido**: Engine busca `.favorite` marker files no disco, frontend usava `localStorage`. Adicionado `CLIPS_SET_FAVORITE` IPC handler (`clips.ipc.ts:745`) que cria/remove `.${clipN...
+- **2026-06-24e** — **Fix PTT sobrescrito pelo config handler** (`EngineCoordinator.cs:1465`): handler `config` salvava `oldPttMode` antes do update e só alterava `_audioMixer.MicEnabled` se o modo PTT transicionou (Off→Hold ou Hold→Off)...
+- **2026-06-24f** — **metrics-server test isolado**: Movido `metrics` bloco de `cli.test.ts` para `cli/commands/metrics.test.ts` — 5 testes com mock hoisting correto do `node:http`; cobre `/metrics`, `/health`, 404, server error
+- **2026-06-24g** — **Engine not found fix**: Engine executable wasn't included in packaged app because `extraResources` in `electron-builder.yml` had wrong path. Fixed by pointing to `bin/Release/net10.0-windows10.0.26100.0/publish` as...
+- **2026-06-25** — ClipsPage badge + orphan engine + copy-engine script
+- **2026-06-25** — Engine crash packaged: ffmpeg bundling + symlink fix
+- **2026-06-25b** — **Fix save-clip fire-and-forget no engine C#**: O handler `saveClip` no `EngineCoordinator.cs` usava `_ = SaveClipAsync()` (fire-and-forget) e retornava `"ok"` imediatamente, antes do ffmpeg terminar de salvar o clipe...
+- **2026-06-25c** — **NVENC quality evaluation + improvements**: Pipeline completo mapeado (`WgcCaptureSource` → `FfmpegEncoder` → `ClipExporter` mux sem re-encode) e 3 melhorias aplicadas
+    - Decisão: `-rc-lookahead 32` adiciona ~0.53s de latência a 60fps — aceitável para replay buffer de 5min+
+    - Decisão: `-bf 3` melhora eficiência de compressão em ~15% vs 0 B-frames, com latência de decode desprezível para clips salvos
+    - Decisão: `-temporal-aq 1` é o parâmetro individual mais impactante para qualidade em movimento — sem ele, NVENC distribui bits igualmente entre regiões estáticas e em movimento
+    - Decisão: Bitrate do preset "Bom" subiu de 15→20 Mbps porque 15 Mbps em 1080p60 está abaixo da recomendação NVIDIA para gaming capture (20-30 Mbps para 1080p60)
+- **2026-06-25** — CRF+VBV encoding + presets CQ
+- **2026-06-25** — DiNho UI detection fix + games.json expandido
+- **2026-06-25** — WGC FiveM restart loop + VideoSupport fix
+- **2026-06-25** — H264 corruption fix + docs/package
+    - Decisão: `DataLength` em vez de `new byte[n]`: manter `ArrayPool` para evitar GC pressure com `Process.Start` e encapsulamento de arrays, mas rastrear comprimento real dos dados.
+- **2026-06-25** — Audio sync fix: PTS gap filtering
+- **2026-06-25** — Tooltip position fix
+- **2026-06-25** — RNNoise + Clip Editor + Video Preview
+    - Decisão: `anlmdn` over `arnndn`: built into ffmpeg, no external `.nn` model required; `arnndn` supported as opt-in upgrade
+    - Decisão: Per-packet filtering inside `AudioMixer.OnMicData` (before `_micQueue`) — toggleable at runtime without restart
+    - Decisão: `-c copy` for trim/merge: instant because source clips are already compressed H.264/AAC
+    - Decisão: Custom `clip-video://` protocol instead of `file://` (blocked by `net.fetch`) or base64 (memory for large clips)
+- **2026-06-25** — Video preview fixes + merge UX
+- **2026-06-25** — Video preview CSP fix + Trim UI overhaul
+- **2026-06-26** — H264 corruption root cause + NVENC bitstream filter fix
+    - Decisão: `-bsf:v h264_mp4toannexb` é obrigatório para NVENC H264 (avcc→AnnexB) — sem isso o mp4 fica corrompido
+    - Decisão: GOP 120 vs 60: buffer de 5min+ significa que keyframe intervalos maiores são aceitáveis e melhoram compressão em ~10-15%
+    - Decisão: Debounce de 500ms/250ms para foreground/background: WGC pode ter drops transitórios de 1-5 frames sem indicar perda de foreground real
+    - Decisão: Output queue limit de 32 pacotes: ~533ms de buffer a 60fps — suficiente para absorver picos sem consumir memória ilimitada
+- **2026-06-26** — Matroska writer kills "timestamps unset" warning
+    - Decisão: Raw H264 → **Matroska (.mkv)**: único container que ffmpeg aceita com `-c:v copy` e timestamps por frame sem re-encode; EBML writing é direto, sem dependência externa
+    - Decisão: **SimpleBlocks** em vez de Clusters com BlockGroup — mais simples e suficiente para H264/HEVC/AV1 sem side data
+    - Decisão: Cluster split a cada 1000 frames: relTc cabe em int16 (max 32.767s a 1ms timecode scale)
+    - Decisão: **Unknown size** para Segment e Clusters: ffmpeg não precisa do tamanho para demux, evita seek-back no arquivo
+- **2026-06-26** — Áudio sync fix: priority + diagnostics
+- **2026-06-26** — CodecPrivate fix: Matroska sem SPS/PPS corrompia MP4
+- **2026-06-26** — disk-trim branch coverage finalizado
+- **2026-06-26** — ClipExporter integration tests
+- **2026-06-26** — Config manager extraction: clips.ipc.ts ~1227L → ~972L
+- **2026-06-26** — Log.cs recovery + Console.WriteLine→Log migration
+- **2026-06-26** — Refactoring: Engine state extraction + 12-item cleanup
+- **2026-06-26** — Items 7, 8: games.json auto-update + ffprobe removal
+    - Decisão: **games.json output directory configurable**: `GameDatabaseUpdater` accepts `outputDirectory` in constructor (default `AppContext.BaseDirectory`) — tests use temp dir to avoid polluting shared state
+    - Decisão: **`ffmpeg -i` over `ffprobe`**: saves 217MB; ffmpeg is already bundled for encoding; parsing stderr for duration is reliable and well-documented
+    - Decisão: **SemaphoreSlim over lock**: async-compatible for fire-and-forget from startup
+- **2026-06-26** — Testes unitários para clips-engine-connection.ts
+- **2026-06-27** — Fix 13 test failures + lint auto-fix
+- **2026-06-27** — H264 CodecPrivate fix: avccCache from encoder
+- **2026-06-27** — Test data fix: AnnexB → AVCC format
+- **2026-06-27** — VINT unknown-size fix: range checks exclude max values
+    - Decisão: **Max-value exclusion over width bump**: Using `value < 0x7F` instead of `value < 0x80` means a value of 127 gets encoded as 2-byte VINT (14 bits) instead of 1-byte VINT (7 bits). The 1 extra byte overhead per rare edge case is negligible vs. breaking the e...
+    - Decisão: **Same principle applies to all widths**: 2-byte max 0x3FFF → fall through to 3-byte; 3-byte max 0x1FFFFF → fall through to 4-byte. The guard ensures VINT_VALUE can never be all-1s for data elements
+    - Decisão: **Test isolation**: Cross-test state leakage in the earlier clip IPC tests was caused by `engineRunning`/`engineProcess` module-level vars persisting between tests. Fixed with `stopEngineProcess()` in `afterEach`
+- **2026-06-27** — FfmpegEncoder fix: AVCC format detection + cross-read _pendingLen
+- **2026-06-27** — avcC extradata corruption fix: video=0 frames
+- **2026-06-27** — 3-root cause fix: video=0frames + reader loop corruption + ReplayBuffer budget
+- **2026-06-27** — Pipe-split NALU fix: persistent _rawBuf across reads + live FiveM confirmation
+- **2026-06-27** — ConvertAnnexBToAvcc orphaned data fix: `missing picture in access unit` + 900KB accumulation
+- **2026-06-27** — `video=0frames` fix: AVCC/AnnexB format detection
+    - Decisão: Threshold de 64 bytes para assumir AVCC: buffer grande o suficiente para conter pelo menos um NALU típico sem falso positivo em orphaned tails minúsculos
+    - Decisão: `ScanForStartCode()` em vez de `IsAnnexB()` na posição 0: necessário para dados que começam com orphaned tail mas contêm start codes no meio
+    - Decisão: Parse direto AVCC descarta o buffer (`_rawLen = 0`): AVCC não tem orphaned tails (cada NALU tem length prefix), então não há dados parciais
+- **2026-06-28** — Formato latch + log noise + MP4 bsf fix
+- **2026-06-28** — FindTrailingFrozenFrames fix + save diagnostics
+- **2026-06-29** — Clip stale ending fix: FindTrailingFrozenFrames removido
+- **2026-06-29** — Clip truncado em 3:39 fix: MaxBufferBytes dinâmico
+- **2026-06-29** — Per-stream PTS reference fix: A/V sync quando encoder speed < 1.0x
+- **2026-06-30** — **Análise de logs ao vivo**: Usuário compartilhou logs do engine mostrando sessão de captura saudável — NVENC 57fps, AAC encoder sem erros, ReplayBuffer 300s/~840MB. `hadSlice=False` nos logs de `ParseAvcc` é comporta...
+- **2026-06-30b** — **"10s de delay" root cause identificada e corrigida**: Áudio usa pipeline AAC (~11s) mais rápido que NVENC (~20s). Isso cria um offset de 9-10s onde os valores de PTS do áudio no buffer são mais "frescos" que os do v...
+- **2026-06-30c** — Video freeze fix: Non-monotonic DTS do drain da PTS queue
+- **2026-06-30** — TrimVideoStart fix: threshold 30ms→2s
+- **2026-07-05** — **Auditoria completa do sistema de clips A/V sync**: Pipeline mapeado do WGC capture → NVENC → ReplayBuffer → Matroska → MP4. Identificadas 5 causas de desincronia
+- **2026-07-23** — Áudio clip fix: ADTS separate file + two-input mux
+    - Decisão: **Separate ADTS file sobre Matroska audio track**: O matroskadec do ffmpeg não define `frame_size` para `A_AAC`, tornando impossível muxar com `-c:v copy` para MP4. Arquivo ADTS separado + `-f aac` demux resolve o problema porque o demuxer AAC nativo lê ADT...
+    - Decisão: **`-f aac` em vez de `-f adts`**: ffmpeg aceita `adts` apenas como muxer (output), não como demuxer (input). O demuxer correto para dados AAC com headers ADTS é `aac`.
+- **2026-07-23b** — ReplayBuffer disk spill
+    - Decisão: **ArrayPool-backed disk I/O**: `DiskSpillBuffer.Write()` copies from ArrayPool arrays to file immediately, then calls `Release()` — avoids holding ArrayPool slots during I/O
+    - Decisão: **`MemoryMarshal.AsBytes`** over `Buffer.BlockCopy`: avoids `System.Buffer` namespace shadowing (file is in `DiNho.Capture.Poc.Buffer` namespace)
+    - Decisão: **Auto-activation threshold**: `neededBytes > MaxBufferBytes` — only spills when RAM budget is genuinely insufficient for the configured clip duration
+- **2026-07-24** — **Fixed 285 CLI test failures** (283 import path bugs + 2 context-menu tests)
+- **2026-07-24b** — WGC Session5 upgrades: MinUpdateInterval + IncludeSecondaryWindows
+    - Decisão: **`TimeSpan.Zero` over any positive value**: Setting `MinUpdateInterval` to zero ensures WGC always sends the latest frame — no artificial delay. The DWM already sends frames at monitor refresh rate; this flag just prevents the 24H2+ optimization from suppr...
+    - Decisão: **Same COM QueryInterface pattern as Session2/Session3**: `Marshal.QueryInterface` + `Marshal.GetObjectForIUnknown` + `try/catch/finally` + `Marshal.Release` — no WinRT dependencies, works with any .NET version.
+- **2026-07-24c** — WGC full API: dirty regions, WDA exclusion, DirtyRegionMode
+    - Decisão: **Dirty regions as diagnostics first**: Full dirty-region-aware GPU copy (skip unchanged regions) would require deep integration with the NV12 copy path. For now, diagnostic logging provides data to evaluate whether the optimization is worthwhile.
+    - Decisão: **Reflection for DirtyRegionMode**: No numbered COM interface exposes `DirtyRegionMode`. WinRT properties on non-numbered interfaces require either CsWinRT projections (may not project it) or raw ABI calls. Reflection on the projected type is the safest app...
+    - Decisão: **WDA from engine, not Electron**: The engine has `EnumWindows` + PID-based window lookup. Electron would need `ffi-napi` (not in project deps) to call `SetWindowDisplayAffinity`. Engine-side implementation avoids new npm dependencies.
+- **2026-07-25** — Deep review critical bug fixes
+    - Decisão: **`using var` for CTS** over explicit Dispose in finally: C# 8+ using declaration ensures disposal even on early returns, and is more concise than try/finally for single-resource patterns
+    - Decisão: **Win10 0x01 before Win11 0x11**: `WDA_EXCLUDEFROMCAPTURE` (0x01) is documented since Win10 1903; 0x11 is undocumented Win11 extension — tried first to maximize compatibility
+    - Decisão: **Process.Dispose() for GetProcessesByName**: `Process.GetProcessesByName` returns Process objects that hold OS handles — without Dispose, handles accumulate until GC finalizer runs (unpredictable, may be delayed minutes)
+    - Decisão: **WGC scope vars before try**: C# scoping rules require variables accessed in catch blocks to be declared in the enclosing scope, not inside the try block
+- **2026-07-25** — Config sync over-polling fix
+- **2026-07-26** — Plano de Atualização Geral: 9 Agentes + 1 Reviewer
+- **2026-07-27** — ffmpeg path fix + RamManager config fix + ffmpeg 8.1.2 install
+    - Decisão: **FfmpegPathResolver over hardcoded paths**: Centralized path resolution with fallback chain — all 9 call sites now benefit from the same discovery logic
+    - Decisão: **Staging dir as dev-mode candidate**: From `bin/Debug/net10/.../` the staging dir is 6 levels up at `resources/clips-engine-staging/` — reliable for `npm run dev`
+    - Decisão: **WinGet symlink recreation**: `winget install Gyan.FFmpeg` installed the package but didn't create the symlink in `WinGet/Links/` — manual creation fixed PATH availability
+    - Decisão: **ffmpeg 8.1.2 (latest stable)**: Full build includes all hardware encoders (NVENC, AMF, QSV) and software codecs needed by the engine
+- **2026-07-28** — Volume slider range + NaN crash fix verification
+- **2026-07-28** — Clips test suite audit + fix
+- **2026-07-28b** — C8 + C9: sendPipeCommandLongRunning + disconnectPipe tests
+- **2026-07-28** — Layout fixes + Sidebar merge + Hotkey save feedback
+- **2026-07-29** — FfmpegEncoder infinite restart loop fix
+- **2026-07-29b** — Game Mode validation fix
+- **2026-07-31** — WGC video stall fix: jogo "fechado" falso + teardown zumbi
+- **2026-07-31b** — Fallback não sobrepõe resolução do usuário + labels honestas
+- **2026-07-31c** — CPU fallback quality fix: ultrafast → veryfast CRF+VBV
+- **2026-07-31d** — Codec vazio fix: OverflowException do PointerUSize + fallback não-vazio
+- **2026-07-31e** — av1_nvenc restart loop fix: weighted_pred removido
+- **2026-07-31f** — RAM fix: VideoPacketPool dedicado + NoGCRegion removido
+- **2026-07-31** — Preview de clips + re-encode no trim + watchdog RAM wiring
+- **2026-07-31** — Review fixes: clip-video containment + toast dedup + tipo PipeMessage
+- **2026-07-31** — Review 5 agents: todos CRITICAL/HIGH fixados, veredito APROVADO
+- **2026-07-31** — R2 M1 refinamento: DropOldest + itemDropped no canal do encoder
+    - Decisão: **`DropOldest` + `itemDropped` sobre `DropWrite`**: o canal com callback nativo é a forma mais limpa de restaurar a semântica original (descartar o mais antigo) sem vazar arrays pooled. O `onDropped`/`itemDropped` é chamado pela implementação do channel ao...
+    - Decisão: **Construtor com corpo em vez de inicializador de campo**: necessário porque o callback captura o campo `_droppedPackets` (CS0236). `_outputChannel` continua `readonly` — atribuído uma única vez no construtor.
+- **2026-08-01** — TDD fix Bugs B/C do áudio AAC: race + stdin sem timeout
+    - Decisão: **Lock em vez de canal para serializar o AAC**: `_pcmBuf` é compartilhado entre as 2 threads WASAPI e a ordem de escrita importa (batches contíguos de 1024 samples). Um lock curto dentro do `EncodeAudio` preserva a ordem de chegada sem reestruturar o fluxo.
+    - Decisão: **Espelhar o padrão de timeout do vídeo** (warmup 5000ms / steady 250ms): primeira batch ocorre com o ffmpeg ainda abrindo — timeout generoso evita falso-unhealthy no arranque; steady strict impede travas longas.
+    - Decisão: **`_isHealthy = false` em Timeout**: escolhido porque um ffmpeg AAC travado raramente se recupera; o watchdog do pipeline trata a recuperação via restart.
+- **2026-08-01** — Stall 76s do pipeline: spill fora do write lock
+    - Decisão: **Segmentos sobre arquivo único**: trim destrutivo de arquivo inteiro é O(n) com write lock segurando o pipeline — deletar arquivos de segmento totalmente consumidos é O(1) por segmento e nunca reescreve dados.
+    - Decisão: **Evictados coletados sob lock, flush fora do lock**: a coleção de pacotes a evictar é barata (só manipulação de ponteiros do anel); o I/O (spill write + trim + release) roda na thread do caller após soltar o write lock.
+    - Decisão: **FlushEvicted sem Retain() extra**: pacotes evictados já saíram do anel — vão para o spill e são release'd como antes, preservando a semântica de ownership.
+- **2026-08-01** — Code review `d737658^..HEAD`: export pipeline + IPC/config
+    - Decisão: **Fallback de CodecPrivate só para H264 hoje**: o avcC fallback do encoder foi adicionado na saga de 2026-06-27 porque a extração por packets falhava; HEVC tem o mesmo perfil de risco e o cache (`BuildHvcc`) JÁ é populado — é só religar os params já plumbed...
+    - Decisão: **`CurrentUserOnly` no pipe** é a fronteira de confiança atual: cross-user bloqueado, same-user (ou renderer comprometido) não — aceitável enquanto o renderer roda com contexto isolado, mas o `HandleConfig` sem validação é o ponto mais fraco.
+- **2026-08-01** — IsProcessAlive por PID: fix do falso-negativo FiveM
+    - Decisão: **PID sobre nome**: o build number do FiveM muda a cada update — qualquer heurística de nome é frágil; `OpenProcess` por PID é determinístico e barato (abre/fecha handle em µs).
+    - Decisão: **Fail-closed como política**: em dúvida (exceção, sem acesso de leitura), assume vivo — nunca derruba captura por engano. Custo de falso-positivo (loop espera watchdog) é aceitável vs. derrubar uma sessão de gravação.
+    - Decisão: **Campos estáticos para seams**: reflexão `GetField` não acha backing field de auto-property; usando campos com inicializador default = P/Invoke real.
+- **2026-08-02** — Clip player fix definitivo: net.fetch + trim handles em px
+    - Decisão: **Range manual sobre `net.fetch(file://)`**: o file loader do Chromium ignora `Range` — seek fica impossível (`seekable.end() === 0`). Implementar `206`/`Content-Range`/`Accept-Ranges` com `createReadStream(filePath, { start, end })` é o padrão validado por...
+    - Decisão: **Hit-test em px para os handles**: a escala do clipe (60s vs 300s) torna thresholds em segundos inúteis — o usuário deve poder agarrar o handle VISÍVEL independentemente da duração.
+- **2026-08-02** — G1-3: GetSegments sem lock durante spill I/O + drop-release de RAM
+    - Decisão: **`VideoPacketPool.Rent` no harness em vez de relaxar o assert**: o leak observável é "array pooled retornado exatamente uma vez" — o pool de produção valida procedência, então a simulação precisa de arrays REAIS do pool. `new byte[100]` com `isPooled: true...
+    - Decisão: **ReadAll fora do lock é a prioridade**: segurar o read lock durante I/O de disco inteiro bloquearia AddVideo/AddAudio (write lock exclusivo) — o pior modo de falha (pipeline congelado). A race de teardown é estreita e tratada como best-effort.
+- **2026-08-02** — C8: drenagem de stderr nos filtros de áudio ffmpeg
+    - Decisão: **Drenagem async (`BeginErrorReadLine`) sobre leitura síncrona**: o handler roda em threadpool e nunca bloqueia o pipeline — mesma escolha do AAC encoder e ClipExporter.
+    - Decisão: **Nota de path**: `dotnet publish -o bin/.../publish` a partir de `dinho-clips-poc\` grava em `dinho-clips-poc\bin\...` (raiz), NÃO em `src\DiNho.Capture.Poc\bin\...` — o path canônico para deploy é o staging do `copy-engine` (dll com hash `975F10BD`); o `s...
+- **2026-08-02** — FASE 5: leftover morto do RnnoiseFilter corrigido
+    - Decisão: **Sobre-leitura + leftover preservado sobre leitura exata**: um filtro streaming (`anlmdn`) tem latência interna e pode emitir bursts maiores que o frame; ler só `expectedBytes` perde o excedente no pipe. Preencher o buffer todo e consumir o frame alinhado...
+    - Decisão: **Consumir `expectedBytes` quando disponível**: o steady-state do `anlmdn` preserva taxa/canais, então a saída por frame == entrada (byteLen). Alinhar o consume ao frame evita que um burst ocasione frames maiores que os do mixer.
+- **2026-08-02** — FASE 6 M2+L2 e FASE 7 M14
+    - Decisão: **`itemDropped` do canal sobre `TryWriteOutput`**: o descarte nativo do channel chama o callback — é o único caminho que garante `Release()` mesmo se o frame for evictado internamente. `DropOldest` preserva os frames mais recentes (ponto de save do replay b...
+    - Decisão: **Probe no thumbnail antes do throw**: o export corrompido produzia thumbnail que falhava com exit≠0 e a exceção carregava stderr truncada; o probe de streams dá o diagnóstico "MP4 probe FAILED: expected audio but none found!" que antes era engolido pelo ca...
+- **2026-08-02** — FASE 7 M11 + triagem status FASE 7/8
+    - Decisão: **`StatsDetailed()` único em vez de `Stats()`+`StatsDetailed()`**: cada chamada adquire o read lock do ReplayBuffer; unificar a leitura a uma aquisição reduz contention no status update (roda a cada frame) e garante valores coerentes entre si.
+    - Decisão: **M13/L10/FASE 8 não aplicados**: itens opcionais ou LOW em caminho validado em produção — mudar por mudar arrisca regressão sem ganho mensurável.
+    - Decisão: **Planos desatualizados**: `PLANO_EXECUCAO_FASES.md` referencia linhas de versões antigas (ex.: `ReplayBuffer.cs:1125-1131`, `ClipExporter.cs:841-842`) — itens conferidos no código real, não pela linha do plano.
+- **2026-08-02** — MED #2: handler `config` do pipe passa por ValidateAndFix
+- **2026-08-02** — ClipEditorModal: 8 findings da revisao corrigidos
+- **2026-08-03** — TDD `sharpnessStrength` config: RED → GREEN
+- **2026-08-04** — O1/O2 GPU: revisao aplicada + deploy + smoke
+    - Decisão: **Overload de 7 args com buffer do chamador para o downscale**: evita alocar LOH por frame em 720p+; o cache _downscaleScratch por (nv12W, nv12H) faz reset de tamanho barato e preserva o buffer entre frames.
+    - Decisão: **Branch direto (identidade) tambem para exH == nv12H + 1**: altura impar de captura (ex.: 1081) nao precisa de bilinear no eixo Y quando ja bate as dims — apenas o crop de 1 linha.
+- **2026-08-04** — HIGH do review fixado: áudio resiliente sem NRE quando loopback ausente
+    - Decisão: **`IAudioSource?` no AudioMixer sobre `AudioMixer?` nos call sites**: menor diff; o mixer continua criado sempre (Start/OnMixedAudio/SampleRate válidos em SOMENTE VÍDEO) e os guards de source ficam centralizados no mixer.
+    - Decisão: **Derivar SR/Channels do mic quando loopback null**: TryMix só emite com dados de loopback, então com ambos null a captura é SOMENTE VÍDEO sem produção de áudio — mas o mixer ainda reporta SR/Channels consistentes para o AAC encoder.
+- **2026-08-04** — Botão "Abrir Pasta" dos clips corrigido
+- **2026-08-05** — Auditoria round-trip IPC: 0 BUGs, 4 scans lentos identificados
+- **2026-08-05** — Journey e2e: crash lucide icons fix + crash-guard
+- **2026-08-05** — Review fix: handler de pipe ignora ReplayBufferMode/StretchToFit/SharpnessStrength
+- **2026-08-05b** — Installer embarca ffmpeg 9.0 + NVENC weighted_pred fix
+    - Decisão: **Gate por bframes em vez de remover o arg**: weighted_pred é vantajoso em cenas de baixo movimento; com B-frames o NVENC SDK não o suporta e o 9.0 agora falha em vez de ignorar — manter o arg só no preset Boa (bf 0) preserva o recurso sem risco.
+    - Decisão: **ffmpeg-custom como fonte única**: copy-engine.js já prioriza
+- **2026-08-05** — FASE 2 AMD AMF enhance `sr_amf`/`frc_amf` no trim/merge: testes IPC + deploy do plano
+    - Decisão: **Gate AMD por GPU vendorId via pipe** em vez de `isAMDSupported()` no cliente: engine já enumera GPUs (`CLIPS_GET_GPUS`); reusa esse dado sem novo comando no engine. Cache `_amdDetected` persiste até o próximo GET_GPUS.
+    - Decisão: **Enhance preso ao re-encode**: `sr_amf`/`frc_amf` exigem decodificar+re-codificar — incoerente com `-c copy`; quando reEncode=false ou GPU não-AMD, o enhance é silenciosamente ignorado com warning (não-fatal).
+    - Decisão: **SR cap 1920x1080**: upscaling além de 1080p não é suportado pelo `sr_amf` e adicionaria latência/VRAM sem ganho; 720p→1080p é o caso de uso real (clips de jogo).
+- **2026-08-05** — Upgrade completo de dependências + revisão
+    - Decisão: **Adotar electron-vite 6 beta.1** apesar de ser beta: esperado ~4 meses sem beta novo; peer `vite ^6||^7||^8`; config `rollupOptions` compatível sem mudança
+    - Decisão: **Rolldown não quebra native modules**: `better-sqlite3`/`bindings` continuam external (verificado no `out/main/`) — premissa antiga de que Vite 8 quebraria natives era incorreta
+    - Decisão: **Semver mantidos por decisão**: Playwright 1.62.1, Biome 2.5.7, Lucide 1.28.0, React Router 7.18.2, Vitest 4.1.10
+- **2026-08-05c** — av1_amf tune/rawFmt fix: seams testaveis
+    - Decisão: **Seam estatico em vez de switch privado**: o switch tune e o coracao dos args de cada codec — extrair como puro internal static permite teste determinístico sem spawn de ffmpeg (que depende do hardware/ambiente)
+    - Decisão: **av1_amf sem -me_quarter_pel**: opcao so existe em h264/hevc_amf; inclui-la no av1_amf reproduziria o mesmo erro de opcao que o fix previne (validado no help real do encoder)
+    - Decisão: **Bug invisivel no smoke**: probe passa (ja tinha av1_amf) mas rota real falha — reforca a necessidade de seams testaveis para cada cadeia de args, nao so do probe
+- **2026-08-05d** — QSV real no encode: av1_qsv + init_hw_device + extra_hw_frames removido
+    - Decisão: **`-init_hw_device qsv` obrigatorio**: ffmpeg 9 abandona o auto-init; sem o device o QSV falha com MFX session error antes de qualquer encode.
+    - Decisão: **Gate de suporte por `CheckFfmpegEncoder`**: em maquina sem iGPU/Arc o probe falha → fallback correto; em Intel o probe passa → av1_qsv ativo. Evita falso-positivo de `true` cego.
+    - Decisão: **Sem `-extra_hw_frames`**: opcao frame-level (aplicada no vf via hwupload), nunca como arg de encoder — ffmpeg 9 hard-fail.
+- **2026-08-05e** — E_INVALIDARG fix: pool texture SR→SR|RT
+- **2026-08-05** — Sharpness no editor de clips: UI conectada ao wire
+- **2026-08-07** — Link publicado: cache localStorage + testes
+- **2026-08-11** — AMD h264_amf restart loop fix: -filler → -filler_data
+    - Decisão: **`-filler_data 0` em vez de remover o arg**: manter o comportamento explícito (sem filler) preservando compatibilidade com ffmpeg ≥9; o teste `UsesFillerData_NotFiller` trava a forma correta.
+    - Decisão: **Teste de presença de todas as opções**: a classe de bug (opção inexistente → abort no parse → restart loop) já mordeu 3x (weighted_pred av1_nvenc, -filler AMF, extra_hw_frames QSV) — teste estrutural garante que a cadeia AMF não regrida.
+- **2026-08-11f - P1-P4: log/robustez do engine pos-crash AMD** — **P1 - drop log com anti-spam** (`FfmpegEncoder.cs`): contadores `_totalVideoDropped`/`_consecutiveDrops` via `Interlocked` (so thread do ReaderLoop); `LogDrop` so loga no 1o drop (`== 1`) e a cada 25 (`% 25 == 0`), `...
+    - Decisão: **Anti-spam de log por contador em vez de janela temporal**: frame drops ocorrem em rajadas - janela de tempo exigiria relogio por chamada; contador + modulo e deterministico e barato.
+    - Decisão: **Retry at-most-once no WDA**: excluir janelas e best-effort (falha se a janela ainda nao existe); um unico retry cobre o arranque, e a restauracao sempre zera o contador.
+    - Decisão: **`lock (_dinhoHwnds)`** (objeto de lock = a propria lista): sem campo extra de lock, e compativel com os testes que setam a lista via reflection.
+- **2026-08-11b** — AMD encoder 0.55x: preset speed AMF corta preanalysis chain
+    - Decisão: **`-quality speed` + vbaq, sem preanalysis**: preset quality/preanalysis/lookahead 40 é o modo offline do AMF — inaplicável a captura realtime em RDNA1. `speed` mantém VBR (CQ + maxrate cap) com custo ínfimo, `vbaq` é barato e preserva qualidade em áreas es...
+    - Decisão: **Manter `-rc cqp` e `-qp_i/-qp_p`**: o controle de qualidade continua via CQ do usuário (QP = cq direto, sem offset) — mesmo padrão do NVENC (`-cq`); só o preset de performance mudou.
+    - Decisão: **Teste estrutural ampliado**: além do `AllOptionsExistInFfmpeg9`, novo teste `DoesNotIncludePreanalysisChain` trava a remoção — evita reintroduzir o gargalo de desempenho sem tocar no teste de compatibilidade ffmpeg.
+- **2026-08-11c** — Preset AMF adaptativo por máquina: probe real em quality/balanced/speed
+    - Decisão: **Probe real no arranque em vez de heurística por VCN**: detectar VCN por device é frágil (driver expõe vendor não GPU family); um encode curto de 5 frames na resolução/fps exata da captura mede o que importa — achievedFps vs alvo. Cache por combinação evit...
+    - Decisão: **Escada em vez de default global**: AMD forte não penalizada (mantém quality); AMD fraca degrada só o necessário; threshold 0.85 deixa folga para jitter.
+    - Decisão: **Fail-safe `speed`**: qualquer falha (ffmpeg ausente, probe crash, exit≠0) cai no preset mais leve já validado em campo — nunca arrisca restart loop por opção inválida.
+- **2026-08-11g - AMF CQP: `-rc cqp` com QP = cq direto no lugar de vbr_peak** — **Rate control AMF trocado de `vbr_peak` para `cqp`** (FfmpegEncoder.cs `BuildEncoderTuneArgs`, 3 codecs AMF): `-rc cqp -qp_i {cq} -qp_p {cq}` com o **cq do front direto** (sem offset -4; o -4 permanece só no QSV `-gl...
+    - Decisão: **CQP com QP = cq direto sobre vbr_peak com alvo calculado**: o AMF sem `-b:v` em VBR subalocava ~3 Mbps em 720p60 (borrado) e com `-b:v` + QP setado o QP sobrepunha o alvo (issue obs-ffmpeg #12994). Em CQP o QP é o parâmetro controlado — cq 18/20/24 do fro...
+    - Decisão: **Trade-off aceito**: CQP não tem teto -> picos ~600 Mbps em cena forte (mais disco/spill no replay buffer; registrado nas sessões 2026-07-23b/08-01, não quebra).
+    - Decisão: **ProbeAmfSpeed intocado**: mantém `-rc vbr_peak` porque mede só velocidade de preset (5 frames NV12), não qualidade — mesmos fps entre VBR/CQP.
+- **2026-08-13** — Commit pendente + registro próxima semana + AMD verificado
+- **2026-08-13** — WGC frame sem textura reporta falha ao watchdog
+    - Decisão: **Seam puro sobre teste de integracao**: `TryCaptureFrame` exige GPU/D3D real — o seam estatico puro permite teste determinístico do comportamento de falha sem hardware.
+    - Decisão: **`success:false` em vez de reportar starvation**: frame sem textura apos ambas estrategias e falha de extracao real (nao falta de frame) — deve contar como drop e acionar o watchdog, nao apenas starvation silenciosa.
+- **2026-08-13b** — Otimização A do pipeline GPU descartada: análise registrada
+- **2026-08-13** — Cap de captura WGC estilo OBS: TDD completo + deploy + commit
+    - Decisão: **Cap na fonte WGC em vez de pace do PipelineLoop**: PipelineLoop já paceia encode/conversão pelo fps — o cap resolve o estágio da origem (menos frames do DWM → menos cópias/conversões/entrada NVENC).
+    - Decisão: **`_lastAcceptedTicks` (tempo do frame aceito) em vez de janela deslizante**: boundary inclusiva `nowTicks - lastTicks >= interval` permite jitter do DWM sem acumular drift; frames em rajada excedentes são descartados de uma vez.
+    - Decisão: **Seams estáticos puros**: `OnFrameArrived`/`TryCaptureFrame` exigem GPU/D3D real — o seam puro permite teste determinístico da decisão de aceite sem hardware.
+    - Decisão: **Same-thread wiring no `_wgcPump.Invoke`**: `SetCaptureFrameRate` escreve campo lido pelo `OnFrameArrived` (mesma thread do pump) — sem race com a session ativa.
+- **2026-08-14** — Drop infinito GPU busy: retry bloqueante no MESMO frame
+    - Decisão: **Retry bloqueante no mesmo frame sobre retry no próximo frame**: o retry no próximo frame pressupõe que a GPU eventualmente fique ociosa — inválido sob carga sustentada. `MapFlags.None` bloqueia até a GPU liberar o resource (~0.5-4ms), sacrificando a latên...
+    - Decisão: **DoNotWait mantido como primeira tentativa**: quando a GPU está livre, o fast-path não bloqueia a thread de captura — o bloqueio só ocorre no caminho de exceção (busy).
+    - Decisão: **`false` apenas com duplo busy**: teoricamente `MapFlags.None` nunca devolve WAS_STILL_DRAWING; o `false` é defensivo e mantém a classificação de drop transiente existente (watchdog cobre drops sustentados).
+- **2026-08-14** — captureTimeout opção C: margem +5ms + defer de timeout isolado
+    - Decisão: **Margem +5ms sobre ceil simples**: ceil sozinho (16→17ms) não cobre jitter de 1–3ms; +5ms deixa folga sem reduzir responsiveness. Clamp `[1,100]` mantém fps extremos seguros.
+    - Decisão: **Defer só do timeout isolado (consecutivo conta)**: um único timeout isolado é jitter benigno; timeouts consecutivos indicam stall real do WGC/DWM e devem alimentar o watchdog. O branch background/reinit não foi deferido porque background não é jitter e pr...
+    - Decisão: **3 resets no pipeline**: qualquer frame bom, transição de background ou reinit zera o estado de defer — evita que um timeout antigo "pré-qualifique" o próximo como consecutivo.
+- **2026-08-15 - Deploy do fix AAC shutdown apos reabertura do session summary** — **Deploy df04a51 aplicado no app instalado**: commit HEAD = 0ACDADB6... (fix stdout fechado com exitCode 0 nao marca UNHEALTHY). Publish recriado (dotnet publish -c Release --self-contained true -r win-x64), staging a...
+- **2026-08-15b** — Validacao de campo ENCERRADA: SEM LEAK + GPU busy fix confirmados
+- **2026-08-15c** — FASE 1 medicao GC: gcManagedMB/allocatedMB no tick [RAM]
+    - Decisão: **`GC.GetTotalMemory(false)` sem forcar coleta**: mede o heap managed como ele esta, nao sob estado artificial de GC; false evita bloquear o pipeline de captura durante a medicao.
+    - Decisão: **`GC.GetTotalAllocatedBytes()` monotonic como proxy de churn**: crescimento continua sem teto indica alocacoes nao-recoletadas (candidatos: WGC textures, NVENC surfaces, staging do GpuVideoConverter, buckets retidos do VideoPacketPool); se flat com `proc`...
+    - Decisão: **Seam com delegates sobre chamada direta**: `EngineCoordinatorCaptureTests` nao pode usar GC real (nao-deterministico) — o seam isola a logica de medicao e permite assertions deterministicas.
+- **2026-08-15d** — FASE 2 atribuicao de footprint: native/managedRetained no tick [RAM]
+    - Decisão: **Derivacao pura sobre medicao direta**: `native`/`managedRetained` sao calculos aritmeticos sobre valores ja medidos — seam puro (sem side effect) permite teste deterministico; clamps >= 0 evitam valores absurdos em races.
+    - Decisão: **`ringMb` do total do buffer (video+audio)**: e o ownership retido pelo ReplayBuffer — a comparacao de managedRetained contra ring+poolIdle e a fracao nao atribuida (GC gen0/LOH em voo, WGC textures managed, etc.).
+    - Decisão: **PoolIdle do cap estatico (256MB)**: `VideoPacketPool.MaxIdleBytes` e o teto de retencao do pool — incluir na derivacao da o custo de pool conhecido; o restante de managedRetained e churn nao-recoletado.
+- **2026-08-15e** — Investigacao estatica de footprint: pools e superfícies GPU
+    - Decisão: **Sem mudanca de codigo na investigacao**: pools sao bounded (~380MB max somado); bucket retention NAO explica os 2.5GB. FASE 2 (tick `[RAM]` com gcManaged/native/managedRetained) ja foi a ferramenta de medicao ao vivo — aguardando 1 linha de log de sessao...
+    - Decisão: **Atribuicao em campo**: `native` alto -> DWM/driver; `managedRetained` >> ring (~117MB) + poolIdle (256MB) -> churn nao-recoletado. Decidir reducao de working-set so apos esses numeros.
+- **2026-08-15f** — Medicao FASE 2 concluida: atribuicao do footprint fechada
+- **2026-08-16** — FASE 3: breakdown do heap por geracao no tick [RAM]
+    - Decisão: **`GC.GetGCMemoryInfo()` por tick em vez de profiling**: cada tick do `[RAM]` (2s) ja amostra o working set — o breakdown por geracao e mais um snapshot barato do mesmo instante, sem forcar coleta.
+    - Decisão: **`PinnedObjectsCount` (contagem) em vez de bytes**: o runtime nao expoe pinned size; a contagem ajuda a detectar objetos pinados residuais (ex.: buffers fixos que impedem compactacao do LOH), e `/MB` ~0 e um sinal esperado.
+    - Decisão: **Delegates para teste deterministico**: o estado do GC real e nao-deterministico — o seam com 5 delegates isola a logica de conversao e permite assertions exatas (valores repassados / divisao por MB).
+- **2026-08-17** — G2 completa + nested button fix + G3 plan
+    - Decisão: `/about` route usa `aboutUpdates` key (não `about`) no sidebar.json
+    - Decisão: `clips.json` usa namespace `'clips'` via `useTranslation('clips')`
+    - Decisão: Nested button: `<div role="button">` sobre `<button>` — evita aninhamento `<button>` dentro de `<button>` pai
+- **2026-08-22** — i18n completo + cobertura 93% + upgrade deps + publish/rebuild
+- **2026-08-22b** — publish dos instaladores; rebuild desnecessário
+- **2026-08-23** — Investigação lookahead: lever confirmado, default 16 mantido
+    - Decisão: **16 é default adequado para CQ+VBV**: no regime CQ-dominante com maxrate como cap de segurança, o papel do lookahead é absorver picos de bitrate no teto — janela de 267ms @60fps já faz isso bem; 32 dobraria latência (+267ms) e VRAM com ganho marginal (impo...
+- **2026-08-23b** — NAudio 2.3.0 -> 3.0.1: bump mecanico, zero mudancas de codigo
+    - Decisão: **Bump mecanico sem TDD RED**: nenhuma API usada pelo engine mudou de assinatura — a suite existente (1298 testes) e a verificacao.
+    - Decisão: **TFM windows sobre PackageReference extra no VadTest**: ferramenta de diagnostico Windows-only (COM interop loopback) — TFM correto expressa o requisito e restaura selecao de assets do meta-package.
+- **2026-08-23b** — Auditoria release notes: melhorias custo-zero aplicadas
+    - Decisão: Filtro de adocao: beneficio real + risco ~zero; qualquer arg ffmpeg novo exige validacao empirica contra `-h encoder=` antes
+    - Decisão: Presets encoder estritos (case-sensitive): valor validado cru segue pro ffmpeg — case-insensitive aqui reintroduziria classe restart loop
+    - Decisão: Delta updates (.blockmap) bloqueado em infra (GH_TOKEN), nao codigo
+- **2026-08-17** — S2 no-silent-catch fixes prontos no working tree; aguardando S3
+- **2026-09-13** — G3 completa: S4–S10 commitados (0b556db malware-scanner, 1bf7398 registry-cleaner, 906903b privacy-shield, 17115e5/8d16e1d followups, 96cac67 file-utils, bc89550 memory/backup)
+    - Decisão: **`disableService`/`enableService` lançam em serviço inexistente** (anti chave-fantasma) preservando o early-exit de cache: `revertPrivacySettings` chama `enableService('AiHost')` com o nome real do serviço — query do Start retorna null ⇒ throw sem `reg add`.
+    - Decisão: **`safeDelete` recursion via `lstat` em vez de rejeitar diretórios**: callers legítimos alimentam diretórios (caches de launcher/GPU via `scanDirectoriesAsItems`, `removeSelf` de regras) — `recursive: only(isDirectory)` mantém a semântica forte sem apagar árvores por acidente.
+    - Decisão: **`overwriteFile` atomic com tmp único `{path}.{pid}.{n}.tmp` + fsync + `fs.promises.rename`**: sem callers em produção, a modernização era segura; nome único elimina colisão entre callers concorrentes.
+    - Decisão: **`backup-manager` unificado em `getBackupDir()`** (settings `backupPath` + default Documents) em vez de `userData\backups` hardcoded — fluxos divergentes salvavam em duas pastas.
+    - Decisão: **threshold de memória corrigido**: `memory > 500` comparava MB contra KB não-convertidos (nunca disparava) — `HIGH_MEMORY_MB = 500` sobre valor já dividido por 1024.
