@@ -58,7 +58,11 @@ async function getNetworkHistory(): Promise<{ name: string; guid: string }[]> {
     }
     return entries
   } catch (error) {
-    getLogger().warning('network-cleanup', 'Failed to read profiles from HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\NetworkList\\Profiles, returning []', error)
+    getLogger().warning(
+      'network-cleanup',
+      'Failed to read profiles from HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\NetworkList\\Profiles, returning []',
+      error,
+    )
     return []
   }
 }

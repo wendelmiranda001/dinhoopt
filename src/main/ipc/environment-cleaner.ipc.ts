@@ -125,7 +125,7 @@ async function readWinRegistryEnv(scope: 'user' | 'system'): Promise<Map<string,
       }
     }
   } catch (err) {
-    getLogger().warning('environment-cleaner', `Failed to read registry env var for scope '${scope}': ${String(err)}`);
+    getLogger().warning('environment-cleaner', `Failed to read registry env var for scope '${scope}': ${String(err)}`)
     // Scope not accessible (e.g. HKLM without admin)
   }
   return vars
@@ -153,9 +153,7 @@ async function scanWindowsPathEntries(): Promise<EnvEntry[]> {
     const pathValue = vars.get('Path') || vars.get('PATH') || vars.get('path')
     if (!pathValue) continue
 
-    const entries = (pathValue.match(/(?:[^";]|"[^"]*")+/g) ?? [])
-      .map((e) => e.trim())
-      .filter(Boolean)
+    const entries = (pathValue.match(/(?:[^";]|"[^"]*")+/g) ?? []).map((e) => e.trim()).filter(Boolean)
     for (const entry of entries) {
       const expanded = expandWinVars(entry, mergedVars)
       if (expanded && !existsSync(expanded)) {
@@ -199,17 +197,15 @@ async function removeWindowsPathEntry(entry: EnvEntry): Promise<void> {
   const vars = await readWinRegistryEnv(entry.scope)
   const currentPath = vars.get('Path') || vars.get('PATH') || vars.get('path') || ''
   const sep = ';'
-  const entries = (currentPath.match(/(?:[^";]|"[^"]*")+/g) ?? [])
-    .map((e) => e.trim())
-    .filter(Boolean)
-  let removed = false;
+  const entries = (currentPath.match(/(?:[^";]|"[^"]*")+/g) ?? []).map((e) => e.trim()).filter(Boolean)
+  let removed = false
   const filtered = entries.filter((e) => {
     if (!removed && e.toLowerCase() === entry.value.toLowerCase()) {
-      removed = true;
-      return false;
+      removed = true
+      return false
     }
-    return true;
-  });
+    return true
+  })
 
   // Safety: never write an empty PATH — that would break the system
   if (filtered.length === 0) {
@@ -259,7 +255,7 @@ async function broadcastWinEnvChange(): Promise<void> {
       { timeout: 15000, windowsHide: true },
     )
   } catch (err) {
-    getLogger().warning('environment-cleaner', `Failed to broadcast env change: ${String(err)}`);
+    getLogger().warning('environment-cleaner', `Failed to broadcast env change: ${String(err)}`)
     // Best effort — apps may need a restart to see changes
   }
 }

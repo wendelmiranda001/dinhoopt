@@ -690,15 +690,15 @@ describe('toggleStartupItem', () => {
       expect(discordEntries.length).toBe(1)
     })
 
-  it('logs a warning when reading the registry raises an exception', async () => {
-    mockLogger.warning.mockReset()
-    const args = ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/s']
-    const handler = setupExecFileHandler(args)
-    handler.calls[0].cb(new Error('boom'), '', '')
-    const entries = await readStartupItems('registry-hkcu')
-    expect(entries).toEqual([])
-    expect(mockLogger.warning).toHaveBeenCalledWith('startup-manager', expect.stringContaining('registry'))
-  })
+    it('logs a warning when reading the registry raises an exception', async () => {
+      mockLogger.warning.mockReset()
+      const args = ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/s']
+      const handler = setupExecFileHandler(args)
+      handler.calls[0].cb(new Error('boom'), '', '')
+      const entries = await readStartupItems('registry-hkcu')
+      expect(entries).toEqual([])
+      expect(mockLogger.warning).toHaveBeenCalledWith('startup-manager', expect.stringContaining('registry'))
+    })
   })
 
   describe('enabling a registry item', () => {
