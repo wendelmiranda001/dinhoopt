@@ -1317,6 +1317,94 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
     #endregion
 
+    #region ApplyReplayBufferMode
+
+    [Fact]
+    public void ApplyReplayBufferMode_DiskOnly_SetsTinyCapsAndSpillsAudio()
+    {
+        var coord = CreateWithMinimalDeps(cfg => cfg.ReplayBufferMode = "disk");
+        SetField(coord, "_activeProfile", new CaptureProfile
+        {
+            MaxrateKbps = 30_000,
+            ReplaySeconds = 120,
+            MaxBufferBytes = 2000 * 1024 * 1024
+        });
+
+        var method = CoordinatorType.GetMethod("ApplyReplayBufferMode",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        method.Invoke(coord, null);
+
+        var buffer = GetField<ReplayBuffer>(coord, "_buffer")!;
+        Assert.Equal(TimeSpan.FromSeconds(1), buffer.VideoRamDuration);
+        Assert.Equal(TimeSpan.FromSeconds(1), buffer.AudioRamDuration);
+        Assert.True(buffer.SpillAudioWhenEvicted, "Disk-only deve spillar áudio também");
+        Assert.True(buffer.IsDiskSpillEnabled);
+    }
+
+    [Fact]
+    public void ApplyReplayBufferMode_Hybrid_SetsVideoCap_KeepsAudioDrop()
+    {
+        var coord = CreateWithMinimalDeps(cfg => cfg.ReplayBufferMode = "hybrid");
+        SetField(coord, "_activeProfile", new CaptureProfile
+        {
+            MaxrateKbps = 30_000,
+            ReplaySeconds = 120,
+            MaxBufferBytes = 2000 * 1024 * 1024
+        });
+
+        var method = CoordinatorType.GetMethod("ApplyReplayBufferMode",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        method.Invoke(coord, null);
+
+        var buffer = GetField<ReplayBuffer>(coord, "_buffer")!;
+        Assert.NotNull(buffer.VideoRamDuration);
+        Assert.Null(buffer.AudioRamDuration);
+        Assert.False(buffer.SpillAudioWhenEvicted, "Híbrido preserva áudio RAM-only (drop)");
+        Assert.True(buffer.IsDiskSpillEnabled);
+    }
+
+    [Fact]
+    public void ApplyReplayBufferMode_Ram_NoCap_NoSpillByDefault()
+    {
+        var coord = CreateWithMinimalDeps(cfg => cfg.ReplayBufferMode = "ram");
+        SetField(coord, "_activeProfile", new CaptureProfile
+        {
+            MaxrateKbps = 30_000,
+            ReplaySeconds = 30,
+            MaxBufferBytes = 2000 * 1024 * 1024
+        });
+
+        var method = CoordinatorType.GetMethod("ApplyReplayBufferMode",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        method.Invoke(coord, null);
+
+        var buffer = GetField<ReplayBuffer>(coord, "_buffer")!;
+        Assert.Null(buffer.VideoRamDuration);
+        Assert.False(buffer.IsDiskSpillEnabled, "RAM suficiente → sem spill");
+    }
+
+    [Fact]
+    public void ApplyReplayBufferMode_Ram_NeededBytesExceedsBuffer_EnablesSpill()
+    {
+        var coord = CreateWithMinimalDeps(cfg => cfg.ReplayBufferMode = "ram");
+        SetField(coord, "_activeProfile", new CaptureProfile
+        {
+            MaxrateKbps = 100_000,
+            ReplaySeconds = 600,
+            MaxBufferBytes = 10 * 1024 * 1024
+        });
+
+        var method = CoordinatorType.GetMethod("ApplyReplayBufferMode",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        method.Invoke(coord, null);
+
+        var buffer = GetField<ReplayBuffer>(coord, "_buffer")!;
+        Assert.True(buffer.IsDiskSpillEnabled, "Sessão longa > RAM segura → spill emergencial");
+        Assert.Null(buffer.VideoRamDuration);
+    }
+
+    #endregion
+
     #region EngineStatus - Additional Capture Fields
 
     [Fact]

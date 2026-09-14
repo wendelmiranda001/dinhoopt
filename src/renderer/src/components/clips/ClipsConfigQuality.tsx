@@ -289,20 +289,26 @@ export function QualitySection({
         onToggle={() => handleConfigUpdate({ stretchToFit: !(config.stretchToFit ?? false) })}
       />
 
-      {/* Replay buffer mode (RAM + disk) */}
-      <ToggleRow
-        title={t('replayBufferMode')}
-        tip={t('replayBufferModeTooltip')}
-        tooltipId="replay-buffer-mode"
-        activeTip={activeTip}
-        setActiveTip={setActiveTip}
-        enabled={(config.replayBufferMode ?? 'ram') === 'hybrid'}
-        onToggle={() =>
-          handleConfigUpdate({
-            replayBufferMode: (config.replayBufferMode ?? 'ram') === 'hybrid' ? 'ram' : 'hybrid',
-          })
-        }
-      />
+      {/* Replay buffer mode (RAM / hybrid / disk-only) */}
+      <div
+        className="rounded-xl px-3 py-2.5"
+        style={{ background: 'rgba(113,113,122,0.05)', border: '1px solid var(--border-subtle)' }}
+      >
+        <FieldLabel>
+          {t('replayBufferMode')}
+          <TipBadge id="replay-buffer-mode" activeTip={activeTip} setActiveTip={setActiveTip} />
+        </FieldLabel>
+        <SegmentedControl
+          layoutId="replay-buffer-mode"
+          value={config.replayBufferMode ?? 'disk'}
+          onChange={(v) => handleConfigUpdate({ replayBufferMode: v })}
+          options={[
+            { value: 'ram', label: t('replayBufferModeRam'), sub: t('replayBufferModeRamSub') },
+            { value: 'hybrid', label: t('replayBufferModeHybrid'), sub: t('replayBufferModeHybridSub') },
+            { value: 'disk', label: t('replayBufferModeDisk'), sub: t('replayBufferModeDiskSub') },
+          ]}
+        />
+      </div>
 
       {/* Replay Time */}
       <div

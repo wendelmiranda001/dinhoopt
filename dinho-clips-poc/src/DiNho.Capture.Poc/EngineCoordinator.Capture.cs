@@ -29,6 +29,64 @@ public sealed partial class EngineCoordinator
             StartCapture();
     }
 
+    /// <summary>
+    /// Aplica a estratégia de buffer do <see cref="ReplayBufferMode"/> configurado
+    /// sobre o buffer ativo (RAM caps + spill). Extraído de StartCapture para
+    /// permitir teste unitário direto por reflexão.
+    /// </summary>
+    private void ApplyReplayBufferMode()
+    {
+        var buffer = _buffer;
+        if (_config.Config.ReplayBufferMode == "hybrid")
+        {
+            // Híbrido: vídeo em RAM é capado em ~2 min (fixos); o excedente é
+            // evictado para o disco (vídeo-only). Se a RAM segura não couber
+            // 2 min no bitrate alvo, o cap encolhe para o que couber do
+            // orçamento (ComputeSafeBudget já clampa no piso de 80MB) —
+            // nunca excede a RAM segura. MaxBytes é elevado para o byte
+            // budget do cap (90% vídeo + 10% áudio), então o teto de tempo
+            // (2 min) é o limitante real — não o byte budget do perfil.
+            long safeBudget = RamManager.ComputeSafeBudget(RamManager.GetAvailableRamBytes());
+            var (ramCap, ramCapBytes) = RamManager.ComputeHybridRamCap(
+                _activeProfile.MaxrateKbps, _activeProfile.ReplaySeconds, safeBudget);
+            buffer.VideoRamDuration = ramCap;
+            buffer.MaxBytes = ramCapBytes * 10L / 9L;
+            if (!buffer.IsDiskSpillEnabled)
+                buffer.EnableDiskSpill();
+            Log.I("EngineCoordinator",
+                $"Hybrid buffer: RAM cap video={ramCap.TotalSeconds:F0}s ({ramCapBytes / (1024 * 1024)}MB) " +
+                $"diskSpill=ON budget={safeBudget / (1024 * 1024)}MB");
+        }
+        else if (_config.Config.ReplayBufferMode == "disk")
+        {
+            // Disk-only: RAM vira staging transitório (~1s). Todo o replay
+            // (vídeo + áudio) vive no disco (spill), escrito sequentialmente
+            // com buffer de 64KB e trim por janela de tempo no spill. RAM é
+            // quase zero (1s de cada stream) → WGC/encoder/mixers ficam estáveis
+            // mesmo em sessões longas; o custo é I/O síncrono extra no hot
+            // path de captura (aceito explicitamente: "demora mais, mas HW ok").
+            buffer.VideoRamDuration = TimeSpan.FromSeconds(1);
+            buffer.AudioRamDuration = TimeSpan.FromSeconds(1);
+            buffer.SpillAudioWhenEvicted = true;
+            if (!buffer.IsDiskSpillEnabled)
+                buffer.EnableDiskSpill();
+            Log.I("EngineCoordinator",
+                "Disk-only buffer: RAM staging ~1s video + ~1s audio, spill=ON (video+audio)");
+        }
+        else
+        {
+            // Legado 'ram': RAM guarda a janela completa; spill só emergencial
+            // quando a duração pedida excede o que a RAM segura por bytes.
+            buffer.VideoRamDuration = null;
+            long neededBytes = (long)_activeProfile.MaxrateKbps * _activeProfile.ReplaySeconds * 1024L * 13L / 80L;
+            if (neededBytes > _activeProfile.MaxBufferBytes && !buffer.IsDiskSpillEnabled)
+            {
+                buffer.EnableDiskSpill();
+                Log.I("EngineCoordinator", $"Disk spill ENABLED — need={neededBytes / (1024 * 1024)}MB buf={_activeProfile.MaxBufferBytes / (1024 * 1024)}MB");
+            }
+        }
+    }
+
     private void StartCapture()
     {
         lock (_pipelineLock)
@@ -240,38 +298,7 @@ public sealed partial class EngineCoordinator
                 _buffer.MaxBytes = _activeProfile.MaxBufferBytes;
                 Log.I("EngineCoordinator", "[6/7] Buffer limits aplicados");
 
-                if (_config.Config.ReplayBufferMode == "hybrid")
-                {
-                    // Híbrido: vídeo em RAM é capado em ~2 min (fixos); o excedente é
-                    // evictado para o disco (vídeo-only). Se a RAM segura não couber
-                    // 2 min no bitrate alvo, o cap encolhe para o que couber do
-                    // orçamento (ComputeSafeBudget já clampa no piso de 80MB) —
-                    // nunca excede a RAM segura. MaxBytes é elevado para o byte
-                    // budget do cap (90% vídeo + 10% áudio), então o teto de tempo
-                    // (2 min) é o limitante real — não o byte budget do perfil.
-                    long safeBudget = RamManager.ComputeSafeBudget(RamManager.GetAvailableRamBytes());
-                    var (ramCap, ramCapBytes) = RamManager.ComputeHybridRamCap(
-                        _activeProfile.MaxrateKbps, _activeProfile.ReplaySeconds, safeBudget);
-                    _buffer.VideoRamDuration = ramCap;
-                    _buffer.MaxBytes = ramCapBytes * 10L / 9L;
-                    if (!_buffer.IsDiskSpillEnabled)
-                        _buffer.EnableDiskSpill();
-                    Log.I("EngineCoordinator",
-                        $"Hybrid buffer: RAM cap video={ramCap.TotalSeconds:F0}s ({ramCapBytes / (1024 * 1024)}MB) " +
-                        $"diskSpill=ON budget={safeBudget / (1024 * 1024)}MB");
-                }
-                else
-                {
-                    // Legado 'ram': RAM guarda a janela completa; spill só emergencial
-                    // quando a duração pedida excede o que a RAM segura por bytes.
-                    _buffer.VideoRamDuration = null;
-                    long neededBytes = (long)_activeProfile.MaxrateKbps * _activeProfile.ReplaySeconds * 1024L * 13L / 80L;
-                    if (neededBytes > _activeProfile.MaxBufferBytes && !_buffer.IsDiskSpillEnabled)
-                    {
-                        _buffer.EnableDiskSpill();
-                        Log.I("EngineCoordinator", $"Disk spill ENABLED — need={neededBytes / (1024 * 1024)}MB buf={_activeProfile.MaxBufferBytes / (1024 * 1024)}MB");
-                    }
-                }
+                ApplyReplayBufferMode();
 
                 Log.I("EngineCoordinator", $"RAM profile: {_activeProfile.Level} — {_activeProfile.EncodeWidth}x{_activeProfile.EncodeHeight} " +
                     $"maxRate={_activeProfile.MaxrateKbps}kbps maxBuf={_buffer.MaxBytes / (1024 * 1024)}MB " +

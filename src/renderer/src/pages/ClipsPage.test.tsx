@@ -359,6 +359,17 @@ describe('ClipsPage', () => {
     expect(await screen.findByText('forceSoftware')).toBeTruthy()
   })
 
+  it('switches replay buffer mode to disk via 3-way selector', async () => {
+    render(<ClipsPage />)
+    showSettings()
+    await screen.findByText('replayBufferMode')
+    expect(screen.getByText('replayBufferModeRam')).toBeTruthy()
+    expect(screen.getByText('replayBufferModeHybrid')).toBeTruthy()
+    expect(screen.getByText('replayBufferModeDisk')).toBeTruthy()
+    screen.getByText('replayBufferModeDisk').click()
+    expect(mockSetConfig).toHaveBeenCalledWith(expect.objectContaining({ replayBufferMode: 'disk' }))
+  })
+
   it('shows calibrated machine profile badge when adaptive quality is active', async () => {
     mockGetStatus.mockResolvedValue({
       running: true,

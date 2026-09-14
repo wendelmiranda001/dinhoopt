@@ -779,6 +779,93 @@ public sealed class ReplayBufferTests
     }
 
     [Fact]
+    public void DiskSpill_DiskOnly_BothStreamsSpill()
+    {
+        var dir = TempDir();
+        try
+        {
+            // Disk-only: caps de RAM mínimos (~1ms) para vídeo E áudio + spill de
+            // áudio ligado → ambos os streams vivem no disco; nada é dropado.
+            using var buf = new ReplayBuffer(TimeSpan.FromSeconds(60));
+            buf.EnableDiskSpill(dir);
+            buf.VideoRamDuration = TimeSpan.FromMilliseconds(1);
+            buf.AudioRamDuration = TimeSpan.FromMilliseconds(1);
+            buf.SpillAudioWhenEvicted = true;
+
+            for (int i = 0; i < 20; i++)
+            {
+                buf.AddVideo(MakeVideo(TimeSpan.FromSeconds(i), false, 100));
+                buf.AddAudio(MakeAudio(TimeSpan.FromSeconds(i), 100));
+            }
+
+            var stats = buf.SpillStats();
+            Assert.True(stats.diskVideo > 0, "Vídeo excedente deve ir pro disco (cap 1ms)");
+            Assert.True(stats.diskAudio > 0, "Áudio excedente deve ir pro disco (SpillAudioWhenEvicted)");
+
+            var (video, audio) = buf.GetSegments();
+            Assert.Equal(20, video.Count); // nenhum frame de vídeo perdido
+            Assert.Equal(20, audio.Count); // nenhum frame de áudio perdido
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void AudioRamDuration_TimeCap_SpillsExcessAudio()
+    {
+        var dir = TempDir();
+        try
+        {
+            using var buf = new ReplayBuffer(TimeSpan.FromSeconds(60));
+            buf.EnableDiskSpill(dir);
+            buf.SpillAudioWhenEvicted = true;
+
+            for (int i = 0; i < 20; i++)
+                buf.AddAudio(MakeAudio(TimeSpan.FromSeconds(i), 100));
+
+            // Sem cap: áudio fica todo em RAM.
+            Assert.Equal(20, buf.SpillStats().ramAudio);
+            Assert.Equal(0, buf.SpillStats().diskAudio);
+
+            // Cap de 1ms → todo o áudio antigo é evictado pro disco.
+            buf.AudioRamDuration = TimeSpan.FromMilliseconds(1);
+
+            var stats = buf.SpillStats();
+            Assert.True(stats.diskAudio > 0, "Áudio excedente deve ir pro disco após o cap");
+            Assert.Equal(20, stats.ramAudio + stats.diskAudio);
+
+            var (_, audio) = buf.GetSegments();
+            Assert.Equal(20, audio.Count); // nenhum frame de áudio perdido
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void DiskSpill_Hybrid_ExplicitSpillAudioFalse_KeepsAudioDropped()
+    {
+        var dir = TempDir();
+        try
+        {
+            // Contrato híbrido preservado mesmo com spill habilitado: SpillAudioWhenEvicted
+            // = false (default) → áudio evictado é dropado, nunca gravado no disco.
+            using var buf = new ReplayBuffer(TimeSpan.FromSeconds(60), 300);
+            buf.EnableDiskSpill(dir);
+            buf.VideoRamDuration = TimeSpan.FromSeconds(60);
+            buf.SpillAudioWhenEvicted = false;
+
+            for (int i = 0; i < 10; i++)
+            {
+                buf.AddVideo(MakeVideo(TimeSpan.FromSeconds(i), false, 100));
+                buf.AddAudio(MakeAudio(TimeSpan.FromSeconds(i), 100));
+            }
+
+            var stats = buf.SpillStats();
+            Assert.True(stats.diskVideo > 0, "Excesso de vídeo deve ir pro disco");
+            Assert.Equal(0, stats.diskAudio); // áudio evictado continua dropado
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
     public void DiskSpill_ADTSAudioBytes_SurviveRoundTrip()
     {
         var dir = TempDir();

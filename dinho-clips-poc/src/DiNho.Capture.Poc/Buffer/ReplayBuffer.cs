@@ -17,6 +17,7 @@ public sealed class ReplayBuffer : IDisposable
     private int _audioCount;
     private TimeSpan _maxDuration;
     private TimeSpan? _videoRamDuration;
+    private TimeSpan? _audioRamDuration;
     private long _maxBytes;
     private long _maxVideoBytes;
     private long _maxAudioBytes;
@@ -27,6 +28,7 @@ public sealed class ReplayBuffer : IDisposable
     private long _totalAudioBytes;
     private DiskSpillBuffer? _spill;
     private bool _diskSpillEnabled;
+    private bool _spillAudioWhenEvicted;
     private static long _lastSegmentOffsetLogTick;
     private const double SegmentOffsetWarnMs = 100.0;
     private static readonly long SegmentOffsetLogThrottleTicks = Stopwatch.Frequency * 5;
@@ -167,6 +169,58 @@ public sealed class ReplayBuffer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Disk-only mode audio RAM cap: limits how much AUDIO the ring retains in
+    /// RAM. Excess audio older than this window is evicted (and spilled to disk
+    /// when <see cref="SpillAudioWhenEvicted"/> is set). Null = audio stays in
+    /// RAM for the full replay window (legacy 'ram'/'hybrid' behavior, where
+    /// audio was always RAM-only).
+    /// </summary>
+    public TimeSpan? AudioRamDuration
+    {
+        get
+        {
+            _lock.EnterReadLock();
+            try { return _audioRamDuration; }
+            finally { _lock.ExitReadLock(); }
+        }
+        set
+        {
+            List<EncodedPacket>? evicted;
+            _lock.EnterWriteLock();
+            try
+            {
+                _audioRamDuration = value;
+                evicted = TrimExcessAudio();
+            }
+            finally { _lock.ExitWriteLock(); }
+            FlushEvicted(evicted);
+        }
+    }
+
+    /// <summary>
+    /// When true, evicted AUDIO packets are written to the disk spill instead of
+    /// being dropped. Enables disk-only mode (both streams live on disk), where
+    /// the RAM caps (<see cref="VideoRamDuration"/>/<see cref="AudioRamDuration"/>)
+    /// shrink both streams to a small transient staging window. Default false —
+    /// hybrid keeps evicted audio dropped (audio RAM-only).
+    /// </summary>
+    public bool SpillAudioWhenEvicted
+    {
+        get
+        {
+            _lock.EnterReadLock();
+            try { return _spillAudioWhenEvicted; }
+            finally { _lock.ExitReadLock(); }
+        }
+        set
+        {
+            _lock.EnterWriteLock();
+            try { _spillAudioWhenEvicted = value; }
+            finally { _lock.ExitWriteLock(); }
+        }
+    }
+
     public int VideoCount
     {
         get
@@ -254,7 +308,11 @@ public sealed class ReplayBuffer : IDisposable
     private List<EncodedPacket>? TrimExcessAudio()
     {
         List<EncodedPacket>? evicted = null;
-        while (_audioCount > 0 && (_totalAudioDuration > _maxDuration || (_maxAudioBytes > 0 && _totalAudioBytes > _maxAudioBytes)))
+        // Disk-only (AudioRamDuration setado): áudio em RAM é limitado à janela
+        // de staging (ex.: 1s) — o excedente é evictado (e espilhado quando
+        // SpillAudioWhenEvicted=true). Sem o cap, a RAM guarda _maxDuration.
+        var window = _audioRamDuration ?? _maxDuration;
+        while (_audioCount > 0 && (_totalAudioDuration > window || (_maxAudioBytes > 0 && _totalAudioBytes > _maxAudioBytes)))
         {
             var oldest = _audioPackets[_audioHead]!;
             _audioPackets[_audioHead] = null;
@@ -280,17 +338,18 @@ public sealed class ReplayBuffer : IDisposable
 
         var spill = _spill;
         var spillEnabled = _diskSpillEnabled;
-        // Híbrido (VideoRamDuration setado): o disco é vídeo-only — áudio (AAC)
-        // evictado é descartado, nunca gravado no spill. Sem o cap (modo 'ram'),
-        // todos os evictados vão pro disco (emergencial por bytes).
-        var videoOnly = _videoRamDuration != null;
+        // Híbrido (VideoRamDuration setado e SpillAudioWhenEvicted=false): o disco
+        // é vídeo-only — áudio (AAC) evictado é descartado, nunca gravado no spill.
+        // Sem o cap (modo 'ram'): todos os evictados vão pro disco (emergencial por
+        // bytes). Disk-only (SpillAudioWhenEvicted=true): áudio também espilha.
+        var dropAudio = _videoRamDuration != null && !_spillAudioWhenEvicted;
         try
         {
             if (spillEnabled && spill != null)
             {
                 foreach (var oldest in evicted)
                 {
-                    if (videoOnly && oldest.Type != MediaType.Video)
+                    if (dropAudio && oldest.Type != MediaType.Video)
                         continue; // áudio evictado: dropa (não spill)
                     spill.Write(oldest);
                 }

@@ -246,7 +246,7 @@ public sealed class ConfigManagerTests
 
         cfg.Update(c => c.ReplayBufferMode = "disk-only");
 
-        Assert.Equal("hybrid", cfg.Config.ReplayBufferMode);
+        Assert.Equal("disk", cfg.Config.ReplayBufferMode);
     }
 
     [Fact]

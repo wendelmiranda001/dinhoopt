@@ -768,6 +768,14 @@ describe('CLIPS_SET_CONFIG', () => {
     expect(cfg.replayBufferMode).toBe('hybrid')
   })
 
+  it('updates replayBufferMode to disk', async () => {
+    const handlers = captureHandlers()
+    const handler = getAsyncHandler(handlers, IPC.CLIPS_SET_CONFIG)
+    await handler({}, { replayBufferMode: 'disk' })
+    const cfg = getSyncHandler(handlers, IPC.CLIPS_GET_CONFIG)() as Record<string, unknown>
+    expect(cfg.replayBufferMode).toBe('disk')
+  })
+
   it('ignores invalid replayBufferMode', async () => {
     clipsConfig.replayBufferMode = 'ram'
     const handlers = captureHandlers()

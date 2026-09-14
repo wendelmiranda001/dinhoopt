@@ -45,7 +45,7 @@ export interface ConfigState {
   autoCleanupThresholdGB: number
   adaptiveQuality: boolean
   stretchToFit: boolean
-  replayBufferMode: 'ram' | 'hybrid'
+  replayBufferMode: 'ram' | 'hybrid' | 'disk'
 }
 
 export const config: ConfigState = {
@@ -85,7 +85,7 @@ export const config: ConfigState = {
   autoCleanupThresholdGB: 100,
   adaptiveQuality: true,
   stretchToFit: false,
-  replayBufferMode: 'hybrid',
+  replayBufferMode: 'disk',
 }
 
 function defaultHotkeys(): HotkeyBinding[] {
@@ -218,7 +218,7 @@ export function loadPersistedClipsConfig(): void {
   config.noiseSuppression = saved.noiseSuppression ?? false
   config.adaptiveQuality = saved.adaptiveQuality ?? true
   config.stretchToFit = saved.stretchToFit ?? false
-  config.replayBufferMode = saved.replayBufferMode ?? 'hybrid'
+  config.replayBufferMode = saved.replayBufferMode ?? 'disk'
   config.audioSampleRate = saved.audioSampleRate ?? 48000
   config.autoCleanupEnabled = saved.autoCleanupEnabled ?? true
   config.autoCleanupThresholdGB = saved.autoCleanupThresholdGB ?? 100

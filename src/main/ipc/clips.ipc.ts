@@ -359,7 +359,8 @@ export function registerClipsIpc(): void {
       if (typeof c.audioLoopback === 'boolean') C.audioLoopback = c.audioLoopback
       if (typeof c.forceSoftware === 'boolean') C.forceSoftware = c.forceSoftware
       if (typeof c.stretchToFit === 'boolean') C.stretchToFit = c.stretchToFit
-      if (c.replayBufferMode === 'ram' || c.replayBufferMode === 'hybrid') C.replayBufferMode = c.replayBufferMode
+      if (c.replayBufferMode === 'ram' || c.replayBufferMode === 'hybrid' || c.replayBufferMode === 'disk')
+        C.replayBufferMode = c.replayBufferMode
       if (typeof c.gameDetection === 'boolean') C.gameDetection = c.gameDetection
       if (typeof c.gameAudioOnly === 'boolean') C.gameAudioOnly = c.gameAudioOnly
       if (typeof c.customGameProcess === 'string') {

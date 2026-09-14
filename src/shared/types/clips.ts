@@ -121,8 +121,8 @@ export interface ClipsConfig {
   adaptiveQuality?: boolean
   /** Remove black bars (letterboxing) by stretching to fill the full 16:9 frame instead of preserving aspect ratio */
   stretchToFit?: boolean
-  /** Buffer de replay: 'ram' = só RAM (excedente descartado); 'hybrid' = RAM cap 3min + excedente no disco */
-  replayBufferMode?: 'ram' | 'hybrid'
+  /** Buffer de replay: 'ram' = só RAM (excedente descartado); 'hybrid' = RAM cap 3min + excedente no disco; 'disk' = só disco (RAM staging ~1s, vídeo+áudio spill) */
+  replayBufferMode?: 'ram' | 'hybrid' | 'disk'
 }
 
 export interface ClipTrimResult {

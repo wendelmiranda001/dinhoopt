@@ -144,14 +144,19 @@ describe('clips-config-manager', () => {
       config.stretchToFit = false
     })
 
-    it('includes replayBufferMode hybrid by default', () => {
-      config.replayBufferMode = 'hybrid'
-      expect(buildEngineConfig().replayBufferMode).toBe('hybrid')
+    it('includes replayBufferMode disk by default', () => {
+      config.replayBufferMode = 'disk'
+      expect(buildEngineConfig().replayBufferMode).toBe('disk')
     })
 
     it('propagates replayBufferMode ram to the engine payload', () => {
       config.replayBufferMode = 'ram'
       expect(buildEngineConfig().replayBufferMode).toBe('ram')
+    })
+
+    it('propagates replayBufferMode disk to the engine payload', () => {
+      config.replayBufferMode = 'disk'
+      expect(buildEngineConfig().replayBufferMode).toBe('disk')
     })
 
     it('uses config hotkeys when non-empty', () => {
@@ -417,13 +422,13 @@ describe('clips-config-manager', () => {
         autoCleanupEnabled: true,
         autoCleanupThresholdGB: 100,
         adaptiveQuality: true,
-        replayBufferMode: 'hybrid',
+        replayBufferMode: 'disk',
       }
       vi.mocked(loadClipsConfig).mockReturnValueOnce(saved)
       loadPersistedClipsConfig()
       expect(config.engineReplayTimeSeconds).toBe(600)
       expect(config.engineFps).toBe(120)
-      expect(config.replayBufferMode).toBe('hybrid')
+      expect(config.replayBufferMode).toBe('disk')
     })
   })
 

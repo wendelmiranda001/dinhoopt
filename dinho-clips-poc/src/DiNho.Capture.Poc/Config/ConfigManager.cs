@@ -37,8 +37,10 @@ public sealed class AppConfig
     public int ReplayTimeSeconds { get; set; } = 120; // 2 min
 
     // Buffer de replay: "ram" = só RAM (excedente descartado quando enche);
-    // "hybrid" = RAM com cap de 2 min fixo + excedente vai pro disco (spill vídeo-only).
-    public string ReplayBufferMode { get; set; } = "hybrid";
+    // "hybrid" = RAM com cap de 2 min fixo + excedente vai pro disco (spill vídeo-only);
+    // "disk" = só disco (RAM vira staging ~1s; vídeo E áudio espilham).
+    // Default para usuário novo: "disk" (RAM quase zero, HW estável).
+    public string ReplayBufferMode { get; set; } = "disk";
 
     // Item 2: fallback p/ Hybrid (sem textura = fundo branco e manchas) é EXPLÍCITO.
     // Default false → se AllowHybridFallback==false e nenhuma textura funcionar,
@@ -151,10 +153,10 @@ public sealed class ConfigManager : IDisposable
 
     private static readonly HashSet<string> ValidReplayBufferModes = new(StringComparer.OrdinalIgnoreCase)
     {
-        // Alinhado com o allowlist TS (clips.ipc.ts): "ram" (só RAM) e
-        // "hybrid" (RAM 2min fixo + spill no disco). Qualquer outro valor
-        // cai no default "hybrid".
-        "ram", "hybrid",
+        // Alinhado com o allowlist TS (clips.ipc.ts): "ram" (só RAM),
+        // "hybrid" (RAM 2min fixo + spill no disco) e "disk" (só disco,
+        // RAM só como staging ~1s). Qualquer outro valor cai no default "hybrid".
+        "ram", "hybrid", "disk",
     };
 
     public static bool IsValidReplayBufferMode(string? mode)
