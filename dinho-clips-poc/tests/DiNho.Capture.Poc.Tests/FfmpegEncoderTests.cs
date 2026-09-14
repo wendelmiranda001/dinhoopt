@@ -782,8 +782,79 @@ public sealed class FfmpegEncoderTests
             Assert.Contains("-g 120", args);
             Assert.Contains("-filler_data 0", args);
             Assert.Contains("-enforce_hrd 0", args);
-            Assert.Contains("-vbaq true", args);
         }
+    }
+
+    [Theory]
+    [InlineData("h264_amf")]
+    [InlineData("hevc_amf")]
+    public void BuildEncoderTuneArgs_H264HevcAmf_UsesVbaq(string codec)
+    {
+        // h264/hevc_amf: VBAQ é o AQ clássico da família AVC/HEVC da AMF.
+        var args = FfmpegEncoder.BuildEncoderTuneArgs(codec, 22, 40000, 80000, 2, 32, "p4");
+        Assert.Contains("-vbaq true", args);
+        Assert.DoesNotContain("-aq_mode ", args);
+    }
+
+    [Fact]
+    public void BuildEncoderTuneArgs_Av1Amf_UsesAqModeCaq_NotVbaq()
+    {
+        // Bug (2026-09-14): -vbaq é opção regia do av1_amf — verificada no ffmpeg 9.0.1 real
+        // ("has not been used for any stream"). O AQ do código AV1 da AMF é -aq_mode caq
+        // (context adaptive quantization), valor 1 no help do ffmpeg — sem ele, AV1 AMD fica
+        // sem adaptive quantization nenhum (qualidade assimétrica em cenas complexas).
+        var args = FfmpegEncoder.BuildEncoderTuneArgs("av1_amf", 22, 40000, 80000, 2, 32, "p4");
+        Assert.Contains("-aq_mode caq", args);
+        Assert.DoesNotContain("-vbaq ", args);
+    }
+
+    [Theory]
+    [InlineData("av1_amf")]
+    [InlineData("h264_amf")]
+    [InlineData("hevc_amf")]
+    public void BuildEncoderTuneArgs_AmfCodecs_PreanalysisAdded_WhenProbeSustains(string codec)
+    {
+        // DGPU forte (probe sustenta quality/high_quality): liga preanalysis + TAQ para
+        // máxima qualidade perceptiva (padrão AMD). O PA NUNCA entra sem o probe ter passado
+        // por SelectAmfPreanalysis — iGPU/VCN 1.0 degrada p/ balanced/speed e fica OFF.
+        var args = FfmpegEncoder.BuildEncoderTuneArgs(codec, 22, 40000, 80000, 2, 32, "p4", "quality", amfPreanalysis: true);
+        Assert.Contains("-preanalysis true", args);
+        Assert.Contains("-pa_taq_mode 2", args);
+        Assert.DoesNotContain("-pa_adaptive_mini_gop", args);
+    }
+
+    [Theory]
+    [InlineData("av1_amf")]
+    [InlineData("h264_amf")]
+    [InlineData("hevc_amf")]
+    public void BuildEncoderTuneArgs_AmfCodecs_PreanalysisAbsent_WhenNotSustained(string codec)
+    {
+        // Padrão (iGPU/fraca): sem PA — cadeia preanalysis ausente nos 3 codecs AMF.
+        var args = FfmpegEncoder.BuildEncoderTuneArgs(codec, 22, 40000, 80000, 2, 32, "p4");
+        Assert.DoesNotContain("preanalysis", args);
+        Assert.DoesNotContain("pa_", args);
+    }
+
+    [Theory]
+    [InlineData("av1_amf")]
+    [InlineData("h264_amf")]
+    [InlineData("hevc_amf")]
+    public void BuildEncoderTuneArgs_AmfCodecs_SavEnabled_WhenSupported(string codec)
+    {
+        // SAV só entra quando SupportsSmartAccessVideo confirmou (≥2 adapters AMD + probe ok).
+        var args = FfmpegEncoder.BuildEncoderTuneArgs(codec, 22, 40000, 80000, 2, 32, "p4", amfSav: true);
+        Assert.Contains("-smart_access_video 1", args);
+    }
+
+    [Theory]
+    [InlineData("av1_amf")]
+    [InlineData("h264_amf")]
+    [InlineData("hevc_amf")]
+    public void BuildEncoderTuneArgs_AmfCodecs_SavAbsent_ByDefault(string codec)
+    {
+        // Padrão sem SAV — dGPU-only/iGPU-only (1 adapter) nunca recebe -smart_access_video.
+        var args = FfmpegEncoder.BuildEncoderTuneArgs(codec, 22, 40000, 80000, 2, 32, "p4");
+        Assert.DoesNotContain("smart_access_video", args);
     }
 
     [Theory]
@@ -903,6 +974,9 @@ public sealed class FfmpegEncoderTests
     [InlineData("quality", "quality")]
     [InlineData("balanced", "balanced")]
     [InlineData("speed", "speed")]
+    [InlineData("high_quality", "high_quality")]
+    [InlineData("High_Quality", "high_quality")]
+    [InlineData(" HIGH_QUALITY ", "high_quality")]
     [InlineData("QUALITY", "quality")]
     [InlineData(" Balanced ", "balanced")]
     [InlineData("ultra", "speed")]

@@ -151,23 +151,41 @@ export function formatKey(vk: number, modifiers: string[]): string {
 
 /* ── Shared UI Components ── */
 
+export const ACCENT_TINTS = {
+  violet: { solid: '#8b5cf6', soft: '#a78bfa', chip: 'rgba(139,92,246,0.14)' },
+  blue: { solid: '#3b82f6', soft: '#60a5fa', chip: 'rgba(59,130,246,0.14)' },
+  green: { solid: '#22c55e', soft: '#4ade80', chip: 'rgba(34,197,94,0.14)' },
+  amber: { solid: '#f59e0b', soft: '#fbbf24', chip: 'rgba(245,158,11,0.14)' },
+  red: { solid: '#ef4444', soft: '#f87171', chip: 'rgba(239,68,68,0.14)' },
+} as const
+
+export type AccentKey = keyof typeof ACCENT_TINTS
+
 export function ConfigSection({
   icon: Icon,
   label,
   defaultOpen,
   content,
+  accent = 'violet',
 }: {
   icon: React.ElementType
   label: React.ReactNode
   defaultOpen: boolean
   content: React.ReactNode
+  accent?: AccentKey
 }) {
   const [open, setOpen] = useState(defaultOpen)
+  const tint = ACCENT_TINTS[accent]
   return (
     <div
-      className="rounded-xl border overflow-hidden transition-all"
-      style={{ background: 'var(--card-bg)', borderColor: 'var(--border-medium)' }}
+      className="overflow-hidden rounded-2xl border transition-all duration-200"
+      style={{
+        background: `linear-gradient(180deg, rgba(255,255,255,0.025), transparent 34%), var(--card-bg)`,
+        borderColor: 'var(--border-medium)',
+        boxShadow: open ? '0 10px 28px rgba(0,0,0,0.28)' : '0 2px 8px rgba(0,0,0,0.16)',
+      }}
     >
+      <div className="h-px w-full" style={{ background: `linear-gradient(90deg, ${tint.solid}, transparent)` }} />
       <div
         role="button"
         tabIndex={0}
@@ -178,13 +196,22 @@ export function ConfigSection({
             setOpen(!open)
           }
         }}
-        className="flex w-full items-center gap-2 px-4 py-3 text-xs font-semibold transition-colors hover:bg-white/[0.03]"
+        className="flex w-full cursor-pointer items-center gap-3 px-4 py-3.5 text-xs font-semibold transition-colors hover:bg-white/[0.02]"
         style={{ color: 'var(--text-primary)' }}
       >
-        <Icon className="h-4 w-4 shrink-0" style={{ color: 'var(--text-dim)' }} />
+        <span
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-lg"
+          style={{ background: tint.chip, color: tint.soft }}
+        >
+          <Icon className="h-3.5 w-3.5" />
+        </span>
         <span className="flex-1 text-left">{label}</span>
-        <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
-          <ChevronDown className="h-3.5 w-3.5" style={{ color: 'var(--text-dim)' }} />
+        <motion.div
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+          style={{ color: 'var(--text-dim)' }}
+        >
+          <ChevronDown className="h-3.5 w-3.5" />
         </motion.div>
       </div>
       <AnimatePresence initial={false}>
@@ -205,6 +232,64 @@ export function ConfigSection({
   )
 }
 
+export function SegmentedControl<T extends string>({
+  options,
+  value,
+  onChange,
+  accent = 'violet',
+  layoutId,
+  wrap = false,
+  className = '',
+}: {
+  options: Array<{ value: T; label: React.ReactNode; sub?: React.ReactNode; title?: string }>
+  value: T
+  onChange: (v: T) => void
+  accent?: AccentKey
+  layoutId: string
+  wrap?: boolean
+  className?: string
+}) {
+  const tint = ACCENT_TINTS[accent]
+  return (
+    <div
+      className={`${wrap ? 'flex flex-wrap gap-1' : 'flex gap-1 rounded-xl p-1'} ${className}`}
+      style={wrap ? undefined : { background: 'rgba(113,113,122,0.08)', border: '1px solid var(--border-subtle)' }}
+    >
+      {options.map((opt) => {
+        const active = opt.value === value
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            title={opt.title}
+            onClick={() => onChange(opt.value)}
+            className={`relative ${wrap ? 'rounded-lg px-2 py-1' : 'flex-1 rounded-lg py-1'} text-[10px] font-medium transition-all`}
+            style={{ color: active ? '#fff' : 'var(--text-secondary)' }}
+          >
+            {active && (
+              <motion.div
+                layoutId={layoutId}
+                className="absolute inset-0 rounded-lg"
+                style={{
+                  background: `linear-gradient(135deg, ${tint.solid}, ${tint.soft})`,
+                  boxShadow: `0 4px 14px ${tint.solid}44`,
+                }}
+                transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+              />
+            )}
+            <span className="relative z-10 flex flex-col items-center leading-tight">
+              <span>{opt.label}</span>
+              {opt.sub && (
+                <span style={{ opacity: active ? 0.85 : 0.55, fontSize: '8px', fontWeight: 400 }}>{opt.sub}</span>
+              )}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export function VolumeSlider({
   label,
   value,
@@ -216,25 +301,31 @@ export function VolumeSlider({
 }) {
   const pct = Math.round(value * 100)
   return (
-    <div className="flex items-center gap-2">
-      <span className="w-24 text-[10px] shrink-0" style={{ color: 'var(--text-dim)' }}>
-        {label}
-      </span>
-      <input
-        type="range"
-        min={0}
-        max={400}
-        value={pct}
-        onChange={(e) => onChange(Number(e.target.value) / 100)}
-        className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
-        style={{
-          background: `linear-gradient(to right, var(--accent) ${pct}%, rgba(113,113,122,0.2) ${pct}%)`,
-          accentColor: 'var(--accent)',
-        }}
-      />
-      <span className="w-8 text-right text-[10px] font-mono tabular-nums" style={{ color: 'var(--text-primary)' }}>
-        {pct}%
-      </span>
+    <div
+      className="rounded-xl px-3 py-2.5"
+      style={{ background: 'rgba(113,113,122,0.05)', border: '1px solid var(--border-subtle)' }}
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[10px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+          {label}
+        </span>
+        <span className="font-mono text-[10px] tabular-nums" style={{ color: 'var(--text-dim)' }}>
+          {pct}%
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="range"
+          min={0}
+          max={400}
+          value={pct}
+          onChange={(e) => onChange(Number(e.target.value) / 100)}
+          className="clip-range flex-1"
+          style={{
+            background: `linear-gradient(to right, var(--accent) ${pct}%, rgba(113,113,122,0.2) ${pct}%)`,
+          }}
+        />
+      </div>
     </div>
   )
 }
@@ -242,34 +333,45 @@ export function VolumeSlider({
 export function ToggleItem({
   label,
   enabled,
-  accent,
+  accent = 'blue',
   onToggle,
 }: {
   label: React.ReactNode
   enabled: boolean
-  accent: 'green' | 'amber' | 'blue'
+  accent: 'green' | 'amber' | 'blue' | 'violet'
   onToggle: () => void
 }) {
-  const colorMap = { green: '#22c55e', amber: '#f59e0b', blue: '#3b82f6' }
-  const bgMap = {
-    green: 'rgba(34,197,94,0.12)',
-    amber: 'rgba(245,158,11,0.12)',
-    blue: 'rgba(59,130,246,0.12)',
-  }
+  const colorMap = { green: '#22c55e', amber: '#f59e0b', blue: '#3b82f6', violet: '#8b5cf6' }
+  const color = colorMap[accent]
   return (
     <button
       type="button"
       onClick={onToggle}
-      className="flex items-center justify-between rounded-lg px-2.5 py-2 text-[10px] font-medium transition-all hover:bg-white/[0.03]"
+      className="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-[10px] font-medium transition-all hover:bg-white/[0.03]"
       style={{
-        background: enabled ? bgMap[accent] : 'rgba(113,113,122,0.06)',
-        color: enabled ? colorMap[accent] : 'var(--text-dim)',
+        background: `linear-gradient(180deg, rgba(255,255,255,0.03), transparent 55%), var(--card-bg)`,
+        border: `1px solid ${enabled ? `${color}44` : 'var(--border-subtle)'}`,
       }}
+      aria-pressed={enabled}
     >
-      <span>{label}</span>
+      <span className="flex items-center gap-1.5" style={{ color: enabled ? color : 'var(--text-secondary)' }}>
+        <span
+          className="grid h-4 w-4 place-items-center rounded-full"
+          style={{ background: enabled ? `${color}22` : 'rgba(113,113,122,0.12)' }}
+        >
+          <span
+            className="h-1.5 w-1.5 rounded-full"
+            style={{ background: enabled ? color : 'rgba(113,113,122,0.5)' }}
+          />
+        </span>
+        {label}
+      </span>
       <span
-        className="ml-2 rounded-full px-2 py-0.5 text-[8px] font-semibold"
-        style={{ background: enabled ? `${colorMap[accent]}22` : 'rgba(113,113,122,0.15)' }}
+        className="rounded-full px-2 py-0.5 text-[8px] font-semibold"
+        style={{
+          background: enabled ? `${color}22` : 'rgba(113,113,122,0.15)',
+          color: enabled ? color : 'var(--text-dim)',
+        }}
       >
         {enabled ? 'ON' : 'OFF'}
       </span>
@@ -283,22 +385,27 @@ export function TogglePill({
   onToggle,
 }: {
   enabled: boolean
-  accent?: 'blue'
+  accent?: 'blue' | 'violet'
   onToggle: () => void
 }) {
-  const colorMap = { blue: '#3b82f6' }
+  const colorMap = { blue: '#3b82f6', violet: '#8b5cf6' }
   const c = colorMap[accent]
   return (
     <button
       type="button"
       onClick={onToggle}
-      className="rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-all"
+      aria-pressed={enabled}
+      className="relative h-5 w-9 shrink-0 rounded-full transition-all duration-200"
       style={{
-        background: enabled ? `${c}22` : 'rgba(113,113,122,0.1)',
-        color: enabled ? c : 'var(--text-dim)',
+        background: enabled ? c : 'rgba(113,113,122,0.25)',
+        boxShadow: enabled ? `0 0 12px ${c}55` : 'none',
       }}
     >
-      {enabled ? 'ON' : 'OFF'}
+      <motion.span
+        className="absolute top-0.5 block h-4 w-4 rounded-full bg-white shadow"
+        animate={{ left: enabled ? 18 : 2 }}
+        transition={{ type: 'spring', stiffness: 600, damping: 30 }}
+      />
     </button>
   )
 }
@@ -314,15 +421,18 @@ export function CollapsibleMini({
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="rounded-lg" style={{ background: 'rgba(113,113,122,0.04)' }}>
+    <div
+      className="overflow-hidden rounded-xl transition-colors"
+      style={{ background: 'rgba(113,113,122,0.05)', border: '1px solid var(--border-subtle)' }}
+    >
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium transition-colors hover:bg-white/[0.02]"
-        style={{ color: 'var(--text-dim)' }}
+        className="flex w-full items-center gap-1.5 px-3 py-2 text-[10px] font-medium transition-colors hover:bg-white/[0.02]"
+        style={{ color: 'var(--text-secondary)' }}
       >
         <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.15 }}>
-          <ChevronDown className="h-3 w-3" />
+          <ChevronDown className="h-3 w-3" style={{ color: 'var(--text-dim)' }} />
         </motion.div>
         {label}
       </button>
@@ -336,7 +446,7 @@ export function CollapsibleMini({
             transition={{ duration: 0.15, ease: 'easeInOut' }}
             className="overflow-hidden will-change-transform"
           >
-            <div className="px-2.5 pb-2">{children}</div>
+            <div className="px-3 pb-2.5">{children}</div>
           </motion.div>
         )}
       </AnimatePresence>

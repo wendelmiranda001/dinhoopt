@@ -432,9 +432,11 @@ public sealed class EncoderManager : IDisposable
     internal static bool IsAmfCodec(string codec) =>
         codec is "h264_amf" or "hevc_amf" or "av1_amf";
 
-    /// <summary>Seleciona o preset AMF por máquina: tenta quality, degrada para balanced/speed
-    /// quando o encode real não sustenta ≥85% do fps alvo na resolução da captura. AMD forte
-    /// (RDNA2+/VCN 2.0+) mantém quality; RDNA1 (RX 5700 XT, VCN 1.0) degrada automático.
+    /// <summary>Seleciona o preset AMF por máquina: tenta high_quality, degrada para quality,
+    /// balanced e speed quando o encode real não sustenta ≥85% do fps alvo na resolução da
+    /// captura. AMD forte (RDNA2+/VCN 2.0+ dGPU) sustenta high_quality/quality; RDNA1 (RX 5700 XT,
+    /// VCN 1.0) e iGPU fraca degradam automático até o degrau que a máquina segura — usuário de
+    /// alto desempenho ganha qualidade perceptiva, usuário de iGPU nunca perde fps.
     /// Cache por codec|res|fps — um probe por combinação por sessão.</summary>
     internal static string SelectAmfPreset(string codec, int width, int height, int fps)
     {
@@ -447,7 +449,7 @@ public sealed class EncoderManager : IDisposable
         }
 
         var result = "speed";
-        foreach (var preset in new[] { "quality", "balanced", "speed" })
+        foreach (var preset in new[] { "high_quality", "quality", "balanced", "speed" })
         {
             double? achieved;
             try { achieved = ProbeAmfSpeedProbe(codec, width, height, fps, preset); }
@@ -468,12 +470,36 @@ public sealed class EncoderManager : IDisposable
     /// preset dado e mede achievedFps = frames entregues / tempo real decorrido. O preset
     /// `-quality` em h264_amf/hevc_amf/av1_amf define o equilíbrio quality/speed.</summary>
     internal static double? ProbeAmfSpeed(string codec, int width, int height, int fps, string preset)
+        => RunAmfThroughputProbe(codec, width, height, fps, preset, extraArgs: "");
+
+    /// <summary>Seam trocável nos testes para o probe real do preanalysis/TAQ da cadência AMF.
+    /// Devolve achievedFps de um encode real com -preanalysis + pa_taq_mode 2 habilitados, ou
+    /// null se falhar. Exceções são permitidas — desligam o PA.</summary>
+    internal static Func<string, int, int, int, string, double?> ProbeAmfPreanalysisProbe = ProbeAmfPreanalysis;
+
+    /// <summary>Probe real do preanalysis/TAQ: mesmo encode dummy do ProbeAmfSpeed, mas com a
+    /// cadeia PA ligada (mede o custo real da pré-análise num frame NV12 na resolução alvo).
+    /// Só é usado em GPUs que JÁ sustentaram quality/high_quality — iGPU/VCN 1.0 nunca paga esse custo.</summary>
+    internal static double? ProbeAmfPreanalysis(string codec, int width, int height, int fps, string preset)
+        => RunAmfThroughputProbe(codec, width, height, fps, preset,
+            extraArgs: " -preanalysis true -pa_lookahead_buffer_depth 40 -pa_taq_mode 2");
+
+    /// <summary>Probe real de suporte a Smart Access Video (multi-VCN): encode dummy com
+    /// -smart_access_video 1. true = o driver/hardware aceitou a opção (AMF_OK);
+    /// false = sem SAV (iGPU-only, dGPU-only, driver antigo) → o pipeline nunca recebe a flag.</summary>
+    internal static bool ProbeAmfSav(string codec, int width, int height, int fps)
+        => RunAmfThroughputProbe(codec, width, height, fps, "speed", " -smart_access_video 1") != null;
+
+    /// <summary>Probe comum: roda o encode dummy NV12 5 frames com o preset + extraArgs dados e
+    /// devolve achievedFps (double?) calculado do tempo líquido do encode, ou null quando o
+    /// ffmpeg sai com exit != 0 (codec/opção inválida no driver real).</summary>
+    internal static double? RunAmfThroughputProbe(string codec, int width, int height, int fps, string preset, string extraArgs)
     {
         var presetNorm = FfmpegEncoder.NormalizeAmfPreset(preset);
         var outputFmt = codec.Contains("av1", StringComparison.Ordinal) ? "ivf" : "h264";
         var args = $"-y -loglevel error -f rawvideo -pix_fmt nv12 -s {width}x{height} " +
                    $"-r {fps} -i pipe:0 -c:v {codec} -quality {presetNorm} -rc vbr_peak " +
-                   $"-bf 0 -g 60 -frames:v 5 -f {outputFmt} pipe:1";
+                   $"-bf 0 -g 60 -frames:v 5{extraArgs} -f {outputFmt} pipe:1";
         try
         {
             using var process = new Process
@@ -528,6 +554,98 @@ public sealed class EncoderManager : IDisposable
         {
             return null;
         }
+    }
+
+    // ── AMF preanalysis/TAQ adaptativo ───────────────────────────────
+
+    private static readonly Lock AmfPreanalysisCacheLock = new();
+    private static Dictionary<string, bool>? _amfPreanalysisCache;
+
+    /// <summary>Limpa o cache de preanalysis/TAQ (usado nos testes entre cenários).</summary>
+    internal static void ResetAmfPreanalysisCache()
+    {
+        lock (AmfPreanalysisCacheLock) _amfPreanalysisCache = null;
+    }
+
+    /// <summary>Decide se o preanalysis/TAQ da AMF entra no encode. PRÉ-REQUISITO: a GPU já
+    /// sustentou quality/high_quality no SelectAmfPreset (iGPU/VCN 1.0 degrada p/ balanced/speed e
+    /// NUNCA paga o custo do PA). Com isso garantido, o PA ainda é sondado de verdade: se o encode
+    /// com a cadeia PA não sustenta ≥85% do fps alvo, fica OFF (o PA pesa ~5-10% no VCN; se a
+    /// máquina não aguenta no degrau escolhido, prioriza o fps). Cache por codec|res|fps|preset.</summary>
+    internal static bool SelectAmfPreanalysis(string codec, int width, int height, int fps, string preset)
+    {
+        if (!IsAmfCodec(codec)) return false;
+        if (preset is not ("quality" or "high_quality")) return false;
+        var key = $"{codec}|{width}x{height}@{fps}|preset={preset}";
+        lock (AmfPreanalysisCacheLock)
+        {
+            if (_amfPreanalysisCache != null && _amfPreanalysisCache.TryGetValue(key, out var cached))
+                return cached;
+        }
+
+        var enabled = false;
+        try
+        {
+            double? achieved = ProbeAmfPreanalysisProbe(codec, width, height, fps, preset);
+            enabled = achieved != null && achieved >= fps * 0.85;
+        }
+        catch { /* PA nunca derruba o encode — falha = OFF */ }
+
+        lock (AmfPreanalysisCacheLock)
+        {
+            _amfPreanalysisCache ??= new Dictionary<string, bool>();
+            _amfPreanalysisCache[key] = enabled;
+        }
+        return enabled;
+    }
+
+    // ── AMD Smart Access Video (multi-VCN) ───────────────────────────
+
+    /// <summary>Seam trocável nos testes — número de GPUs AMD presentes (0x1002).</summary>
+    internal static Func<int> AmdAdapterCountProbe = CountAmdAdapters;
+
+    /// <summary>Seam trocável nos testes — probe real do -smart_access_video (true = aceito).</summary>
+    internal static Func<string, int, int, int, bool> ProbeAmfSavProbe = ProbeAmfSav;
+
+    private static readonly Lock AmfSavCacheLock = new();
+    private static Dictionary<string, bool>? _amfSavCache;
+
+    /// <summary>Limpa o cache de Smart Access Video (usado nos testes entre cenários).</summary>
+    internal static void ResetAmfSavCache()
+    {
+        lock (AmfSavCacheLock) _amfSavCache = null;
+    }
+
+    private static int CountAmdAdapters() => GetGpuList().Count(g => g.VendorId == 0x1002);
+
+    /// <summary>Decide se o Smart Access Video entra no encode AMF. Exige APU/dGPU AMD dupla
+    /// (≥2 adapters 0x1002 = 2 VCNs) E o probe real com a flag aceito pelo driver. Desktops
+    /// dGPU-only e iGPU-only (1 adapter) → false sem custo de probe. Sempre false p/ não-AMF.
+    /// Cache por codec|res|fps.</summary>
+    internal static bool SupportsSmartAccessVideo(string codec, int width, int height, int fps)
+    {
+        if (!IsAmfCodec(codec)) return false;
+        var key = $"{codec}|{width}x{height}@{fps}";
+        lock (AmfSavCacheLock)
+        {
+            if (_amfSavCache != null && _amfSavCache.TryGetValue(key, out var cached))
+                return cached;
+        }
+
+        var supported = false;
+        try
+        {
+            if (AmdAdapterCountProbe() >= 2)
+                supported = ProbeAmfSavProbe(codec, width, height, fps);
+        }
+        catch { /* driver indisponível = sem SAV */ }
+
+        lock (AmfSavCacheLock)
+        {
+            _amfSavCache ??= new Dictionary<string, bool>();
+            _amfSavCache[key] = supported;
+        }
+        return supported;
     }
 
     private static string BuildProbeArgs(string codec, int width, int height, int fps)

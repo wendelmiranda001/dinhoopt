@@ -1,7 +1,7 @@
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Gauge, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { QUALITY_PRESETS, type QualityPresetKey } from './clips-quality-presets'
-import { TogglePill } from './clips-utils'
+import { SegmentedControl, TogglePill } from './clips-utils'
 import type { ClipsState } from './useClipsState'
 
 export function TipBadge({
@@ -13,17 +13,70 @@ export function TipBadge({
   activeTip: string | null
   setActiveTip: (tip: string | null) => void
 }) {
+  const active = activeTip === id
   return (
     <span className="relative inline-flex" data-tip={id}>
       <button
         type="button"
-        className="inline-flex h-3.5 w-3.5 cursor-pointer items-center justify-center rounded-full text-[9px] font-bold"
-        style={{ background: 'rgba(113,113,122,0.15)', color: 'var(--text-dim)' }}
-        onClick={() => setActiveTip(activeTip === id ? null : id)}
+        className="inline-flex h-3.5 w-3.5 cursor-pointer items-center justify-center rounded-full text-[9px] font-bold transition-all duration-150"
+        style={{
+          background: active ? 'rgba(139,92,246,0.2)' : 'rgba(113,113,122,0.15)',
+          color: active ? 'var(--accent)' : 'var(--text-dim)',
+        }}
+        onClick={() => setActiveTip(active ? null : id)}
       >
         ?
       </button>
     </span>
+  )
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold tracking-wide uppercase"
+      style={{ color: 'var(--text-dim)' }}
+    >
+      {children}
+    </p>
+  )
+}
+
+function ToggleRow({
+  title,
+  tip,
+  activeTip,
+  setActiveTip,
+  enabled,
+  tooltipId,
+  onToggle,
+}: {
+  title: string
+  tip?: string
+  activeTip?: ClipsState['activeTip']
+  setActiveTip?: ClipsState['setActiveTip']
+  enabled: boolean
+  tooltipId: string
+  onToggle: () => void
+}) {
+  return (
+    <div
+      className="flex items-center justify-between rounded-xl px-3 py-2.5"
+      style={{
+        background: `linear-gradient(180deg, rgba(255,255,255,0.03), transparent 55%), var(--card-bg)`,
+        border: `1px solid ${enabled ? `rgba(59,130,246,0.35)` : 'var(--border-subtle)'}`,
+      }}
+    >
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] font-medium" style={{ color: 'var(--text-primary)' }}>
+          {title}
+        </span>
+        {tip && activeTip && setActiveTip && (
+          <TipBadge id={tooltipId} activeTip={activeTip} setActiveTip={setActiveTip} />
+        )}
+      </div>
+      <TogglePill accent="blue" enabled={enabled} onToggle={onToggle} />
+    </div>
   )
 }
 
@@ -53,7 +106,7 @@ export function QualitySection({
   return (
     <div className="space-y-3">
       {/* Quick Preset */}
-      <div className="flex gap-1.5">
+      <div className="grid grid-cols-3 gap-1.5">
         {(
           [
             { id: 'muito-alta', label: t('presetMuitoAlta'), sub: 'CQ 16 \u00b7 1080p', icon: '\u25cf\u25cf\u25cf' },
@@ -68,35 +121,30 @@ export function QualitySection({
               key={p.id}
               type="button"
               onClick={() => handleConfigUpdate(preset)}
-              className={`group relative flex-1 rounded-xl border px-2.5 py-2 text-left transition-all ${
-                active ? 'border-transparent' : 'hover:border-white/10'
-              }`}
+              className="relative overflow-hidden rounded-xl border px-2 py-2 transition-all duration-150"
               style={{
-                background: active ? 'var(--accent)' : 'rgba(113,113,122,0.06)',
-                borderColor: active ? 'transparent' : 'rgba(113,113,122,0.1)',
-                boxShadow: 'none',
+                background: active
+                  ? 'linear-gradient(160deg, rgba(139,92,246,0.22), rgba(139,92,246,0.06))'
+                  : 'rgba(113,113,122,0.05)',
+                borderColor: active ? 'rgba(139,92,246,0.5)' : 'var(--border-subtle)',
+                boxShadow: active ? '0 4px 16px rgba(139,92,246,0.15)' : 'none',
               }}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold" style={{ color: active ? '#fff' : 'var(--text-primary)' }}>
-                  {p.label}
-                </span>
-                <span
-                  className="text-[9px] tracking-wider"
-                  style={{
-                    color: active ? '#fff' : 'var(--text-dim)',
-                    opacity: active ? 0.7 : 0.5,
-                  }}
-                >
-                  {p.icon}
-                </span>
+              <div
+                className="mb-1 text-[9px] tracking-[0.08em]"
+                style={{ color: active ? 'var(--accent)' : 'var(--text-dim)', opacity: active ? 1 : 0.6 }}
+              >
+                {p.icon}
               </div>
               <div
-                className="mt-0.5 text-[9px]"
-                style={{
-                  color: active ? '#fff' : 'var(--text-dim)',
-                  opacity: active ? 0.7 : 0.6,
-                }}
+                className="text-[11px] font-semibold leading-tight"
+                style={{ color: active ? '#fff' : 'var(--text-primary)' }}
+              >
+                {p.label}
+              </div>
+              <div
+                className="mt-0.5 text-[8px] font-medium"
+                style={{ color: active ? 'rgba(255,255,255,0.7)' : 'var(--text-dim)', opacity: active ? 1 : 0.7 }}
               >
                 {p.sub}
               </div>
@@ -107,51 +155,42 @@ export function QualitySection({
 
       {/* Codec selector */}
       <div>
-        <p className="mb-1 text-[10px] font-medium tracking-wide uppercase" style={{ color: 'var(--text-dim)' }}>
+        <FieldLabel>
           {t('codec')}
           <TipBadge id="codec" activeTip={activeTip} setActiveTip={setActiveTip} />
-        </p>
-        <div className="flex flex-wrap gap-1">
-          {[
-            { id: 'auto', labelKey: 'codecAuto' },
-            { id: 'h264', labelKey: 'codecH264' },
-            { id: 'hevc', labelKey: 'codecHevc' },
-            { id: 'av1', labelKey: 'codecAv1' },
-            { id: 'libx264', labelKey: 'codecSwH264' },
-            { id: 'libx265', labelKey: 'codecSwHevc' },
-          ].map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => handleConfigUpdate({ codec: c.id })}
-              className="rounded-lg py-1 px-2 text-[10px] font-medium transition-all"
-              style={{
-                background: (config.codec ?? 'auto') === c.id ? 'var(--accent)' : 'rgba(113,113,122,0.08)',
-                color: (config.codec ?? 'auto') === c.id ? '#fff' : 'var(--text-primary)',
-              }}
-            >
-              {t(c.labelKey)}
-            </button>
-          ))}
-        </div>
+        </FieldLabel>
+        <SegmentedControl
+          layoutId="codec"
+          wrap
+          options={[
+            { value: 'auto', label: t('codecAuto') },
+            { value: 'h264', label: t('codecH264') },
+            { value: 'hevc', label: t('codecHevc') },
+            { value: 'av1', label: t('codecAv1') },
+            { value: 'libx264', label: t('codecSwH264') },
+            { value: 'libx265', label: t('codecSwHevc') },
+          ]}
+          value={(config.codec ?? 'auto') as 'auto' | 'h264' | 'hevc' | 'av1' | 'libx264' | 'libx265'}
+          onChange={(codec) => handleConfigUpdate({ codec })}
+        />
       </div>
 
       {/* GPU selector */}
       {gpuList.length > 0 && (
         <div>
-          <p className="mb-1 text-[10px] font-medium tracking-wide uppercase" style={{ color: 'var(--text-dim)' }}>
+          <FieldLabel>
             {t('gpuLabel')}
             <TipBadge id="gpu" activeTip={activeTip} setActiveTip={setActiveTip} />
-          </p>
+          </FieldLabel>
           <div className="relative">
             <button
               type="button"
               onClick={() => setGpuOpen((o) => !o)}
-              className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-[11px] transition-all"
+              className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-[11px] transition-all"
               style={{
-                background: 'rgba(113,113,122,0.08)',
+                background: 'rgba(113,113,122,0.06)',
                 color: 'var(--text-primary)',
-                border: '1px solid rgba(113,113,122,0.15)',
+                border: '1px solid var(--border-subtle)',
               }}
             >
               <span className="truncate">
@@ -159,17 +198,17 @@ export function QualitySection({
                   ? t('codecAuto')
                   : (gpuList.find((g) => g.index === config.adapterIndex)?.name ?? t('codecAuto'))}
               </span>
-              <ChevronDown className="h-3 w-3 shrink-0" style={{ color: 'var(--text-dim)' }} />
+              <ChevronDown className="h-3 w-3 shrink-0 transition-transform" style={{ color: 'var(--text-dim)' }} />
             </button>
             {gpuOpen && (
               <>
                 <div aria-hidden="true" className="fixed inset-0 z-20" onMouseDown={() => setGpuOpen(false)} />
                 <div
-                  className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-lg py-1"
+                  className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-xl py-1"
                   style={{
                     background: 'var(--card-bg)',
                     border: '1px solid var(--border-medium)',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
+                    boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
                   }}
                 >
                   {[{ index: -1, name: t('codecAuto') }, ...gpuList].map((gpu) => (
@@ -180,7 +219,7 @@ export function QualitySection({
                         handleConfigUpdate({ adapterIndex: gpu.index })
                         setGpuOpen(false)
                       }}
-                      className="block w-full truncate px-2.5 py-1.5 text-left text-[11px] transition-colors hover:bg-white/[0.05]"
+                      className="block w-full truncate px-3 py-1.5 text-left text-[11px] transition-colors hover:bg-white/[0.05]"
                       style={{
                         color: (config.adapterIndex ?? -1) === gpu.index ? 'var(--accent)' : 'var(--text-primary)',
                       }}
@@ -196,134 +235,99 @@ export function QualitySection({
       )}
 
       {/* Resolution + FPS side by side */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2">
         <div>
-          <p className="mb-1 text-[10px] font-medium tracking-wide uppercase" style={{ color: 'var(--text-dim)' }}>
+          <FieldLabel>
             {t('resolution')}
             <TipBadge id="resolution" activeTip={activeTip} setActiveTip={setActiveTip} />
-          </p>
-          <div className="flex gap-1">
-            {[
-              { w: 854, h: 480, l: '480p' },
-              { w: 1280, h: 720, l: '720p' },
-              { w: 1920, h: 1080, l: '1080p' },
-            ].map((r) => (
-              <button
-                key={r.l}
-                type="button"
-                onClick={() => handleConfigUpdate({ width: r.w, height: r.h })}
-                className="flex-1 rounded-lg py-1 text-[11px] font-medium transition-all"
-                style={{
-                  background: r.w === config.width ? 'var(--accent)' : 'rgba(113,113,122,0.08)',
-                  color: r.w === config.width ? '#fff' : 'var(--text-primary)',
-                }}
-              >
-                {r.l}
-              </button>
-            ))}
-          </div>
+          </FieldLabel>
+          <SegmentedControl
+            layoutId="resolution"
+            options={[
+              { value: '854', label: '480p' },
+              { value: '1280', label: '720p' },
+              { value: '1920', label: '1080p' },
+            ]}
+            value={String(config.width) as '854' | '1280' | '1920'}
+            onChange={(v) => {
+              const w = Number(v)
+              handleConfigUpdate({ width: w, height: w === 854 ? 480 : w === 1280 ? 720 : 1080 })
+            }}
+          />
         </div>
         <div>
-          <p className="mb-1 text-[10px] font-medium tracking-wide uppercase" style={{ color: 'var(--text-dim)' }}>
+          <FieldLabel>
             {t('fps')}
             <TipBadge id="fps" activeTip={activeTip} setActiveTip={setActiveTip} />
-          </p>
-          <div className="flex gap-1">
-            {[30, 60, 75, 120].map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => handleConfigUpdate({ fps: f })}
-                className="flex-1 rounded-lg py-1 text-[11px] font-medium transition-all"
-                style={{
-                  background: f === config.fps ? 'var(--accent)' : 'rgba(113,113,122,0.08)',
-                  color: f === config.fps ? '#fff' : 'var(--text-primary)',
-                }}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
+          </FieldLabel>
+          <SegmentedControl
+            layoutId="fps"
+            options={[
+              { value: '30', label: '30' },
+              { value: '60', label: '60' },
+              { value: '75', label: '75' },
+              { value: '120', label: '120' },
+            ]}
+            value={String(config.fps) as '30' | '60' | '75' | '120'}
+            onChange={(v) => handleConfigUpdate({ fps: Number(v) })}
+          />
         </div>
       </div>
 
       {/* Stretch to fit (remove black bars) */}
-      <div className="rounded-lg px-2.5 py-2" style={{ background: 'rgba(113,113,122,0.06)' }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs" style={{ color: 'var(--text-primary)' }}>
-              {t('stretchToFit')}
-            </span>
-            <TipBadge id="stretch-to-fit" activeTip={activeTip} setActiveTip={setActiveTip} />
-          </div>
-          <TogglePill
-            enabled={config.stretchToFit ?? false}
-            accent="blue"
-            onToggle={() => handleConfigUpdate({ stretchToFit: !(config.stretchToFit ?? false) })}
-          />
-        </div>
-      </div>
+      <ToggleRow
+        title={t('stretchToFit')}
+        tip={t('stretchToFitTooltip')}
+        tooltipId="stretch-to-fit"
+        activeTip={activeTip}
+        setActiveTip={setActiveTip}
+        enabled={config.stretchToFit ?? false}
+        onToggle={() => handleConfigUpdate({ stretchToFit: !(config.stretchToFit ?? false) })}
+      />
 
       {/* Replay buffer mode (RAM + disk) */}
-      <div className="rounded-lg px-2.5 py-2" style={{ background: 'rgba(113,113,122,0.06)' }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs" style={{ color: 'var(--text-primary)' }}>
-              {t('replayBufferMode')}
-            </span>
-            <TipBadge id="replay-buffer-mode" activeTip={activeTip} setActiveTip={setActiveTip} />
-          </div>
-          <TogglePill
-            enabled={(config.replayBufferMode ?? 'ram') === 'hybrid'}
-            accent="blue"
-            onToggle={() =>
-              handleConfigUpdate({
-                replayBufferMode: (config.replayBufferMode ?? 'ram') === 'hybrid' ? 'ram' : 'hybrid',
-              })
-            }
-          />
-        </div>
-      </div>
+      <ToggleRow
+        title={t('replayBufferMode')}
+        tip={t('replayBufferModeTooltip')}
+        tooltipId="replay-buffer-mode"
+        activeTip={activeTip}
+        setActiveTip={setActiveTip}
+        enabled={(config.replayBufferMode ?? 'ram') === 'hybrid'}
+        onToggle={() =>
+          handleConfigUpdate({
+            replayBufferMode: (config.replayBufferMode ?? 'ram') === 'hybrid' ? 'ram' : 'hybrid',
+          })
+        }
+      />
 
       {/* Replay Time */}
-      <div>
-        <p className="mb-1 text-[10px] font-medium tracking-wide uppercase" style={{ color: 'var(--text-dim)' }}>
+      <div
+        className="rounded-xl px-3 py-2.5"
+        style={{ background: 'rgba(113,113,122,0.05)', border: '1px solid var(--border-subtle)' }}
+      >
+        <FieldLabel>
           {t('replayTime')}
           <TipBadge id="replay" activeTip={activeTip} setActiveTip={setActiveTip} />
-        </p>
-        <div className="flex gap-1">
-          {[
-            { s: 30, label: t('replayPreset30s') },
-            { s: 120, label: t('replayPreset2min') },
-            { s: 300, label: t('replayPreset5min') },
-          ].map(({ s, label }) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => handleConfigUpdate({ replayTimeSeconds: s })}
-              className="flex-1 rounded-lg py-1 text-[11px] font-medium transition-all"
-              style={{
-                background: s === config.replayTimeSeconds ? 'var(--accent)' : 'rgba(113,113,122,0.08)',
-                color: s === config.replayTimeSeconds ? '#fff' : 'var(--text-primary)',
-              }}
-            >
-              {label}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => handleConfigUpdate({ replayTimeSeconds: isCustomReplay ? config.replayTimeSeconds : 150 })}
-            className="flex-1 rounded-lg py-1 text-[11px] font-medium transition-all"
-            style={{
-              background: isCustomReplay ? 'var(--accent)' : 'rgba(113,113,122,0.08)',
-              color: isCustomReplay ? '#fff' : 'var(--text-primary)',
-            }}
-          >
-            {t('replayCustom')}
-          </button>
-        </div>
+        </FieldLabel>
+        <SegmentedControl
+          layoutId="replay"
+          options={[
+            { value: '30', label: t('replayPreset30s') },
+            { value: '120', label: t('replayPreset2min') },
+            { value: '300', label: t('replayPreset5min') },
+            {
+              value: 'custom',
+              label: t('replayCustom'),
+              ...(isCustomReplay ? { title: `${formatReplay(config.replayTimeSeconds)}` } : {}),
+            },
+          ]}
+          value={isCustomReplay ? 'custom' : String(config.replayTimeSeconds)}
+          onChange={(v) =>
+            handleConfigUpdate({ replayTimeSeconds: v === 'custom' ? config.replayTimeSeconds || 150 : Number(v) })
+          }
+        />
         {isCustomReplay && (
-          <div className="mt-2 rounded-lg px-2.5 py-2" style={{ background: 'rgba(113,113,122,0.06)' }}>
+          <div className="mt-2">
             <input
               type="range"
               min={30}
@@ -331,7 +335,12 @@ export function QualitySection({
               step={5}
               value={Math.max(30, Math.min(600, config.replayTimeSeconds))}
               onChange={(e) => handleConfigUpdate({ replayTimeSeconds: Number(e.target.value) })}
-              className="w-full"
+              className="clip-range w-full"
+              style={{
+                background: `linear-gradient(to right, var(--accent) ${
+                  ((Math.max(30, Math.min(600, config.replayTimeSeconds)) - 30) / 570) * 100
+                }%, rgba(113,113,122,0.2) ${((Math.max(30, Math.min(600, config.replayTimeSeconds)) - 30) / 570) * 100}%)`,
+              }}
             />
             <div className="mt-1 flex justify-between text-[10px]">
               <span style={{ color: 'var(--text-dim)' }}>{t('replayMin')}</span>
@@ -344,7 +353,7 @@ export function QualitySection({
         )}
         {config.replayTimeSeconds >= 300 && (
           <div
-            className="mt-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-[10px] leading-snug"
+            className="mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-[10px] leading-snug"
             style={{ color: '#f87171' }}
           >
             {t('replayRamWarning')}
@@ -353,52 +362,52 @@ export function QualitySection({
       </div>
 
       {/* Force Software Encoding */}
-      <div className="rounded-lg px-2.5 py-2" style={{ background: 'rgba(113,113,122,0.06)' }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs" style={{ color: 'var(--text-primary)' }}>
-              {t('forceSoftware')}
-            </span>
-            <TipBadge id="force-software" activeTip={activeTip} setActiveTip={setActiveTip} />
-          </div>
-          <TogglePill
-            enabled={config.forceSoftware ?? false}
-            accent="blue"
-            onToggle={() => handleConfigUpdate({ forceSoftware: !(config.forceSoftware ?? false) })}
-          />
-        </div>
-      </div>
+      <ToggleRow
+        title={t('forceSoftware')}
+        tip={t('forceSoftwareTooltip')}
+        tooltipId="force-software"
+        activeTip={activeTip}
+        setActiveTip={setActiveTip}
+        enabled={config.forceSoftware ?? false}
+        onToggle={() => handleConfigUpdate({ forceSoftware: !(config.forceSoftware ?? false) })}
+      />
 
       {/* Adaptive Quality */}
-      <div className="rounded-lg px-2.5 py-2" style={{ background: 'rgba(113,113,122,0.06)' }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs" style={{ color: 'var(--text-primary)' }}>
-              {t('adaptiveQuality')}
-            </span>
-            <TipBadge id="adaptive-quality" activeTip={activeTip} setActiveTip={setActiveTip} />
-          </div>
-          <TogglePill
-            enabled={config.adaptiveQuality ?? true}
-            accent="blue"
-            onToggle={() => handleConfigUpdate({ adaptiveQuality: !(config.adaptiveQuality ?? true) })}
-          />
+      <ToggleRow
+        title={t('adaptiveQuality')}
+        tip={t('tooltipAdaptiveQuality')}
+        tooltipId="adaptive-quality"
+        activeTip={activeTip}
+        setActiveTip={setActiveTip}
+        enabled={config.adaptiveQuality ?? true}
+        onToggle={() => handleConfigUpdate({ adaptiveQuality: !(config.adaptiveQuality ?? true) })}
+      />
+      {(config.adaptiveQuality ?? true) && _status.calibrationTier && (
+        <div
+          className="flex items-center gap-2 rounded-xl border px-3 py-2"
+          style={{
+            background: 'linear-gradient(90deg, rgba(139,92,246,0.16), rgba(59,130,246,0.1))',
+            borderColor: 'rgba(139,92,246,0.35)',
+          }}
+        >
+          <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--accent)' }} />
+          <span className="text-[10px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+            {t('calibrationActive', { tier: _status.calibrationTier })}
+          </span>
         </div>
-        {(config.adaptiveQuality ?? true) && _status.calibrationTier ? (
-          <div
-            className="mt-2 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[10px]"
-            style={{ background: 'rgba(59,130,246,0.12)', color: '#60a5fa' }}
-          >
-            <span>{t('calibrationActive', { tier: _status.calibrationTier })}</span>
-          </div>
-        ) : null}
-      </div>
+      )}
 
       {/* Buffer Usage */}
       {estimatedRamMB > 0 && (
-        <div>
-          <div className="mb-1 flex justify-between text-[10px]">
-            <span style={{ color: 'var(--text-dim)' }}>{t('ramLabel')}</span>
+        <div
+          className="rounded-xl px-3 py-2.5"
+          style={{ background: 'rgba(113,113,122,0.05)', border: '1px solid var(--border-subtle)' }}
+        >
+          <div className="mb-1.5 flex justify-between text-[10px]">
+            <span className="flex items-center gap-1 font-medium" style={{ color: 'var(--text-dim)' }}>
+              <Gauge className="h-3 w-3" />
+              {t('ramLabel')}
+            </span>
             <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
               {_status.replayBufferBytes
                 ? `${Math.round(_status.replayBufferBytes / 1024 / 1024)} ${t('megabytes')}`
@@ -407,7 +416,7 @@ export function QualitySection({
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: 'rgba(113,113,122,0.12)' }}>
             <div
-              className="h-full rounded-full transition-all"
+              className="relative h-full rounded-full transition-all duration-300"
               style={{
                 width: `${
                   _status.replayBufferBytes

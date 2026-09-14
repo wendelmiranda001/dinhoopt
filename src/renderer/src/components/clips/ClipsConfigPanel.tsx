@@ -45,11 +45,20 @@ export function ClipsConfigPanel({
           <div className="w-[380px] space-y-3">
             {/* Output Directory */}
             <div
-              className="rounded-xl border px-4 py-3"
-              style={{ background: 'var(--card-bg)', borderColor: 'var(--border-medium)' }}
+              className="relative overflow-hidden rounded-2xl border px-4 py-3"
+              style={{
+                background: `linear-gradient(180deg, rgba(139,92,246,0.06), transparent 60%), var(--card-bg)`,
+                borderColor: 'var(--border-medium)',
+              }}
             >
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-500/40 to-transparent" />
               <div className="flex items-center gap-2 text-xs">
-                <HardDrive className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--text-dim)' }} />
+                <span
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-lg"
+                  style={{ background: 'rgba(139,92,246,0.14)', color: '#a78bfa' }}
+                >
+                  <HardDrive className="h-3.5 w-3.5" />
+                </span>
                 <span
                   className="min-w-0 flex-1 truncate font-mono text-[11px]"
                   style={{ color: 'var(--text-primary)' }}

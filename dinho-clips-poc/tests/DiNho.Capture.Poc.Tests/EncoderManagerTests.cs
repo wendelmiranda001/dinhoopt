@@ -471,9 +471,9 @@ public sealed class EncoderManagerTests
     // ─── SelectAmfPreset (preset AMF adaptativo por máquina) ────────────
 
     [Fact]
-    public void SelectAmfPreset_QualitySustains_ReturnsQuality_ProbesWithCaptureDims()
+    public void SelectAmfPreset_HighQualitySustains_ReturnsHighQuality_ProbesWithCaptureDims()
     {
-        // GPU forte: preset quality sustenta ≥ 0.85× do fps alvo → fica quality.
+        // GPU forte: preset high_quality sustenta ≥ 0.85× do fps alvo → fica high_quality.
         // O probe recebe a resolução/fps reais da captura, não dados sintéticos.
         EncoderManager.ResetAmfPresetCache();
         var calls = new System.Collections.Generic.List<(string codec, int w, int h, int fps, string preset)>();
@@ -485,13 +485,37 @@ public sealed class EncoderManagerTests
                 calls.Add((codec, w, h, fps, preset));
                 return fps * 0.9;
             };
-            Assert.Equal("quality", EncoderManager.SelectAmfPreset("h264_amf", 1920, 1080, 60));
+            Assert.Equal("high_quality", EncoderManager.SelectAmfPreset("h264_amf", 1920, 1080, 60));
             var first = Assert.Single(calls);
             Assert.Equal("h264_amf", first.codec);
             Assert.Equal(1920, first.w);
             Assert.Equal(1080, first.h);
             Assert.Equal(60, first.fps);
-            Assert.Equal("quality", first.preset);
+            Assert.Equal("high_quality", first.preset);
+        }
+        finally
+        {
+            EncoderManager.ProbeAmfSpeedProbe = old;
+            EncoderManager.ResetAmfPresetCache();
+        }
+    }
+
+    [Fact]
+    public void SelectAmfPreset_HighQualitySlow_QualitySustains_ReturnsQuality()
+    {
+        // DGPU média: high_quality não sustenta (<0.85×) → quality sustenta → quality.
+        EncoderManager.ResetAmfPresetCache();
+        var presets = new System.Collections.Generic.List<string>();
+        var old = EncoderManager.ProbeAmfSpeedProbe;
+        try
+        {
+            EncoderManager.ProbeAmfSpeedProbe = (_, _, _, fps, preset) =>
+            {
+                presets.Add(preset);
+                return preset == "high_quality" ? fps * 0.5 : fps * 0.95;
+            };
+            Assert.Equal("quality", EncoderManager.SelectAmfPreset("h264_amf", 1920, 1080, 60));
+            Assert.Equal(new[] { "high_quality", "quality" }, presets);
         }
         finally
         {
@@ -503,7 +527,7 @@ public sealed class EncoderManagerTests
     [Fact]
     public void SelectAmfPreset_QualitySlow_BalancedSustains_ReturnsBalanced()
     {
-        // Escada: quality não sustenta (<0.85×) → balanced sustenta → balanced.
+        // Escada: high_quality e quality não sustentam (<0.85×) → balanced sustenta → balanced.
         EncoderManager.ResetAmfPresetCache();
         var presets = new System.Collections.Generic.List<string>();
         var old = EncoderManager.ProbeAmfSpeedProbe;
@@ -512,10 +536,10 @@ public sealed class EncoderManagerTests
             EncoderManager.ProbeAmfSpeedProbe = (_, _, _, fps, preset) =>
             {
                 presets.Add(preset);
-                return preset == "quality" ? fps * 0.5 : fps * 0.95;
+                return preset is "high_quality" or "quality" ? fps * 0.5 : fps * 0.95;
             };
             Assert.Equal("balanced", EncoderManager.SelectAmfPreset("h264_amf", 1920, 1080, 60));
-            Assert.Equal(new[] { "quality", "balanced" }, presets);
+            Assert.Equal(new[] { "high_quality", "quality", "balanced" }, presets);
         }
         finally
         {
@@ -527,7 +551,7 @@ public sealed class EncoderManagerTests
     [Fact]
     public void SelectAmfPreset_AllSlow_ReturnsSpeed()
     {
-        // GPU muito fraca: nenhum preset sustenta → último degrau (speed) é retornado.
+        // GPU muito fraca (iGPU/VCN 1.0): nenhum preset sustenta → último degrau (speed).
         EncoderManager.ResetAmfPresetCache();
         var presets = new System.Collections.Generic.List<string>();
         var old = EncoderManager.ProbeAmfSpeedProbe;
@@ -539,7 +563,7 @@ public sealed class EncoderManagerTests
                 return fps * 0.5;
             };
             Assert.Equal("speed", EncoderManager.SelectAmfPreset("h264_amf", 1920, 1080, 60));
-            Assert.Equal(new[] { "quality", "balanced", "speed" }, presets);
+            Assert.Equal(new[] { "high_quality", "quality", "balanced", "speed" }, presets);
         }
         finally
         {
@@ -563,7 +587,7 @@ public sealed class EncoderManagerTests
                 throw new System.Exception("probe boom");
             };
             Assert.Equal("speed", EncoderManager.SelectAmfPreset("h264_amf", 1920, 1080, 60));
-            Assert.Equal(new[] { "quality", "balanced", "speed" }, presets);
+            Assert.Equal(new[] { "high_quality", "quality", "balanced", "speed" }, presets);
         }
         finally
         {
@@ -620,8 +644,8 @@ public sealed class EncoderManagerTests
         try
         {
             EncoderManager.ProbeAmfSpeedProbe = (_, _, _, fps, _) => { count++; return fps * 0.9; };
-            Assert.Equal("quality", EncoderManager.SelectAmfPreset("h264_amf", 1920, 1080, 60));
-            Assert.Equal("quality", EncoderManager.SelectAmfPreset("h264_amf", 1920, 1080, 60));
+            Assert.Equal("high_quality", EncoderManager.SelectAmfPreset("h264_amf", 1920, 1080, 60));
+            Assert.Equal("high_quality", EncoderManager.SelectAmfPreset("h264_amf", 1920, 1080, 60));
             Assert.Equal(1, count);
             EncoderManager.SelectAmfPreset("h264_amf", 1280, 720, 60);
             Assert.Equal(2, count);
@@ -630,6 +654,272 @@ public sealed class EncoderManagerTests
         {
             EncoderManager.ProbeAmfSpeedProbe = old;
             EncoderManager.ResetAmfPresetCache();
+        }
+    }
+
+    // ─── SelectAmfPreanalysis (PA/TAQ adaptativo, só GPU forte) ───────────
+
+    [Fact]
+    public void SelectAmfPreanalysis_QualitySustains_ReturnsTrue_ProbesWithPreset()
+    {
+        // DGPU forte (quality sustentado): preanalysis+TAQ habilitado, probe com o preset real.
+        EncoderManager.ResetAmfPreanalysisCache();
+        var calls = new System.Collections.Generic.List<(string codec, int w, int h, int fps, string preset)>();
+        var old = EncoderManager.ProbeAmfPreanalysisProbe;
+        try
+        {
+            EncoderManager.ProbeAmfPreanalysisProbe = (codec, w, h, fps, preset) =>
+            {
+                calls.Add((codec, w, h, fps, preset));
+                return fps * 0.9;
+            };
+            Assert.True(EncoderManager.SelectAmfPreanalysis("h264_amf", 1920, 1080, 60, "quality"));
+            var first = Assert.Single(calls);
+            Assert.Equal("h264_amf", first.codec);
+            Assert.Equal(1920, first.w);
+            Assert.Equal(1080, first.h);
+            Assert.Equal(60, first.fps);
+            Assert.Equal("quality", first.preset);
+        }
+        finally
+        {
+            EncoderManager.ProbeAmfPreanalysisProbe = old;
+            EncoderManager.ResetAmfPreanalysisCache();
+        }
+    }
+
+    [Fact]
+    public void SelectAmfPreanalysis_HighQualitySustains_ReturnsTrue()
+    {
+        // high_quality sustentado (topo da escada) → PA/TAQ ligado (GPU máxima).
+        EncoderManager.ResetAmfPreanalysisCache();
+        var old = EncoderManager.ProbeAmfPreanalysisProbe;
+        try
+        {
+            EncoderManager.ProbeAmfPreanalysisProbe = (_, _, _, fps, _) => fps * 0.9;
+            Assert.True(EncoderManager.SelectAmfPreanalysis("h264_amf", 1920, 1080, 60, "high_quality"));
+        }
+        finally
+        {
+            EncoderManager.ProbeAmfPreanalysisProbe = old;
+            EncoderManager.ResetAmfPreanalysisCache();
+        }
+    }
+
+    [Fact]
+    public void SelectAmfPreanalysis_ProbeSlow_ReturnsFalse()
+    {
+        // PA/TAQ pesa — se o probe não sustenta ≥0.85×, mantém OFF (segurança).
+        EncoderManager.ResetAmfPreanalysisCache();
+        var old = EncoderManager.ProbeAmfPreanalysisProbe;
+        try
+        {
+            EncoderManager.ProbeAmfPreanalysisProbe = (_, _, _, fps, _) => fps * 0.5;
+            Assert.False(EncoderManager.SelectAmfPreanalysis("h264_amf", 1920, 1080, 60, "quality"));
+        }
+        finally
+        {
+            EncoderManager.ProbeAmfPreanalysisProbe = old;
+            EncoderManager.ResetAmfPreanalysisCache();
+        }
+    }
+
+    [Fact]
+    public void SelectAmfPreanalysis_ProbeThrows_ReturnsFalse()
+    {
+        // Exceção no probe → PA/TAQ OFF (nunca derruba o encode por PA).
+        EncoderManager.ResetAmfPreanalysisCache();
+        var old = EncoderManager.ProbeAmfPreanalysisProbe;
+        try
+        {
+            EncoderManager.ProbeAmfPreanalysisProbe = (_, _, _, _, _) => throw new System.Exception("pa boom");
+            Assert.False(EncoderManager.SelectAmfPreanalysis("h264_amf", 1920, 1080, 60, "quality"));
+        }
+        finally
+        {
+            EncoderManager.ProbeAmfPreanalysisProbe = old;
+            EncoderManager.ResetAmfPreanalysisCache();
+        }
+    }
+
+    [Fact]
+    public void SelectAmfPreanalysis_BalancedOrSpeed_ReturnsFalse_WithoutProbe()
+    {
+        // iGPU/VCN 1.0 degradou para balanced/speed → PA/TAQ OFF sem nem sondar.
+        EncoderManager.ResetAmfPreanalysisCache();
+        var count = 0;
+        var old = EncoderManager.ProbeAmfPreanalysisProbe;
+        try
+        {
+            EncoderManager.ProbeAmfPreanalysisProbe = (_, _, _, _, _) => { count++; return 0.0; };
+            Assert.False(EncoderManager.SelectAmfPreanalysis("h264_amf", 1920, 1080, 60, "balanced"));
+            Assert.False(EncoderManager.SelectAmfPreanalysis("h264_amf", 1920, 1080, 60, "speed"));
+            Assert.Equal(0, count);
+        }
+        finally
+        {
+            EncoderManager.ProbeAmfPreanalysisProbe = old;
+            EncoderManager.ResetAmfPreanalysisCache();
+        }
+    }
+
+    [Fact]
+    public void SelectAmfPreanalysis_NonAmfCodec_ReturnsFalse_WithoutProbe()
+    {
+        EncoderManager.ResetAmfPreanalysisCache();
+        var count = 0;
+        var old = EncoderManager.ProbeAmfPreanalysisProbe;
+        try
+        {
+            EncoderManager.ProbeAmfPreanalysisProbe = (_, _, _, _, _) => { count++; return 0.0; };
+            Assert.False(EncoderManager.SelectAmfPreanalysis("h264_nvenc", 1920, 1080, 60, "quality"));
+            Assert.False(EncoderManager.SelectAmfPreanalysis("hevc_qsv", 1920, 1080, 60, "quality"));
+            Assert.Equal(0, count);
+        }
+        finally
+        {
+            EncoderManager.ProbeAmfPreanalysisProbe = old;
+            EncoderManager.ResetAmfPreanalysisCache();
+        }
+    }
+
+    [Fact]
+    public void SelectAmfPreanalysis_CachesByCodecResFpsPreset()
+    {
+        EncoderManager.ResetAmfPreanalysisCache();
+        var count = 0;
+        var old = EncoderManager.ProbeAmfPreanalysisProbe;
+        try
+        {
+            EncoderManager.ProbeAmfPreanalysisProbe = (_, _, _, fps, _) => { count++; return fps * 0.9; };
+            Assert.True(EncoderManager.SelectAmfPreanalysis("h264_amf", 1920, 1080, 60, "quality"));
+            Assert.True(EncoderManager.SelectAmfPreanalysis("h264_amf", 1920, 1080, 60, "quality"));
+            Assert.Equal(1, count);
+            EncoderManager.SelectAmfPreanalysis("h264_amf", 1920, 1080, 60, "high_quality");
+            Assert.Equal(2, count);
+        }
+        finally
+        {
+            EncoderManager.ProbeAmfPreanalysisProbe = old;
+            EncoderManager.ResetAmfPreanalysisCache();
+        }
+    }
+
+    // ─── SupportsSmartAccessVideo (SAV, APU+dGPU / múltiplos VCN) ────────
+
+    [Fact]
+    public void SupportsSmartAccessVideo_AmdMultiGpu_ProbeOk_ReturnsTrue()
+    {
+        // APU + dGPU AMD: adapter count ≥ 2 E probe real com -smart_access_video 1 → SAV liga.
+        EncoderManager.ResetAmfSavCache();
+        var oldAdapter = EncoderManager.AmdAdapterCountProbe;
+        var oldProbe = EncoderManager.ProbeAmfSavProbe;
+        try
+        {
+            EncoderManager.AmdAdapterCountProbe = () => 2;
+            EncoderManager.ProbeAmfSavProbe = (_, _, _, _) => true;
+            Assert.True(EncoderManager.SupportsSmartAccessVideo("h264_amf", 1920, 1080, 60));
+        }
+        finally
+        {
+            EncoderManager.AmdAdapterCountProbe = oldAdapter;
+            EncoderManager.ProbeAmfSavProbe = oldProbe;
+            EncoderManager.ResetAmfSavCache();
+        }
+    }
+
+    [Fact]
+    public void SupportsSmartAccessVideo_AmdMultiGpu_ProbeFails_ReturnsFalse()
+    {
+        // Dois adapters AMD mas probe real falha (driver/dGPU não suporta SAV) → OFF.
+        EncoderManager.ResetAmfSavCache();
+        var oldAdapter = EncoderManager.AmdAdapterCountProbe;
+        var oldProbe = EncoderManager.ProbeAmfSavProbe;
+        try
+        {
+            EncoderManager.AmdAdapterCountProbe = () => 2;
+            EncoderManager.ProbeAmfSavProbe = (_, _, _, _) => false;
+            Assert.False(EncoderManager.SupportsSmartAccessVideo("h264_amf", 1920, 1080, 60));
+        }
+        finally
+        {
+            EncoderManager.AmdAdapterCountProbe = oldAdapter;
+            EncoderManager.ProbeAmfSavProbe = oldProbe;
+            EncoderManager.ResetAmfSavCache();
+        }
+    }
+
+    [Fact]
+    public void SupportsSmartAccessVideo_SingleGpu_ReturnsFalse_WithoutProbe()
+    {
+        // Desktops dGPU-only / iGPU-only não têm 2 VCNs — SAV OFF sem custo de probe.
+        EncoderManager.ResetAmfSavCache();
+        var adapterCall = 0;
+        var probeCall = 0;
+        var oldAdapter = EncoderManager.AmdAdapterCountProbe;
+        var oldProbe = EncoderManager.ProbeAmfSavProbe;
+        try
+        {
+            EncoderManager.AmdAdapterCountProbe = () => { adapterCall++; return 1; };
+            EncoderManager.ProbeAmfSavProbe = (_, _, _, _) => { probeCall++; return true; };
+            Assert.False(EncoderManager.SupportsSmartAccessVideo("h264_amf", 1920, 1080, 60));
+            Assert.Equal(1, adapterCall);
+            Assert.Equal(0, probeCall);
+        }
+        finally
+        {
+            EncoderManager.AmdAdapterCountProbe = oldAdapter;
+            EncoderManager.ProbeAmfSavProbe = oldProbe;
+            EncoderManager.ResetAmfSavCache();
+        }
+    }
+
+    [Fact]
+    public void SupportsSmartAccessVideo_NonAmfCodec_ReturnsFalse_WithoutProbe()
+    {
+        EncoderManager.ResetAmfSavCache();
+        var adapterCall = 0;
+        var probeCall = 0;
+        var oldAdapter = EncoderManager.AmdAdapterCountProbe;
+        var oldProbe = EncoderManager.ProbeAmfSavProbe;
+        try
+        {
+            EncoderManager.AmdAdapterCountProbe = () => { adapterCall++; return 2; };
+            EncoderManager.ProbeAmfSavProbe = (_, _, _, _) => { probeCall++; return true; };
+            Assert.False(EncoderManager.SupportsSmartAccessVideo("h264_nvenc", 1920, 1080, 60));
+            Assert.Equal(0, adapterCall);
+            Assert.Equal(0, probeCall);
+        }
+        finally
+        {
+            EncoderManager.AmdAdapterCountProbe = oldAdapter;
+            EncoderManager.ProbeAmfSavProbe = oldProbe;
+            EncoderManager.ResetAmfSavCache();
+        }
+    }
+
+    [Fact]
+    public void SupportsSmartAccessVideo_CachesPerCodecResFps()
+    {
+        EncoderManager.ResetAmfSavCache();
+        var adapterCall = 0;
+        var oldAdapter = EncoderManager.AmdAdapterCountProbe;
+        var oldProbe = EncoderManager.ProbeAmfSavProbe;
+        try
+        {
+            EncoderManager.AmdAdapterCountProbe = () => { adapterCall++; return 2; };
+            EncoderManager.ProbeAmfSavProbe = (_, _, _, _) => true;
+            Assert.True(EncoderManager.SupportsSmartAccessVideo("h264_amf", 1920, 1080, 60));
+            Assert.True(EncoderManager.SupportsSmartAccessVideo("h264_amf", 1920, 1080, 60));
+            Assert.Equal(1, adapterCall);
+            EncoderManager.SupportsSmartAccessVideo("av1_amf", 1920, 1080, 60);
+            Assert.Equal(2, adapterCall);
+        }
+        finally
+        {
+            EncoderManager.AmdAdapterCountProbe = oldAdapter;
+            EncoderManager.ProbeAmfSavProbe = oldProbe;
+            EncoderManager.ResetAmfSavCache();
         }
     }
 
