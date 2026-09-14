@@ -18,7 +18,7 @@
   "renameError": "Failed to rename clip",
   "actions": "Clip actions",
   "failedToStart": "Failed to start recording",
-  "replayTime": "Replay Buffer",
+  "replayTime": "Recording Time",
   "replayCustom": "Custom",
   "replayMin": "30s",
   "replayMax": "10 min",

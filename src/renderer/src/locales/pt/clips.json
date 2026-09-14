@@ -18,7 +18,7 @@
   "renameError": "Falha ao renomear clipe",
   "actions": "Ações do clipe",
   "failedToStart": "Falha ao iniciar gravação",
-  "replayTime": "Buffer de Replay",
+  "replayTime": "Tempo de Gravação",
   "replayCustom": "Personalizado",
   "replayMin": "30s",
   "replayMax": "10 min",

@@ -323,7 +323,9 @@ export function QualitySection({
           ]}
           value={isCustomReplay ? 'custom' : String(config.replayTimeSeconds)}
           onChange={(v) =>
-            handleConfigUpdate({ replayTimeSeconds: v === 'custom' ? config.replayTimeSeconds || 150 : Number(v) })
+            handleConfigUpdate({
+              replayTimeSeconds: v === 'custom' ? (isCustomReplay ? config.replayTimeSeconds : 150) : Number(v),
+            })
           }
         />
         {isCustomReplay && (

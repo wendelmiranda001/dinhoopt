@@ -426,4 +426,91 @@ describe('ClipsPage', () => {
     fsToggle.click()
     expect(mockSetConfig).toHaveBeenCalledWith({ forceSoftware: true })
   })
+
+  it('calls setConfig with 150 when selecting custom replay time from a preset', async () => {
+    mockGetConfig.mockResolvedValue({
+      replayTimeSeconds: 30,
+      micEnabled: true,
+      audioLoopback: false,
+      fps: 30,
+      width: 1920,
+      height: 1080,
+      bitrateKbps: 50000,
+      cq: 22,
+      maxrateKbps: 30000,
+      bufsizeKbps: 60000,
+      bframes: 2,
+      lookahead: 16,
+      encoderPreset: 'p4',
+      outputDirectory: 'C:\\Users\\Test\\Desktop\\DiNhoClips',
+      forceSoftware: false,
+      pushToTalk: 'off',
+      pushToTalkKeys: [0x7a],
+      gameDetection: false,
+      hotkeys: [],
+    })
+    render(<ClipsPage />)
+    showSettings()
+    await screen.findByText('recordingQuality')
+    screen.getByText('replayCustom').click()
+    expect(mockSetConfig).toHaveBeenCalledWith({ replayTimeSeconds: 150 })
+  })
+
+  it('calls setConfig with preset value when selecting preset replay time from custom', async () => {
+    mockGetConfig.mockResolvedValue({
+      replayTimeSeconds: 150,
+      micEnabled: true,
+      audioLoopback: false,
+      fps: 30,
+      width: 1920,
+      height: 1080,
+      bitrateKbps: 50000,
+      cq: 22,
+      maxrateKbps: 30000,
+      bufsizeKbps: 60000,
+      bframes: 2,
+      lookahead: 16,
+      encoderPreset: 'p4',
+      outputDirectory: 'C:\\Users\\Test\\Desktop\\DiNhoClips',
+      forceSoftware: false,
+      pushToTalk: 'off',
+      pushToTalkKeys: [0x7a],
+      gameDetection: false,
+      hotkeys: [],
+    })
+    render(<ClipsPage />)
+    showSettings()
+    await screen.findByText('recordingQuality')
+    screen.getByText('replayPreset30s').click()
+    expect(mockSetConfig).toHaveBeenCalledWith({ replayTimeSeconds: 30 })
+  })
+
+  it('keeps current custom replay value when clicking custom again from custom', async () => {
+    mockGetConfig.mockResolvedValue({
+      replayTimeSeconds: 150,
+      micEnabled: true,
+      audioLoopback: false,
+      fps: 30,
+      width: 1920,
+      height: 1080,
+      bitrateKbps: 50000,
+      cq: 22,
+      maxrateKbps: 30000,
+      bufsizeKbps: 60000,
+      bframes: 2,
+      lookahead: 16,
+      encoderPreset: 'p4',
+      outputDirectory: 'C:\\Users\\Test\\Desktop\\DiNhoClips',
+      forceSoftware: false,
+      pushToTalk: 'off',
+      pushToTalkKeys: [0x7a],
+      gameDetection: false,
+      hotkeys: [],
+    })
+    render(<ClipsPage />)
+    showSettings()
+    await screen.findByText('recordingQuality')
+    screen.getByText('replayCustom').click()
+    expect(mockSetConfig).toHaveBeenCalledWith({ replayTimeSeconds: 150 })
+  })
 })
