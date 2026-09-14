@@ -192,6 +192,15 @@ public sealed class NamedPipeServer : IDisposable
             _rawBroadcastQueue.TryDequeue(out _);
     }
 
+    /// <summary>Enfileira com teto (drop-oldest): impede crescimento ilimitado quando o
+    /// consumidor é lento (mesmo padrão do BroadcastRaw). Puro para teste.</summary>
+    internal static void EnqueueBounded(ConcurrentQueue<string> queue, string item, int maxSize)
+    {
+        queue.Enqueue(item);
+        while (queue.Count > maxSize)
+            queue.TryDequeue(out _);
+    }
+
     private async Task ListenLoop(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
@@ -250,7 +259,11 @@ public sealed class NamedPipeServer : IDisposable
         {
             try
             {
-                broadcastQueue.Enqueue(JsonSerializer.Serialize(msg.ToEnvelope()));
+                // Fila por-cliente SEM cap era vetor real de crescimento de RAM: se o
+                // cliente não lê (pipe cheio → WriteLineAsync bloqueado no drain), os
+                // broadcasts de 2s acumulavam para sempre. Cap drop-oldest mantém o
+                // status efêmero sempre fresco sem consumo ilimitado.
+                EnqueueBounded(broadcastQueue, JsonSerializer.Serialize(msg.ToEnvelope()), MaxBroadcastQueueSize);
             }
             catch { }
         };

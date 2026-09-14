@@ -181,6 +181,13 @@ internal sealed class GpuVideoConverter : IDisposable
         _cachedOutput?.Dispose();
         _cachedInputView?.Dispose();
         _cachedOutputView?.Dispose();
+        // _videoContext1 é uma QueryInterface do shared device (esperada, distinta
+        // do _videoContext acima) com AddRef próprio — NÃO é o contexto compartilhado.
+        // Sem o Dispose, vaza 1 ref COM por instância a cada reinit/restart do
+        // encoder (classe do bug obs-nvenc "resource destruction order" — acumulação
+        // não revertida de objetos do driver até o fim do processo).
+        _videoContext1?.Dispose();
+        _videoContext1 = null;
         // VideoProcessor and Enumerator were created by us — safe to dispose.
         _videoProcessor.Dispose();
         _enumerator.Dispose();

@@ -2,6 +2,7 @@ using DiNho.Capture.Poc.Audio;
 using DiNho.Capture.Poc.Capture;
 using DiNho.Capture.Poc.Encoders;
 using DiNho.Capture.Poc.GameDetection;
+using DiNho.Capture.Poc.Graphics;
 using DiNho.Capture.Poc.Logging;
 using DiNho.Capture.Poc.Memory;
 using DiNho.Capture.Poc.Watchdog;
@@ -10,6 +11,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Vortice.Direct3D;
 using Vortice.Direct3D11;
+using Vortice.DXGI;
 using Vortice.MediaFoundation;
 using Windows.Win32;
 using Windows.Win32.Foundation;
@@ -54,10 +56,26 @@ public sealed partial class EngineCoordinator
                 if (_sharedDevice == null)
                 {
                     var creationFlags = DeviceCreationFlags.BgraSupport;
+
+                    // Item 2: resolve o adapter que detém o monitor do jogo (dGPU do
+                    // monitor em notebooks híbridos); AdapterIndex do config vale como
+                    // override manual. Null = Windows escolhe (comportamento atual).
+                    var gameHwnd = _captureTargetHwnd != IntPtr.Zero
+                        ? _captureTargetHwnd
+                        : _gameDetector.CurrentGame.Hwnd;
+                    IDXGIAdapter? resolvedAdapter = null;
+                    if (gameHwnd != IntPtr.Zero)
+                    {
+                        resolvedAdapter = MonitorAdapterResolver.TryResolveGameAdapter(gameHwnd, _config.Config.AdapterIndex);
+                        if (resolvedAdapter != null)
+                            Log.I("EngineCoordinator", $"D3D11 device usando adapter {resolvedAdapter.Description.Description.TrimEnd('\0')} (AdapterIndex={_config.Config.AdapterIndex})");
+                    }
+
                     var hr = Vortice.Direct3D11.D3D11.D3D11CreateDevice(
-                        null, DriverType.Hardware, creationFlags,
+                        resolvedAdapter, DriverType.Hardware, creationFlags,
                         new[] { FeatureLevel.Level_11_1, FeatureLevel.Level_11_0 },
                         out _sharedDevice, out _, out _);
+                    resolvedAdapter?.Dispose();
                     if (!hr.Success || _sharedDevice is null)
                     {
                         Log.E("EngineCoordinator", $"D3D11CreateDevice falhou: {hr}");
@@ -93,6 +111,11 @@ public sealed partial class EngineCoordinator
                 // Inicializa dimensões reais da captura
                 _captureWidth = Math.Max(_capture.Width, 320);
                 _captureHeight = Math.Max(_capture.Height, 240);
+
+                // Calibração por capacidade da máquina (defaults calibrados p/ PCs fracos)
+                // roda ANTES do RamManager — que continua ajustando em runtime por cima.
+                // Override explícito do usuário sempre vence. Não persiste em disco.
+                TryApplyMachineCalibration(_config, out _);
 
                 // RamManager — resolve o perfil ANTES de criar o encoder, para que a
                 // qualidade configurada pelo usuário (Cq/Maxrate/Bufsize/Bframes/Lookahead)
@@ -927,23 +950,31 @@ public sealed partial class EngineCoordinator
                     // (não periodicamente no loop).
                 }
 
-                _status.Update(s =>
+                // Status update a cada ~30 frames (~2Hz a 60fps): o consumidor real é
+                // o broadcast IPC de 2s (Ipc/NamedPipeServer). Atualizar por frame
+                // rodava GetHealth() 2x (~120 sorts/lista de ~600 entradas por segundo)
+                // na thread de captura sem nenhum consumidor — puro desperdício de CPU.
+                if (diagFrames % 30 == 0)
                 {
-                    s.LastFrameMs = _watchdog.GetHealth().AvgFrameTimeMs;
-                    s.WatchdogOk = _watchdog.GetHealth().Level != HealthLevel.Red;
-                    // M11: snapshot único (StatsDetailed) em vez de Stats()+StatsDetailed()
-                    // — cada chamada adquire o read lock do ReplayBuffer separadamente.
-                    // Uma chamada = uma aquisição = snapshot consistente + menos lock
-                    // contention no hot path do status update (a cada frame).
-                    var d = _buffer.StatsDetailed();
-                    s.ReplayBufferBytes = d.videoBytes + d.audioBytes;
-                    s.ReplayBufferVideoFrames = d.videoCount;
-                    s.ReplayBufferVideoBytes = d.videoBytes;
-                    s.ReplayBufferAudioPackets = d.audioCount;
-                    s.ReplayBufferAudioBytes = d.audioBytes;
-                    s.DroppedFrames = _droppedFrames;
-                    s.GpuBusyDrops = (_encoder as FfmpegEncoder)?.GpuBusyDrops ?? 0;
-                });
+                    var health = _watchdog.GetHealth();
+                    _status.Update(s =>
+                    {
+                        s.LastFrameMs = health.AvgFrameTimeMs;
+                        s.WatchdogOk = health.Level != HealthLevel.Red;
+                        // M11: snapshot único (StatsDetailed) em vez de Stats()+StatsDetailed()
+                        // — cada chamada adquire o read lock do ReplayBuffer separadamente.
+                        // Uma chamada = uma aquisição = snapshot consistente + menos lock
+                        // contention no hot path do status update.
+                        var d = _buffer.StatsDetailed();
+                        s.ReplayBufferBytes = d.videoBytes + d.audioBytes;
+                        s.ReplayBufferVideoFrames = d.videoCount;
+                        s.ReplayBufferVideoBytes = d.videoBytes;
+                        s.ReplayBufferAudioPackets = d.audioCount;
+                        s.ReplayBufferAudioBytes = d.audioBytes;
+                        s.DroppedFrames = _droppedFrames;
+                        s.GpuBusyDrops = (_encoder as FfmpegEncoder)?.GpuBusyDrops ?? 0;
+                    });
+                }
 
                 // Log de RAM a cada ~60 frames (~1s a 60fps) — movido para o topo do
                 // loop (clock-based) para continuar rodando durante stall de vídeo.

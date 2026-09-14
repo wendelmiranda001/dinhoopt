@@ -391,6 +391,20 @@ public sealed class ConfigManager : IDisposable
         OnConfigChanged?.Invoke(Config);
     }
 
+    /// <summary>
+    /// Troca o Config EM MEMÓRIA (sem persistir no disco) — usado pelos defaults
+    /// calibrados por capacidade da máquina. O arquivo segue com os defaults limpos;
+    /// a UI reflete o valor efetivo em uso via OnConfigChanged.
+    /// </summary>
+    internal void ApplyCalibrated(AppConfig calibrated)
+    {
+        lock (_lock)
+        {
+            Config = calibrated;
+        }
+        OnConfigChanged?.Invoke(Config);
+    }
+
     private static AppConfig CloneConfig(AppConfig source)
     {
         return JsonSerializer.Deserialize<AppConfig>(

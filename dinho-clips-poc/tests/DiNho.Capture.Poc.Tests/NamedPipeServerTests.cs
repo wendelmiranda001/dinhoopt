@@ -424,6 +424,30 @@ public sealed class NamedPipeServerTests
         Assert.True(queue.Contains("msg1001"));
     }
 
+    [Fact]
+    public void EnqueueBounded_UnderMax_KeepsAll()
+    {
+        var queue = new ConcurrentQueue<string>();
+        NamedPipeServer.EnqueueBounded(queue, "a", 3);
+        NamedPipeServer.EnqueueBounded(queue, "b", 3);
+        NamedPipeServer.EnqueueBounded(queue, "c", 3);
+
+        Assert.Equal(3, queue.Count);
+        Assert.Equal(new[] { "a", "b", "c" }, queue.ToArray());
+    }
+
+    [Fact]
+    public void EnqueueBounded_OverMax_DropsOldest()
+    {
+        var queue = new ConcurrentQueue<string>();
+        NamedPipeServer.EnqueueBounded(queue, "1", 2);
+        NamedPipeServer.EnqueueBounded(queue, "2", 2);
+        NamedPipeServer.EnqueueBounded(queue, "3", 2);
+
+        Assert.Equal(2, queue.Count);
+        Assert.Equal(new[] { "2", "3" }, queue.ToArray());
+    }
+
     // ── EnqueueLongRunningResult ────────────────────────────────────
 
     [Fact]

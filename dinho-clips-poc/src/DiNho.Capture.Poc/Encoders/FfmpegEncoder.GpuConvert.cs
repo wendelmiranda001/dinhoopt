@@ -165,7 +165,7 @@ internal partial class FfmpegEncoder
     private int Nv12W => _nv12W > 0 ? _nv12W : _width;
     private int Nv12H => _nv12H > 0 ? _nv12H : _height;
 
-    private unsafe byte[]? ConvertGpuNv12(ID3D11Texture2D texture)
+    private unsafe byte[]? ConvertGpuNv12(ID3D11Texture2D texture, byte[] dst)
     {
         if ((_cropW > 0 && _cropW < 320) || (_cropH > 0 && _cropH < 240))
         {
@@ -185,13 +185,13 @@ internal partial class FfmpegEncoder
 
         // Odd capture height: GpuVideoConverter requires even NV12 dimensions — go straight to CPU fallback
         if ((texDesc.Height & 1) != 0)
-            return ConvertCpuNv12(texture, texture.Device);
+            return ConvertCpuNv12(texture, texture.Device, dst);
 
         var device = texture.Device;
         var ctx = device.ImmediateContext;
 
         if (_gpuConverter == null && DateTime.UtcNow < _gpuConverterFailedUntil)
-            return ConvertCpuNv12(texture, device);
+            return ConvertCpuNv12(texture, device, dst);
 
         int nv12W = Nv12W, nv12H = Nv12H;
         try
@@ -213,7 +213,7 @@ internal partial class FfmpegEncoder
             _gpuConvertFails++;
             _gpuConverterFailedUntil = DateTime.UtcNow.AddMilliseconds(GPU_CONVERTER_COOLDOWN_MS);
             Log.E("FfmpegEncoder", $"GpuVideoConverter constructor fail #{_gpuConvertFails}: {ex.Message} — falling back to CPU conversion");
-            return ConvertCpuNv12(texture, device);
+            return ConvertCpuNv12(texture, device, dst);
         }
 
         try
@@ -254,7 +254,7 @@ internal partial class FfmpegEncoder
             _gpuConvertFails = 0;
             try
             {
-                return PackNv12(map);
+                return PackNv12(map, dst);
             }
             finally { ctx.Unmap(_nv12Staging, 0); }
         }
@@ -274,11 +274,11 @@ internal partial class FfmpegEncoder
         {
             _gpuConvertFails++;
             Log.E("FfmpegEncoder", $"GPU convert fail #{_gpuConvertFails}: {ex.GetType().Name}: {ex.Message}");
-            return ConvertCpuNv12(texture, device);
+            return ConvertCpuNv12(texture, device, dst);
         }
     }
 
-    private unsafe byte[]? ConvertCpuNv12(ID3D11Texture2D texture, ID3D11Device device)
+    private unsafe byte[]? ConvertCpuNv12(ID3D11Texture2D texture, ID3D11Device device, byte[] dst)
     {
         try
         {
@@ -314,18 +314,15 @@ internal partial class FfmpegEncoder
                 int ySize = nv12H * nv12W;
                 int totalSize = ySize + (nv12H / 2) * nv12W;
 
-                if (_nv12Scratch == null || _nv12Scratch.Length != totalSize)
-                    _nv12Scratch = new byte[totalSize];
-
                 var src = (byte*)map.DataPointer.ToPointer();
                 // texH == nv12H + 1 (altura ímpar) pode usar o branch direto: só converte as
                 // primeiras nv12H linhas e descarta a última — evita bilinear do frame inteiro.
                 if (texW == nv12W && (texH == nv12H || texH == nv12H + 1))
                 {
-                    fixed (byte* dst = _nv12Scratch)
+                    fixed (byte* dstPtr = dst)
                     {
-                        byte* yPlane = dst;
-                        byte* uvPlane = dst + ySize;
+                        byte* yPlane = dstPtr;
+                        byte* uvPlane = dstPtr + ySize;
 
                         // Only convert _height rows (may be 1 less than texH if odd)
                         for (int row = 0; row < nv12H; row++)
@@ -368,9 +365,9 @@ internal partial class FfmpegEncoder
                     DownscaleBgra(
                         new ReadOnlySpan<byte>(src, srcPitch * texH),
                         texW, texH, srcPitch, nv12W, nv12H, _downscaleScratch);
-                    BgraToNv12(_downscaleScratch, nv12W * 4, nv12W, nv12H, _nv12Scratch);
+                    BgraToNv12(_downscaleScratch, nv12W * 4, nv12W, nv12H, dst);
                 }
-                return _nv12Scratch;
+                return dst;
             }
             finally { ctx.Unmap(_cpuStaging, 0); }
         }
@@ -421,15 +418,12 @@ internal partial class FfmpegEncoder
         _stagingH = nv12H;
     }
 
-    private unsafe byte[] PackNv12(MappedSubresource map)
+    private unsafe byte[] PackNv12(MappedSubresource map, byte[] dst)
     {
         int srcPitch = (int)map.RowPitch;
         int nv12W = Nv12W, nv12H = Nv12H;
         int ySize = nv12H * nv12W;
         int totalSize = ySize + nv12H / 2 * nv12W;
-
-        if (_nv12Scratch?.Length != totalSize)
-            _nv12Scratch = new byte[totalSize];
 
         var src = (byte*)map.DataPointer.ToPointer();
 
@@ -437,12 +431,12 @@ internal partial class FfmpegEncoder
         int yBytes = ySize;
         if (srcPitch == nv12W)
         {
-            Unsafe.CopyBlockUnaligned(ref _nv12Scratch[0], ref src[0], (uint)yBytes);
+            Unsafe.CopyBlockUnaligned(ref dst[0], ref src[0], (uint)yBytes);
         }
         else
         {
             for (int y = 0; y < nv12H; y++)
-                Unsafe.CopyBlockUnaligned(ref _nv12Scratch[y * nv12W], ref src[y * srcPitch], (uint)nv12W);
+                Unsafe.CopyBlockUnaligned(ref dst[y * nv12W], ref src[y * srcPitch], (uint)nv12W);
         }
 
         // Bulk copy UV plane
@@ -450,14 +444,14 @@ internal partial class FfmpegEncoder
         int uvBytes = nv12H / 2 * nv12W;
         if (srcPitch == nv12W)
         {
-            Unsafe.CopyBlockUnaligned(ref _nv12Scratch[yBytes], ref src[uvSrcBase], (uint)uvBytes);
+            Unsafe.CopyBlockUnaligned(ref dst[yBytes], ref src[uvSrcBase], (uint)uvBytes);
         }
         else
         {
             for (int y = 0; y < nv12H / 2; y++)
-                Unsafe.CopyBlockUnaligned(ref _nv12Scratch[yBytes + y * nv12W], ref src[uvSrcBase + y * srcPitch], (uint)nv12W);
+                Unsafe.CopyBlockUnaligned(ref dst[yBytes + y * nv12W], ref src[uvSrcBase + y * srcPitch], (uint)nv12W);
         }
 
-        return _nv12Scratch;
+        return dst;
     }
 }

@@ -112,6 +112,38 @@ public sealed class ReplayBufferTests
     }
 
     [Fact]
+    public void TrimExcess_WithoutSpill_ReturnsEvictedPooledVideoToPool()
+    {
+        // Fix 1 (leak da eviction no caminho puro-RAM): com spill DESABILITADO,
+        // todo packet evictado precisa voltar ao VideoPacketPool imediatamente —
+        // nunca ficar retido sem bound. O FlushEvicted libera no finally
+        // independente do spill; este teste trava a garantia contra regressão.
+        VideoPacketPool.ResetForTest();
+        try
+        {
+            const int packetSize = 100;
+            using var buf = new ReplayBuffer(TimeSpan.FromSeconds(30), maxBytes: 300);
+
+            for (int i = 0; i < 20; i++)
+            {
+                var data = new byte[packetSize];
+                data[0] = 0x00; data[1] = 0x00; data[2] = 0x00; data[3] = 0x01;
+                buf.AddVideo(new EncodedPacket(
+                    data, MediaType.Video, TimeSpan.FromTicks(i * 333_333), TimeSpan.FromTicks(333_333),
+                    isKeyFrame: i == 0, isPooled: true, width: 0, height: 0, dataLength: packetSize));
+            }
+
+            var s = buf.Stats();
+            Assert.True(s.videoCount < 20, "orçamento de bytes deve evictar o excedente");
+            Assert.True(VideoPacketPool.IdleBytes > 0, "packets pooled evictados devem voltar ao pool (sem spill)");
+        }
+        finally
+        {
+            VideoPacketPool.ResetForTest();
+        }
+    }
+
+    [Fact]
     public void MaxBytes_Set_TrimsExcess()
     {
         using var buf = new ReplayBuffer(TimeSpan.FromSeconds(30), 20000);

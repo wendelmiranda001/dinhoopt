@@ -24,6 +24,7 @@ internal sealed partial class FfmpegEncoder : IEncoder
     private CancellationTokenSource? _readerCts;
     private Thread? _stderrThread;
     private CancellationTokenSource? _stderrCts;
+    private FrameWriter? _frameWriter;
     private string? _processFailedCause;
     private string? _codec;
     private readonly bool _useHardware;
@@ -78,8 +79,8 @@ internal sealed partial class FfmpegEncoder : IEncoder
     private string _amfPreset = "speed";
     private bool _multipass = false;
 
-    // Reusable NV12 scratch buffer — elimina alocação de 3.1MB no LOH a cada frame
-    private byte[]? _nv12Scratch;
+    // Buffers NV12 são pooled por frame (VideoPacketPool.Rent) — o writer thread ainda
+    // pode estar escrevendo o frame anterior, então scratch único não é mais seguro.
 
     // Real PTS tracking — ConcurrentQueue because Enqueue (pipeline thread) and Dequeue (reader thread) are different threads
     private readonly ConcurrentQueue<TimeSpan> _inputPtsQueue = new();
@@ -530,6 +531,14 @@ internal sealed partial class FfmpegEncoder : IEncoder
             Name = "FfmpegStderr"
         };
         _stderrThread.Start();
+
+        // O3 (fase 1): thread dedicada para o stdin — a captura enfileira frames (nunca
+        // bloqueia no pipe), o writer escreve em paralelo e enfileira o PTS só em sucesso.
+        _frameWriter = new FrameWriter(
+            () => _stdin,
+            () => ComputeStdinWriteTimeout(_outputFrameIndex),
+            OnFrameWrittenToStdin,
+            OnStdinWriteFailed);
     }
 
     // ── Reader thread: H.264 output (moved to FfmpegEncoder.NalParsing.cs) ──
@@ -615,51 +624,35 @@ internal sealed partial class FfmpegEncoder : IEncoder
         if (_processFailed && !TryRestart())
             return null;
 
-        var nv12 = ConvertGpuNv12(texture);
-        if (nv12 == null) return null;
-
+        // O3 (fase 1): NV12 pooled POR FRAME — o scratch único `_nv12Scratch` não serve:
+        // o writer thread pode ainda estar escrevendo o frame anterior quando a captura
+        // produz este. O buffer é devolvido ao pool pelo writer após a escrita/drop.
+        var nv12Buf = VideoPacketPool.Rent(Nv12OutputSize);
+        byte[]? nv12;
         try
         {
-            // WriteAsync com timeout: se o pipe do ffmpeg encher (processo travado /
-            // CPU zero) e o pipeline for reiniciado, o Write síncrono bloquearia o
-            // loop de captura indefinidamente — e o pipeline ANTIGO continuaria
-            // rodando contra um encoder sendo Dispose()d (A2). Com timeout, o frame
-            // é dropado e o restart ocorre de forma ordenada, sem dupla gravação.
-            // O timeout é estrito (200ms) só depois que o encoder provou funcionar
-            // (primeiro pacote emitido); durante o warm-up usa folga generosa para o
-            // ffmpeg abrir o encoder HW sem ser morto antes do cold-start.
-            var timeoutMs = ComputeStdinWriteTimeout(_outputFrameIndex);
-            var result = TryWriteStdin(_stdin!, nv12, timeoutMs, out var fault);
-            if (result == StdinWriteResult.Timeout)
-            {
-                _processFailed = true;
-                _processFailedCause = "encoder:stdin_timeout";
-                Log.W("FfmpegEncoder", $"stdin write timeout after {timeoutMs}ms (warmup={timeoutMs == StdinWriteWarmupTimeoutMs}, emitted={_outputFrameIndex}) — dropping frame (pts={pts.TotalMilliseconds:F0}ms)");
-                LogProcessExit();
-                return null;
-            }
-            if (result == StdinWriteResult.Faulted)
-            {
-                _processFailed = true;
-                _processFailedCause = "encoder:stdin_io_error";
-                Log.E("FfmpegEncoder", $"stdin: {fault?.Message}");
-                LogProcessExit();
-                return null;
-            }
-
-            // Só enfileira o PTS depois que o Write for bem-sucedido —
-            // se falhar, o EmitPacket() nunca vai desenfileirar e o PTS
-            // ficaria órfão na fila, corrompendo o sync dos frames seguintes
-            _inputPtsQueue.Enqueue(pts);
-            _frameCount++;
-            _restartAttempts = 0;
+            nv12 = ConvertGpuNv12(texture, nv12Buf);
         }
-        catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+        catch
         {
-            _processFailed = true;
-            _processFailedCause = "encoder:stdin_io_error";
-            Log.E("FfmpegEncoder", $"stdin: {ex.Message}");
-            LogProcessExit();
+            VideoPacketPool.Return(nv12Buf);
+            throw;
+        }
+
+        if (nv12 == null)
+        {
+            VideoPacketPool.Return(nv12Buf);
+            return null;
+        }
+
+        // Enfileira no writer (nunca bloqueia). Fila cheia → drop-oldest do frame mais
+        // antigo enfileirado + buffer devolvido; "agora" vence, como no replay buffer.
+        // Timeout/Fault do pipe são reportados via OnStdinWriteFailed (mesmos causes do
+        // caminho síncrono) e o restart continua acontecer no próximo EncodeFrame.
+        var writer = _frameWriter;
+        if (writer == null || !writer.TryEnqueue(nv12Buf, pts))
+        {
+            VideoPacketPool.Return(nv12Buf);
             return null;
         }
 
@@ -688,6 +681,34 @@ internal sealed partial class FfmpegEncoder : IEncoder
             }
         }
         return null;
+    }
+
+    /// <summary>Tamanho exato do buffer NV12 emitido (Y + UV) — usado para rent no pool.</summary>
+    private int Nv12OutputSize => Nv12H * Nv12W + (Nv12H / 2) * Nv12W;
+
+    /// <summary>Frames descartados por overflow da fila de entrada do writer (drop-oldest).</summary>
+    public int InputQueueDroppedFrames => _frameWriter?.DroppedOverflow ?? 0;
+
+    // ── O3 callbacks do FrameWriter (rodam na thread FfmpegInput) ──────────
+
+    private void OnFrameWrittenToStdin(TimeSpan pts)
+    {
+        // Só enfileira o PTS depois que o Write foi bem-sucedido — se falhar, o
+        // EmitPacket() nunca desenfileiraria e o PTS ficaria órfão (sync corrompido).
+        _inputPtsQueue.Enqueue(pts);
+        _frameCount++;
+        _restartAttempts = 0;
+    }
+
+    private void OnStdinWriteFailed(string cause, Exception? fault)
+    {
+        _processFailed = true;
+        _processFailedCause = cause;
+        if (fault != null)
+            Log.E("FfmpegEncoder", $"stdin: {fault.Message}");
+        else if (cause == "encoder:stdin_timeout")
+            Log.W("FfmpegEncoder", "stdin write timeout — encoder não consome input, restartando");
+        LogProcessExit();
     }
 
     // ── Codec fallback chain ─────────────────────────────────────────
@@ -793,6 +814,10 @@ internal sealed partial class FfmpegEncoder : IEncoder
 
     private void StopFfmpeg()
     {
+        // O3: aborta o writer do stdin (frames enfileirados voltam ao pool sem escrita —
+        // o pipe está morrendo; nenhum PTS órfão para o processo antigo).
+        _frameWriter?.Stop(abort: true, joinMs: 2000);
+        _frameWriter = null;
         _readerCts?.Cancel();
         _stderrCts?.Cancel();
         try { _stdin?.Dispose(); } catch { }
@@ -866,7 +891,6 @@ internal sealed partial class FfmpegEncoder : IEncoder
         _cpuStaging = null;
         _cpuStagingW = 0;
         _cpuStagingH = 0;
-        _nv12Scratch = null;
         _ivfHeaderParsed = false;
         _ivfTimebaseDen = 0;
         _ivfTimebaseNum = 0;
@@ -894,6 +918,10 @@ internal sealed partial class FfmpegEncoder : IEncoder
         // processo órfão sem dono. Os pacotes ainda pendentes no channel são drenados
         // para _pendingOutputs (consumido pelo save), independente do estado do processo.
         bool canRestart = !_disposed && _process != null;
+
+        // O3: drena os frames ainda enfileirados no writer ANTES de fechar o stdin —
+        // frames pendentes do clip não podem ser perdidos no EOF.
+        _frameWriter?.Stop(abort: false, joinMs: 5000);
 
         // Close stdin to signal EOF to ffmpeg (like the working PowerShell test)
         try { _stdin?.Dispose(); } catch { }
@@ -931,6 +959,8 @@ internal sealed partial class FfmpegEncoder : IEncoder
         if (_disposed) return;
         _disposed = true;
 
+        _frameWriter?.Stop(abort: true, joinMs: 1000);
+        _frameWriter = null;
         _readerCts?.Cancel();
         _stderrCts?.Cancel();
         try { _stdin?.Dispose(); } catch { }
@@ -950,7 +980,6 @@ internal sealed partial class FfmpegEncoder : IEncoder
         _nv12Staging?.Dispose();
         _inputCopy?.Dispose();
         _cpuStaging?.Dispose();
-        _nv12Scratch = null;
 
         // Release pooled buffers and packets to prevent ArrayPool leaks
         if (_pendingBuf != null)
