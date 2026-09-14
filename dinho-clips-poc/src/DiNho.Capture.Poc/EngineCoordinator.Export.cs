@@ -183,9 +183,9 @@ public sealed partial class EngineCoordinator
         if (!string.IsNullOrEmpty(_config.Config.OutputDirectory))
             return _config.Config.OutputDirectory;
 
-        // Default: Desktop\DiNhoClips
-        var desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-        var dir = Path.Combine(desktop, "DiNhoClips");
+        // Default: %USERPROFILE%\Videos\DiNho Clips (alinhado com a UI do app)
+        var videos = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
+        var dir = Path.Combine(videos, "DiNho Clips");
         Directory.CreateDirectory(dir);
         return dir;
     }

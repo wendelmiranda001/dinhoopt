@@ -1,8 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
-import { _electron as electron } from 'playwright'
 import type { ElectronApplication, Page } from 'playwright'
+import { _electron as electron } from 'playwright'
 import { createLicenseE2EMarker } from './license-e2e'
 
 /**
@@ -199,8 +199,8 @@ const SLOW = new Set<string>([
   'clipsGetGpus',
 ])
 
-const DEFAULT_TIMEOUT = 15_000
-const SLOW_TIMEOUT = 30_000
+const _DEFAULT_TIMEOUT = 15_000
+const _SLOW_TIMEOUT = 30_000
 
 type Result = {
   name: string
@@ -281,29 +281,30 @@ test.beforeAll(async () => {
     return state
   })
 
-  const runner = async ({
-    skip,
-    args,
-    slow,
-  }: {
-    skip: string[]
-    args: Record<string, unknown[]>
-    slow: string[]
-  }) => {
+  const runner = async ({ skip, args, slow }: { skip: string[]; args: Record<string, unknown[]>; slow: string[] }) => {
     const d = window.dinho as Record<string, (...a: unknown[]) => unknown>
     const names = Object.keys(d)
     const withTimeout = (p: Promise<unknown>, ms: number) =>
       new Promise((resolve, reject) => {
         const t = setTimeout(() => reject(new Error('__TIMEOUT__')), ms)
         p.then(
-          (v) => { clearTimeout(t); resolve(v) },
-          (e) => { clearTimeout(t); reject(e) },
+          (v) => {
+            clearTimeout(t)
+            resolve(v)
+          },
+          (e) => {
+            clearTimeout(t)
+            reject(e)
+          },
         )
       })
     const out: Result[] = []
     const deadline = Date.now() + 220_000
     for (const name of names) {
-      if (skip.includes(name)) { out.push({ name, status: 'skip' }); continue }
+      if (skip.includes(name)) {
+        out.push({ name, status: 'skip' })
+        continue
+      }
       if (Date.now() > deadline) {
         out.push({ name, status: 'skip' })
         continue

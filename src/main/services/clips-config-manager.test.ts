@@ -226,7 +226,7 @@ describe('clips-config-manager', () => {
 
     it('falls back to USERPROFILE when outputDirectory is empty', () => {
       config.outputDirectory = ''
-      expect(getDefaultOutputDir()).toBe(join(mockUserProfile, 'Desktop', 'DiNhoClips'))
+      expect(getDefaultOutputDir()).toBe(join(mockUserProfile, 'Videos', 'DiNho Clips'))
     })
 
     it('falls back to HOMEDRIVE+HOMEPATH when USERPROFILE is unset', () => {
@@ -234,7 +234,7 @@ describe('clips-config-manager', () => {
       process.env.HOMEDRIVE = 'D:'
       process.env.HOMEPATH = '\\Users\\teste'
       config.outputDirectory = ''
-      expect(getDefaultOutputDir()).toBe(join('D:\\Users\\teste', 'Desktop', 'DiNhoClips'))
+      expect(getDefaultOutputDir()).toBe(join('D:\\Users\\teste', 'Videos', 'DiNho Clips'))
       delete process.env.HOMEDRIVE
       delete process.env.HOMEPATH
       process.env.USERPROFILE = mockUserProfile
@@ -245,7 +245,7 @@ describe('clips-config-manager', () => {
       delete process.env.HOMEDRIVE
       delete process.env.HOMEPATH
       config.outputDirectory = ''
-      expect(getDefaultOutputDir()).toBe(join(process.cwd(), 'Desktop', 'DiNhoClips'))
+      expect(getDefaultOutputDir()).toBe(join(process.cwd(), 'Videos', 'DiNho Clips'))
       process.env.USERPROFILE = mockUserProfile
     })
   })
@@ -257,16 +257,16 @@ describe('clips-config-manager', () => {
 
     it('returns resolved path for valid clip name', () => {
       const result = clipPathInOutputDir('clip.mp4')
-      expect(result).toBe(join(mockUserProfile, 'Desktop', 'DiNhoClips', 'clip.mp4'))
+      expect(result).toBe(join(mockUserProfile, 'Videos', 'DiNho Clips', 'clip.mp4'))
     })
 
     it('accepts the output directory itself (open folder)', () => {
-      const dir = join(mockUserProfile, 'Desktop', 'DiNhoClips')
+      const dir = join(mockUserProfile, 'Videos', 'DiNho Clips')
       expect(clipPathInOutputDir(dir)).toBe(dir)
     })
 
     it('accepts the output directory itself with trailing separator', () => {
-      const dir = join(mockUserProfile, 'Desktop', 'DiNhoClips')
+      const dir = join(mockUserProfile, 'Videos', 'DiNho Clips')
       expect(clipPathInOutputDir(`${dir}\\`)).toBe(dir)
     })
 
@@ -463,7 +463,7 @@ describe('clips-config-manager', () => {
       config.outputDirectory = ''
       persistClipsConfig()
       const saved = vi.mocked(saveClipsConfig).mock.calls[0][0] as Record<string, unknown>
-      expect(saved.outputDirectory).toBe(join(mockUserProfile, 'Desktop', 'DiNhoClips'))
+      expect(saved.outputDirectory).toBe(join(mockUserProfile, 'Videos', 'DiNho Clips'))
     })
   })
 })

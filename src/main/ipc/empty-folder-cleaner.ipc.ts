@@ -112,7 +112,8 @@ async function findEmptyFolders(
   let entries: import('node:fs').Dirent[]
   try {
     entries = await readdir(dirPath, { withFileTypes: true })
-  } catch {
+  } catch (err) {
+    getLogger().debug('empty-folder-cleaner', `Skipped inaccessible directory ${dirPath}: ${String(err)}`)
     return false // inaccessible — treat as non-empty for safety
   }
 

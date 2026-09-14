@@ -23,7 +23,10 @@ test('dump buttons on problem routes', async () => {
     await page.waitForTimeout(6000)
     const btns = await page.evaluate(() =>
       Array.from(document.querySelectorAll('button'))
-        .map((b) => `${(b.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 50)}|disabled=${b.hasAttribute('disabled')}`)
+        .map(
+          (b) =>
+            `${(b.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 50)}|disabled=${b.hasAttribute('disabled')}`,
+        )
         .filter((x) => x.trim().length > 3),
     )
     console.log(`\n=== ${route} ===`)

@@ -158,7 +158,10 @@ export function getDefaultOutputDir(): string {
     process.env.USERPROFILE ||
     (process.env.HOMEDRIVE && process.env.HOMEPATH ? process.env.HOMEDRIVE + process.env.HOMEPATH : undefined) ||
     process.cwd()
-  return join(home, 'Desktop', 'DiNhoClips')
+  // Default: %USERPROFILE%\Videos\DiNho Clips — pasta de vídeos do usuário (observável,
+  // com nome da marca). O usuário muda pelo front (seletor de pasta) e o valor escolhido
+  // persiste em config.outputDirectory, que tem precedência aqui.
+  return join(home, 'Videos', 'DiNho Clips')
 }
 
 export function clipPathInOutputDir(inputPath: string): string | null {

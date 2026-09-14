@@ -128,9 +128,11 @@ export function registerShortcutCleanerIpc(getWindow: WindowGetter): void {
         for (const sc of shortcuts) {
           if (isTargetBroken(sc)) {
             let size = 0
+            let lastModified = 0
             try {
               const s = await stat(sc.path)
               size = s.size
+              lastModified = s.mtimeMs
             } catch {
               // Can't stat, that's fine
             }
@@ -140,7 +142,7 @@ export function registerShortcutCleanerIpc(getWindow: WindowGetter): void {
               size,
               category,
               subcategory: dir.subcategory,
-              lastModified: 0,
+              lastModified,
               selected: true,
             })
           }

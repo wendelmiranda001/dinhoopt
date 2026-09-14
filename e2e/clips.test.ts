@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
-import { _electron as electron } from 'playwright'
 import type { ElectronApplication, Page } from 'playwright'
+import { _electron as electron } from 'playwright'
 import { createLicenseE2EMarker } from './license-e2e'
 
 let electronApp: ElectronApplication
@@ -40,9 +40,11 @@ test('should navigate to Clips page', async () => {
 
 test('should render the Clips page header', async () => {
   const hasTitle = await page.evaluate(() => {
-    return document.body.textContent?.includes('Clipes de Jogo')
-      || document.body.textContent?.includes('Game Clips')
-      || document.body.textContent?.includes('Clips')
+    return (
+      document.body.textContent?.includes('Clipes de Jogo') ||
+      document.body.textContent?.includes('Game Clips') ||
+      document.body.textContent?.includes('Clips')
+    )
   })
   expect(hasTitle).toBe(true)
 })

@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => {
   const shellShowItemInFolder: ReturnType<typeof vi.fn> = vi.fn()
   const readdir: ReturnType<typeof vi.fn> = vi.fn()
   const rmdir: ReturnType<typeof vi.fn> = vi.fn()
-  const logger = { info: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() }
+  const logger = { info: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn(), debug: vi.fn() }
   const webContentsSend: ReturnType<typeof vi.fn> = vi.fn()
 
   return {

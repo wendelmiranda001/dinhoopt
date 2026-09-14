@@ -13,7 +13,7 @@ const mockReaddir = vi.fn()
 const mockStat = vi.fn()
 const mockRm = vi.fn()
 const mockCreateHash = vi.fn()
-const mockLogger = { info: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() }
+const mockLogger = { info: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn(), debug: vi.fn() }
 
 vi.mock('electron', () => ({
   BrowserWindow: vi.fn(),

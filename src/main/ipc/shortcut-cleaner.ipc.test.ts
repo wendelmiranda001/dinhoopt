@@ -494,7 +494,7 @@ describe('registerShortcutCleanerIpc: SHORTCUT_SCAN', () => {
       mockPowershellOnce(
         `C:\\Users\\User\\Desktop\\broken.lnk|${brokenTarget}\nC:\\Users\\User\\Desktop\\good.lnk|C:\\Windows\\System32\\notepad.exe`,
       )
-      mockStat.mockResolvedValue({ size: 512 } as never)
+      mockStat.mockResolvedValue({ size: 512, mtimeMs: 1710000000000 } as never)
 
       registerShortcutCleanerIpc(() => mockWindow() as never)
       const handler = getHandler('cleaner:shortcut:scan')
@@ -508,7 +508,7 @@ describe('registerShortcutCleanerIpc: SHORTCUT_SCAN', () => {
       expect(results[0]!.items[0]!.size).toBe(512)
       expect(results[0]!.items[0]!.category).toBe('shortcut')
       expect(results[0]!.items[0]!.selected).toBe(true)
-      expect(results[0]!.items[0]!.lastModified).toBe(0)
+      expect(results[0]!.items[0]!.lastModified).toBe(1710000000000)
     })
 
     it('caches broken items', async () => {

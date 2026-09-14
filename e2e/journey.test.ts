@@ -1,8 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { test } from '@playwright/test'
-import { _electron as electron } from 'playwright'
 import type { ElectronApplication, Page } from 'playwright'
+import { _electron as electron } from 'playwright'
 import { createLicenseE2EMarker } from './license-e2e'
 
 /**
@@ -42,9 +42,26 @@ const MODULES: Module[] = [
   { route: '/firewall', label: 'Firewall', buttons: ['Reanalisar', 'Analisar'], capMs: 120_000 },
   { route: '/disk', label: 'Analisador de Disco', buttons: ['Analisar'], capMs: 180_000 },
   { route: '/duplicates', label: 'Duplicados', buttons: [], note: 'seletor de pasta nativo (headless)', capMs: 5_000 },
-  { route: '/large-files', label: 'Arquivos Grandes', buttons: [], note: 'seletor de pasta nativo (headless)', capMs: 5_000 },
-  { route: '/empty-folders', label: 'Pastas Vazias', buttons: [], note: 'seletor de pasta nativo (headless)', capMs: 5_000 },
-  { route: '/updates', label: 'Atualizações', buttons: ['Verificar atualizações', 'Verificar novamente'], capMs: 120_000 },
+  {
+    route: '/large-files',
+    label: 'Arquivos Grandes',
+    buttons: [],
+    note: 'seletor de pasta nativo (headless)',
+    capMs: 5_000,
+  },
+  {
+    route: '/empty-folders',
+    label: 'Pastas Vazias',
+    buttons: [],
+    note: 'seletor de pasta nativo (headless)',
+    capMs: 5_000,
+  },
+  {
+    route: '/updates',
+    label: 'Atualizações',
+    buttons: ['Verificar atualizações', 'Verificar novamente'],
+    capMs: 120_000,
+  },
   { route: '/drivers', label: 'Drivers', buttons: ['Analisar drivers'], capMs: 120_000 },
   { route: '/installer', label: 'Instalador', buttons: ['Carregar apps', 'Atualizar lista'], capMs: 60_000 },
   {
@@ -225,10 +242,7 @@ test('jornada completa: navega + analisa + captura em todos os módulos', async 
   }
 })
 
-async function clickButton(
-  texts: string[],
-  timeoutMs: number,
-): Promise<{ text: string; disabled: boolean } | null> {
+async function clickButton(texts: string[], timeoutMs: number): Promise<{ text: string; disabled: boolean } | null> {
   const t0 = Date.now()
   const deadline = t0 + timeoutMs
   // Some pages auto-scan on mount (privacy/services/debloater/firewall/updates):
@@ -242,9 +256,7 @@ async function clickButton(
     const found = await page.evaluate((labels) => {
       const btns = Array.from(document.querySelectorAll('button'))
       for (const label of labels) {
-        const b = btns.find((x) =>
-          (x.textContent ?? '').trim().toLowerCase().includes(label.toLowerCase()),
-        )
+        const b = btns.find((x) => (x.textContent ?? '').trim().toLowerCase().includes(label.toLowerCase()))
         if (!b) continue
         const disabled =
           b.hasAttribute('disabled') ||
@@ -276,10 +288,7 @@ async function clickButton(
   return null
 }
 
-async function waitForIdle(
-  capMs: number,
-  busySelector?: string,
-): Promise<{ idle: boolean; elapsed: number }> {
+async function waitForIdle(capMs: number, busySelector?: string): Promise<{ idle: boolean; elapsed: number }> {
   const t0 = Date.now()
   const deadline = t0 + capMs
   let idleStreak = 0

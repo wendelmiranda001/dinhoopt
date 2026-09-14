@@ -104,7 +104,7 @@
   "adaptiveQuality": "Calidad Adaptativa",
   "calibrationActive": "Calidad adaptativa — perfil calibrado de la máquina: {{tier}}",
   "droppedFrames": "Fotogramas perdidos",
-  "droppedFramesTooltip": "Fotogramas descartados durante esta sesión de captura. 'GPU' indica descartes por codificador ocupado (gpuBusyDrops)."
+  "droppedFramesTooltip": "Fotogramas descartados durante esta sesión de captura. 'GPU' indica descartes por codificador ocupado (gpuBusyDrops).",
   "stretchToFit": "Quitar barras negras",
   "stretchToFitTooltip": "Estira la imagen para llenar el cuadro 16:9, eliminando las barras negras (letterbox). Desactiva la preservación de la proporción — puede distorsionar la imagen si el juego corre a otra resolución.",
   "sharpness": "Nitidez",

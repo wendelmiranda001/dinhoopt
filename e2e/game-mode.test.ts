@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
-import { _electron as electron } from 'playwright'
 import type { ElectronApplication, Page } from 'playwright'
+import { _electron as electron } from 'playwright'
 import { createLicenseE2EMarker } from './license-e2e'
 
 let electronApp: ElectronApplication
@@ -10,7 +10,10 @@ let page: Page
 test.beforeAll(async () => {
   createLicenseE2EMarker(resolve(__dirname, '.e2e-userdata-game-mode'))
   electronApp = await electron.launch({
-    args: [resolve(__dirname, '../out/main/index.js'), `--dinho-data-dir=${resolve(__dirname, '.e2e-userdata-game-mode')}`],
+    args: [
+      resolve(__dirname, '../out/main/index.js'),
+      `--dinho-data-dir=${resolve(__dirname, '.e2e-userdata-game-mode')}`,
+    ],
     env: { ...process.env, NODE_ENV: 'test', DINHO_E2E: '1' },
   })
   page = await electronApp.firstWindow()
@@ -81,7 +84,7 @@ test('should render optimization category cards', async () => {
 })
 
 test('should toggle an optimization via store and reflect in config', async () => {
-  const before = await page.evaluate(() => {
+  const _before = await page.evaluate(() => {
     const store = (window as any).__GAME_MODE_STORE__
     return store?.getState()?.config?.enabledOptimizations?.length ?? -1
   })
@@ -92,7 +95,7 @@ test('should toggle an optimization via store and reflect in config', async () =
   })
 
   // The page should render at least the default enabled count
-  const enabledText = await page.evaluate(() => {
+  const _enabledText = await page.evaluate(() => {
     const el = document.querySelector('[class*="enabledCount"]')
     return el?.textContent ?? null
   })

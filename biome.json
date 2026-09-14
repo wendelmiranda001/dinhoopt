@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.10/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
   "linter": {
     "enabled": true,
     "rules": {
@@ -42,7 +42,11 @@
   "files": {
     "includes": [
       "**",
-      "!**/src/main/services/coverage/**",
+      "!**/src/main/services/coverage",
+      "!**/.archive",
+      "!**/.opencode",
+      "!**/.kilo",
+      "!**/scripts",
       "!node_modules",
       "!out",
       "!dist",

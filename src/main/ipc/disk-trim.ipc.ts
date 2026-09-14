@@ -306,7 +306,7 @@ async function runTrimWindows(letter: string, getWindow: WindowGetter): Promise<
     })
     child.on('close', (code) => {
       const success = code === 0
-      const summary = success ? `TRIM completed successfully on ${id}:.` : `Optimize-Volume exited with code ${code}.`
+      const summary = success ? `TRIM completed successfully on ${id}.` : `Optimize-Volume exited with code ${code}.`
       sendProgress(getWindow, { driveId: id, phase: success ? 'done' : 'failed', percent: 100, message: summary })
       if (success) setLastTrimAt(id)
       resolve({

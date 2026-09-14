@@ -1,6 +1,6 @@
 {
   "name": "dinho-optimizer",
-  "version": "1.0.7",
+  "version": "2.0.0",
   "description": "DiNho Optimizer — Otimizador de sistema Windows",
   "repository": "optdinho/optdinho",
   "main": "./out/main/index.js",
@@ -52,7 +52,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^5.0.0",
     "electron": "^44.3.0",
-    "electron-builder": "^26.15.7",
+    "electron-builder": "^26.16.1",
     "electron-vite": "^6.0.0-beta.1",
     "jsdom": "^30.0.1",
     "patch-package": "^8.0.1",

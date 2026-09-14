@@ -1,8 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { test } from '@playwright/test'
-import { _electron as electron } from 'playwright'
 import type { ElectronApplication, Page } from 'playwright'
+import { _electron as electron } from 'playwright'
 import { createLicenseE2EMarker } from './license-e2e'
 
 type RecEvent =
@@ -92,7 +92,9 @@ test.beforeAll(async () => {
     }
   })
   page.on('pageerror', (err) => push('pageerror', { text: err.message, stack: err.stack }))
-  page.on('requestfailed', (req) => push('requestfailed', { url: req.url(), text: req.failure()?.errorText ?? 'unknown' }))
+  page.on('requestfailed', (req) =>
+    push('requestfailed', { url: req.url(), text: req.failure()?.errorText ?? 'unknown' }),
+  )
   page.on('unhandledrejection', (reason) =>
     push('unhandledrejection', { text: reason instanceof Error ? reason.message : String(reason) }),
   )

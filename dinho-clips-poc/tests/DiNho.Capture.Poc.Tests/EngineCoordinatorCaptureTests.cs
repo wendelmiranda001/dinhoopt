@@ -1200,6 +1200,17 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
         // If it failed, the catch block resets it to false.
         var captureActive = GetField<bool>(coord, "_captureActive");
         // Both outcomes are valid depending on the environment.
+
+        // Se a captura REAL subiu (D3D11 + ffmpeg disponíveis), derruba o pipeline
+        // imediatamente: o FrameWriter/ffmpeg continuaria vivendo em background e
+        // devolvendo buffers NV12 ao VideoPacketPool global, corrompendo os testes
+        // determinísticos do pool que rodam na fase serializada logo depois.
+        if (captureActive)
+        {
+            var stop = CoordinatorType.GetMethod("StopCapture",
+                BindingFlags.Instance | BindingFlags.NonPublic)!;
+            stop.Invoke(coord, new object?[] { true });
+        }
     }
 
     [Fact]

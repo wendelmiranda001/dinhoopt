@@ -94,6 +94,7 @@ export async function scanBloatware(): Promise<BloatwareApp[]> {
       const parsed = JSON.parse(provStdout)
       provisionedPackages = Array.isArray(parsed) ? parsed : [parsed]
     } catch {
+      getLogger().warning('debloater', `Failed to parse provisioned packages JSON: ${provStdout.slice(0, 120)}`)
       provisionedPackages = []
     }
 
@@ -147,6 +148,7 @@ export async function scanBloatware(): Promise<BloatwareApp[]> {
       const parsed = JSON.parse(win32Stdout)
       win32Apps = Array.isArray(parsed) ? parsed : [parsed]
     } catch {
+      getLogger().warning('debloater', `Failed to parse Win32 apps JSON: ${win32Stdout.slice(0, 120)}`)
       win32Apps = []
     }
 

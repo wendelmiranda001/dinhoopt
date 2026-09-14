@@ -95,8 +95,8 @@ async function walkDirectory(
             progress: 0,
           })
         }
-      } catch {
-        // Skip inaccessible files
+      } catch (err) {
+        getLogger().debug('duplicate-finder', `Skipped inaccessible file while walking ${fullPath}: ${String(err)}`)
       }
     }
   }

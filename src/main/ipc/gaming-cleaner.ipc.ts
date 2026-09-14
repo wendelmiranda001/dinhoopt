@@ -28,8 +28,8 @@ export function registerGamingCleanerIpc(getWindow: WindowGetter): void {
           cacheItems(result.items)
           results.push(result)
         }
-      } catch {
-        /* skipped */
+      } catch (err) {
+        getLogger().debug('gaming-cleaner', `Launcher cache scan skipped (${launcher.name}): ${String(err)}`)
       }
     }
 
@@ -41,8 +41,8 @@ export function registerGamingCleanerIpc(getWindow: WindowGetter): void {
           cacheItems(result.items)
           results.push(result)
         }
-      } catch {
-        /* skipped */
+      } catch (err) {
+        getLogger().debug('gaming-cleaner', `GPU cache scan skipped (${gpu.name}): ${String(err)}`)
       }
     }
 
@@ -51,8 +51,8 @@ export function registerGamingCleanerIpc(getWindow: WindowGetter): void {
       const shaderResults = await scanSteamShaderCaches(category)
       for (const r of shaderResults) cacheItems(r.items)
       results.push(...shaderResults)
-    } catch {
-      /* skipped */
+    } catch (err) {
+      getLogger().debug('gaming-cleaner', `Steam shader cache scan failed: ${String(err)}`)
     }
 
     // Per-game redistributables — one row per game
@@ -60,8 +60,8 @@ export function registerGamingCleanerIpc(getWindow: WindowGetter): void {
       const redistResults = await scanSteamRedistributables(category)
       for (const r of redistResults) cacheItems(r.items)
       results.push(...redistResults)
-    } catch {
-      /* skipped */
+    } catch (err) {
+      getLogger().debug('gaming-cleaner', `Steam redistributables scan failed: ${String(err)}`)
     }
 
     const win = getWindow()
@@ -122,7 +122,8 @@ async function detectSteamFromRegistry(): Promise<string | null> {
     const match = stdout.match(/REG_SZ\s+(.+)$/m)
     if (!match) return null
     return match[1]!.trim()
-  } catch {
+  } catch (err) {
+    getLogger().debug('gaming-cleaner', `Steam registry detection failed: ${String(err)}`)
     return null
   }
 }
@@ -143,8 +144,8 @@ async function getSteamLibraryPaths(): Promise<string[]> {
       for (const match of pathMatches) {
         libraries.add(match[1]!.replace(/\\\\/g, '\\'))
       }
-    } catch {
-      // VDF not found
+    } catch (err) {
+      getLogger().debug('gaming-cleaner', `Failed to read libraryfolders.vdf (${vdfPath}): ${String(err)}`)
     }
   }
 
@@ -170,12 +171,12 @@ async function buildAppIdMap(steamAppsDir: string): Promise<Map<string, string>>
         if (idMatch && nameMatch) {
           map.set(idMatch[1]!, nameMatch[1]!)
         }
-      } catch {
-        // Skip unreadable manifest
+      } catch (err) {
+        getLogger().debug('gaming-cleaner', `Skipped unreadable manifest (${file}): ${String(err)}`)
       }
     }
-  } catch {
-    // Skip
+  } catch (err) {
+    getLogger().debug('gaming-cleaner', `Failed to read app manifest dir (${steamAppsDir}): ${String(err)}`)
   }
   return map
 }
@@ -231,8 +232,8 @@ async function scanSteamShaderCaches(category: CleanerType): Promise<ScanResult[
           getLogger().debug('gaming-cleaner', `Skipped shader cache: ${entry.name}: ${err}`)
         }
       }
-    } catch {
-      // Skip
+    } catch (err) {
+      getLogger().debug('gaming-cleaner', `Failed to list shader cache dir (${shaderDir}): ${String(err)}`)
     }
   }
 
@@ -314,13 +315,13 @@ async function scanSteamRedistributables(category: CleanerType): Promise<ScanRes
                   selected: true,
                 })
                 gameSize += size
-              } catch {
-                // Skip
+              } catch (err) {
+                getLogger().debug('gaming-cleaner', `Skipped nested redist (${redistPath}): ${String(err)}`)
               }
             }
           }
-        } catch {
-          // Skip
+        } catch (err) {
+          getLogger().debug('gaming-cleaner', `Failed to scan subdirs of ${gameDir}: ${String(err)}`)
         }
 
         if (gameItems.length > 0) {
@@ -334,8 +335,8 @@ async function scanSteamRedistributables(category: CleanerType): Promise<ScanRes
           })
         }
       }
-    } catch {
-      // Skip
+    } catch (err) {
+      getLogger().debug('gaming-cleaner', `Failed to scan redistributables for library ${libPath}: ${String(err)}`)
     }
   }
 

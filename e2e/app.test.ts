@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
-import { _electron as electron } from 'playwright'
 import type { ElectronApplication, Page } from 'playwright'
+import { _electron as electron } from 'playwright'
 import { createLicenseE2EMarker } from './license-e2e'
 
 let electronApp: ElectronApplication

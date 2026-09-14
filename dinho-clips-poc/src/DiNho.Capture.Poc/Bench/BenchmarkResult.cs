@@ -40,7 +40,7 @@ public sealed class BenchmarkResult
 
     public static string DefaultOutputPath()
     {
-        var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "DiNhoClips");
+        var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "DiNho Clips");
         Directory.CreateDirectory(dir);
         return Path.Combine(dir, $"bench-{DateTime.Now:yyyyMMdd-HHmmss}.json");
     }

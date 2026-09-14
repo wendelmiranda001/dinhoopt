@@ -104,7 +104,7 @@
   "adaptiveQuality": "Adaptive Quality",
   "calibrationActive": "Adaptive quality — machine-calibrated profile: {{tier}}",
   "droppedFrames": "Dropped frames",
-  "droppedFramesTooltip": "Frames dropped during this capture session. 'GPU' indicates drops caused by a busy encoder (gpuBusyDrops)."
+  "droppedFramesTooltip": "Frames dropped during this capture session. 'GPU' indicates drops caused by a busy encoder (gpuBusyDrops).",
   "stretchToFit": "Remove black bars",
   "stretchToFitTooltip": "Stretches the image to fill the full 16:9 frame, removing black bars (letterboxing). Disables aspect ratio preservation — may distort the image if the game runs at a different resolution.",
   "sharpness": "Sharpness",

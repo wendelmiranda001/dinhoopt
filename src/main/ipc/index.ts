@@ -210,7 +210,6 @@ export function registerCleanerIpc(getWindow: WindowGetter): void {
   ipcMain.handle(IPC.ELEVATION_CHECK, () => isAdmin())
   ipcMain.handle(IPC.ELEVATION_RELAUNCH, () => {
     const exePath = app.getPath('exe')
-    const _userDataDir = app.getPath('userData')
 
     if (process.platform === 'win32') {
       // Use execFile so we wait for PowerShell to finish (including the UAC
@@ -254,8 +253,14 @@ export function registerCleanerIpc(getWindow: WindowGetter): void {
   // Auto-updater
   ipcMain.handle(IPC.UPDATER_CHECK, () => checkForUpdates())
   ipcMain.handle(IPC.UPDATER_DOWNLOAD, () => downloadUpdate())
-  ipcMain.handle(IPC.UPDATER_INSTALL, () => {
-    installUpdate()
+  ipcMain.handle(IPC.UPDATER_INSTALL, async (): Promise<boolean> => {
+    try {
+      await installUpdate()
+      return true
+    } catch (err) {
+      getLogger().error('updater', `Update install failed: ${String(err)}`)
+      return false
+    }
   })
   ipcMain.handle(IPC.UPDATER_GET_STATUS, () => getUpdateStatus())
 }

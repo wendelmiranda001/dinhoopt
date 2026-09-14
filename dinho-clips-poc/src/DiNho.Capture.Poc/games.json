@@ -2522,7 +2522,7 @@
       "displayName": "Monster Hunter Wilds",
       "aliases": [
         "Monster Hunter Wilds",
-        "MHW"
+        "MHWilds"
       ],
       "backends": [
         "wgc",
@@ -3357,7 +3357,8 @@
       "windowClass": "POEWindowClass",
       "displayName": "Path of Exile 2",
       "aliases": [
-        "PoE2"
+        "PoE2",
+        "Path of Exile 2"
       ],
       "backends": [
         "wgc",
@@ -3952,7 +3953,9 @@
       "processName": "RiseOfTheTombRaider",
       "windowClass": "",
       "displayName": "Rise of the Tomb Raider",
-      "aliases": [],
+      "aliases": [
+        "Rise of the Tomb Raider"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -3989,7 +3992,9 @@
       "processName": "MadMax",
       "windowClass": "",
       "displayName": "Mad Max",
-      "aliases": [],
+      "aliases": [
+        "Mad Max"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4000,7 +4005,9 @@
       "processName": "JustCause3",
       "windowClass": "",
       "displayName": "Just Cause 3",
-      "aliases": [],
+      "aliases": [
+        "Just Cause 3"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4011,7 +4018,9 @@
       "processName": "JustCause4",
       "windowClass": "",
       "displayName": "Just Cause 4",
-      "aliases": [],
+      "aliases": [
+        "Just Cause 4"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4022,7 +4031,9 @@
       "processName": "Mafia2",
       "windowClass": "",
       "displayName": "Mafia II",
-      "aliases": [],
+      "aliases": [
+        "Mafia II"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4033,7 +4044,9 @@
       "processName": "Mafia3",
       "windowClass": "",
       "displayName": "Mafia III",
-      "aliases": [],
+      "aliases": [
+        "Mafia III"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4070,7 +4083,9 @@
       "processName": "SaintsRow",
       "windowClass": "",
       "displayName": "Saints Row (2022)",
-      "aliases": [],
+      "aliases": [
+        "Saints Row (2022)"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4094,7 +4109,9 @@
       "processName": "WatchDogs",
       "windowClass": "",
       "displayName": "Watch Dogs",
-      "aliases": [],
+      "aliases": [
+        "Watch Dogs"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4105,7 +4122,9 @@
       "processName": "FarCry3",
       "windowClass": "",
       "displayName": "Far Cry 3",
-      "aliases": [],
+      "aliases": [
+        "Far Cry 3"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4116,7 +4135,9 @@
       "processName": "FarCry4",
       "windowClass": "",
       "displayName": "Far Cry 4",
-      "aliases": [],
+      "aliases": [
+        "Far Cry 4"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4153,7 +4174,9 @@
       "processName": "TheDivision",
       "windowClass": "",
       "displayName": "Tom Clancy's The Division",
-      "aliases": [],
+      "aliases": [
+        "Tom Clancy's The Division"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4177,7 +4200,9 @@
       "processName": "Prey",
       "windowClass": "",
       "displayName": "Prey (2017)",
-      "aliases": [],
+      "aliases": [
+        "Prey (2017)"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4188,7 +4213,9 @@
       "processName": "Thief",
       "windowClass": "",
       "displayName": "Thief",
-      "aliases": [],
+      "aliases": [
+        "Thief"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4199,7 +4226,9 @@
       "processName": "HitmanAbsolution",
       "windowClass": "",
       "displayName": "Hitman: Absolution",
-      "aliases": [],
+      "aliases": [
+        "Hitman Absolution"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4288,7 +4317,9 @@
       "processName": "WoLong",
       "windowClass": "",
       "displayName": "Wo Long: Fallen Dynasty",
-      "aliases": [],
+      "aliases": [
+        "Wo Long Fallen Dynasty"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4299,7 +4330,9 @@
       "processName": "nioh",
       "windowClass": "",
       "displayName": "Nioh",
-      "aliases": [],
+      "aliases": [
+        "Nioh"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4310,7 +4343,9 @@
       "processName": "DynastyWarriorsOrigins",
       "windowClass": "",
       "displayName": "Dynasty Warriors: Origins",
-      "aliases": [],
+      "aliases": [
+        "Dynasty Warriors Origins"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4321,7 +4356,9 @@
       "processName": "CodeVein",
       "windowClass": "",
       "displayName": "CODE VEIN",
-      "aliases": [],
+      "aliases": [
+        "CODE VEIN"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4345,7 +4382,9 @@
       "processName": "TalesOfArise",
       "windowClass": "",
       "displayName": "Tales of Arise",
-      "aliases": [],
+      "aliases": [
+        "Tales of Arise"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4356,7 +4395,9 @@
       "processName": "Outward",
       "windowClass": "",
       "displayName": "Outward",
-      "aliases": [],
+      "aliases": [
+        "Outward"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4367,7 +4408,9 @@
       "processName": "TheSurge",
       "windowClass": "",
       "displayName": "The Surge",
-      "aliases": [],
+      "aliases": [
+        "The Surge"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4378,7 +4421,9 @@
       "processName": "MortalShell",
       "windowClass": "",
       "displayName": "Mortal Shell",
-      "aliases": [],
+      "aliases": [
+        "Mortal Shell"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4402,7 +4447,9 @@
       "processName": "OctopathTraveler",
       "windowClass": "",
       "displayName": "OCTOPATH TRAVELER",
-      "aliases": [],
+      "aliases": [
+        "OCTOPATH TRAVELER"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4413,7 +4460,9 @@
       "processName": "TriangleStrategy",
       "windowClass": "",
       "displayName": "Triangle Strategy",
-      "aliases": [],
+      "aliases": [
+        "Triangle Strategy"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4450,7 +4499,9 @@
       "processName": "BravelyD2",
       "windowClass": "",
       "displayName": "BRAVELY DEFAULT II",
-      "aliases": [],
+      "aliases": [
+        "BRAVELY DEFAULT II"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4461,7 +4512,9 @@
       "processName": "SeaOfStars",
       "windowClass": "",
       "displayName": "Sea of Stars",
-      "aliases": [],
+      "aliases": [
+        "Sea of Stars"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4472,7 +4525,9 @@
       "processName": "Dredge",
       "windowClass": "",
       "displayName": "Dredge",
-      "aliases": [],
+      "aliases": [
+        "Dredge"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4483,7 +4538,9 @@
       "processName": "Spiritfarer",
       "windowClass": "",
       "displayName": "Spiritfarer",
-      "aliases": [],
+      "aliases": [
+        "Spiritfarer"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4533,7 +4590,9 @@
       "processName": "InfinityNikki",
       "windowClass": "",
       "displayName": "Infinity Nikki",
-      "aliases": [],
+      "aliases": [
+        "Infinity Nikki"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4557,7 +4616,9 @@
       "processName": "XCOM2",
       "windowClass": "",
       "displayName": "XCOM 2",
-      "aliases": [],
+      "aliases": [
+        "XCOM 2"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4568,7 +4629,9 @@
       "processName": "PhoenixPoint",
       "windowClass": "",
       "displayName": "Phoenix Point",
-      "aliases": [],
+      "aliases": [
+        "Phoenix Point"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4593,7 +4656,9 @@
       "windowClass": "",
       "displayName": "Pillars of Eternity II: Deadfire",
       "aliases": [
-        "PoE2"
+        "Pillars of Eternity II",
+        "Deadfire",
+        "PoE II"
       ],
       "backends": [
         "wgc",
@@ -4605,7 +4670,9 @@
       "processName": "Tyranny",
       "windowClass": "",
       "displayName": "Tyranny",
-      "aliases": [],
+      "aliases": [
+        "Tyranny"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4616,7 +4683,9 @@
       "processName": "Pathfinder_Kingmaker",
       "windowClass": "",
       "displayName": "Pathfinder: Kingmaker",
-      "aliases": [],
+      "aliases": [
+        "Pathfinder Kingmaker"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4640,7 +4709,9 @@
       "processName": "Wasteland2",
       "windowClass": "",
       "displayName": "Wasteland 2",
-      "aliases": [],
+      "aliases": [
+        "Wasteland 2"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4651,7 +4722,9 @@
       "processName": "Wasteland3",
       "windowClass": "",
       "displayName": "Wasteland 3",
-      "aliases": [],
+      "aliases": [
+        "Wasteland 3"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4662,7 +4735,9 @@
       "processName": "GrimDawn",
       "windowClass": "",
       "displayName": "Grim Dawn",
-      "aliases": [],
+      "aliases": [
+        "Grim Dawn"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4686,7 +4761,9 @@
       "processName": "Shogun2",
       "windowClass": "",
       "displayName": "Total War: SHOGUN 2",
-      "aliases": [],
+      "aliases": [
+        "Total War SHOGUN 2"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4697,7 +4774,9 @@
       "processName": "Rome2",
       "windowClass": "",
       "displayName": "Total War: ROME II",
-      "aliases": [],
+      "aliases": [
+        "Total War ROME II"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4708,7 +4787,9 @@
       "processName": "Attila",
       "windowClass": "",
       "displayName": "Total War: ATTILA",
-      "aliases": [],
+      "aliases": [
+        "Total War ATTILA"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4771,7 +4852,9 @@
       "processName": "TheyAreBillions",
       "windowClass": "",
       "displayName": "They Are Billions",
-      "aliases": [],
+      "aliases": [
+        "They Are Billions"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4782,7 +4865,9 @@
       "processName": "Northgard",
       "windowClass": "",
       "displayName": "Northgard",
-      "aliases": [],
+      "aliases": [
+        "Northgard"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4793,7 +4878,9 @@
       "processName": "DuneSpiceWars",
       "windowClass": "",
       "displayName": "Dune: Spice Wars",
-      "aliases": [],
+      "aliases": [
+        "Dune Spice Wars"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4817,7 +4904,9 @@
       "processName": "Humankind",
       "windowClass": "",
       "displayName": "HUMANKIND",
-      "aliases": [],
+      "aliases": [
+        "HUMANKIND"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4841,7 +4930,9 @@
       "processName": "Anno1800",
       "windowClass": "",
       "displayName": "Anno 1800",
-      "aliases": [],
+      "aliases": [
+        "Anno 1800"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4852,7 +4943,9 @@
       "processName": "Tropico6",
       "windowClass": "",
       "displayName": "Tropico 6",
-      "aliases": [],
+      "aliases": [
+        "Tropico 6"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4863,7 +4956,9 @@
       "processName": "TwoPointHospital",
       "windowClass": "",
       "displayName": "Two Point Hospital",
-      "aliases": [],
+      "aliases": [
+        "Two Point Hospital"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4874,7 +4969,9 @@
       "processName": "TwoPointCampus",
       "windowClass": "",
       "displayName": "Two Point Campus",
-      "aliases": [],
+      "aliases": [
+        "Two Point Campus"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4885,7 +4982,9 @@
       "processName": "SurvivingMars",
       "windowClass": "",
       "displayName": "Surviving Mars",
-      "aliases": [],
+      "aliases": [
+        "Surviving Mars"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4896,7 +4995,9 @@
       "processName": "PrisonArchitect",
       "windowClass": "",
       "displayName": "Prison Architect",
-      "aliases": [],
+      "aliases": [
+        "Prison Architect"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4907,7 +5008,9 @@
       "processName": "Banished",
       "windowClass": "",
       "displayName": "Banished",
-      "aliases": [],
+      "aliases": [
+        "Banished"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4918,7 +5021,9 @@
       "processName": "PlanetCoaster",
       "windowClass": "",
       "displayName": "Planet Coaster",
-      "aliases": [],
+      "aliases": [
+        "Planet Coaster"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4929,7 +5034,9 @@
       "processName": "PlanetBase",
       "windowClass": "",
       "displayName": "Planetbase",
-      "aliases": [],
+      "aliases": [
+        "Planetbase"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4940,7 +5047,9 @@
       "processName": "Frostpunk",
       "windowClass": "",
       "displayName": "Frostpunk",
-      "aliases": [],
+      "aliases": [
+        "Frostpunk"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4951,7 +5060,9 @@
       "processName": "AgainstTheStorm",
       "windowClass": "",
       "displayName": "Against the Storm",
-      "aliases": [],
+      "aliases": [
+        "Against the Storm"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4962,7 +5073,9 @@
       "processName": "Icarus",
       "windowClass": "",
       "displayName": "Icarus",
-      "aliases": [],
+      "aliases": [
+        "Icarus"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -4973,7 +5086,9 @@
       "processName": "gmod",
       "windowClass": "",
       "displayName": "Garry's Mod",
-      "aliases": [],
+      "aliases": [
+        "Garry's Mod"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5010,7 +5125,9 @@
       "processName": "RogueLegacy2",
       "windowClass": "",
       "displayName": "Rogue Legacy 2",
-      "aliases": [],
+      "aliases": [
+        "Rogue Legacy 2"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5034,7 +5151,9 @@
       "processName": "LoopHero",
       "windowClass": "",
       "displayName": "Loop Hero",
-      "aliases": [],
+      "aliases": [
+        "Loop Hero"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5045,7 +5164,9 @@
       "processName": "CultOfTheLamb",
       "windowClass": "",
       "displayName": "Cult of the Lamb",
-      "aliases": [],
+      "aliases": [
+        "Cult of the Lamb"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5056,7 +5177,9 @@
       "processName": "HiFiRush",
       "windowClass": "",
       "displayName": "Hi-Fi RUSH",
-      "aliases": [],
+      "aliases": [
+        "Hi-Fi RUSH"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5067,7 +5190,9 @@
       "processName": "Psychonauts2",
       "windowClass": "",
       "displayName": "Psychonauts 2",
-      "aliases": [],
+      "aliases": [
+        "Psychonauts 2"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5078,7 +5203,9 @@
       "processName": "BombRushCyberfunk",
       "windowClass": "",
       "displayName": "Bomb Rush Cyberfunk",
-      "aliases": [],
+      "aliases": [
+        "Bomb Rush Cyberfunk"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5089,7 +5216,9 @@
       "processName": "KatanaZERO",
       "windowClass": "",
       "displayName": "Katana ZERO",
-      "aliases": [],
+      "aliases": [
+        "Katana ZERO"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5100,7 +5229,9 @@
       "processName": "Broforce",
       "windowClass": "",
       "displayName": "Broforce",
-      "aliases": [],
+      "aliases": [
+        "Broforce"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5111,7 +5242,9 @@
       "processName": "RainWorld",
       "windowClass": "",
       "displayName": "Rain World",
-      "aliases": [],
+      "aliases": [
+        "Rain World"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5122,7 +5255,9 @@
       "processName": "Starbound",
       "windowClass": "",
       "displayName": "Starbound",
-      "aliases": [],
+      "aliases": [
+        "Starbound"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5133,7 +5268,9 @@
       "processName": "Astroneer",
       "windowClass": "",
       "displayName": "Astroneer",
-      "aliases": [],
+      "aliases": [
+        "Astroneer"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5144,7 +5281,9 @@
       "processName": "MK11",
       "windowClass": "",
       "displayName": "Mortal Kombat 11",
-      "aliases": [],
+      "aliases": [
+        "Mortal Kombat 11"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5155,7 +5294,9 @@
       "processName": "Injustice2",
       "windowClass": "",
       "displayName": "Injustice 2",
-      "aliases": [],
+      "aliases": [
+        "Injustice 2"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5179,7 +5320,9 @@
       "processName": "Tekken7",
       "windowClass": "",
       "displayName": "TEKKEN 7",
-      "aliases": [],
+      "aliases": [
+        "TEKKEN 7"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5203,7 +5346,9 @@
       "processName": "Brawlhalla",
       "windowClass": "",
       "displayName": "Brawlhalla",
-      "aliases": [],
+      "aliases": [
+        "Brawlhalla"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5214,7 +5359,9 @@
       "processName": "FIFA22",
       "windowClass": "",
       "displayName": "FIFA 22",
-      "aliases": [],
+      "aliases": [
+        "FIFA 22"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5225,7 +5372,9 @@
       "processName": "FIFA21",
       "windowClass": "",
       "displayName": "FIFA 21",
-      "aliases": [],
+      "aliases": [
+        "FIFA 21"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5236,7 +5385,9 @@
       "processName": "NBA2K24",
       "windowClass": "",
       "displayName": "NBA 2K24",
-      "aliases": [],
+      "aliases": [
+        "NBA 2K24"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5247,7 +5398,9 @@
       "processName": "NBA2K23",
       "windowClass": "",
       "displayName": "NBA 2K23",
-      "aliases": [],
+      "aliases": [
+        "NBA 2K23"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5258,7 +5411,9 @@
       "processName": "WWE2K24",
       "windowClass": "",
       "displayName": "WWE 2K24",
-      "aliases": [],
+      "aliases": [
+        "WWE 2K24"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5269,7 +5424,9 @@
       "processName": "Madden24",
       "windowClass": "",
       "displayName": "Madden NFL 24",
-      "aliases": [],
+      "aliases": [
+        "Madden NFL 24"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5280,7 +5437,9 @@
       "processName": "Amnesia",
       "windowClass": "",
       "displayName": "Amnesia: The Dark Descent",
-      "aliases": [],
+      "aliases": [
+        "Amnesia The Dark Descent"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5291,7 +5450,9 @@
       "processName": "Soma",
       "windowClass": "",
       "displayName": "SOMA",
-      "aliases": [],
+      "aliases": [
+        "SOMA"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5302,7 +5463,9 @@
       "processName": "Outlast",
       "windowClass": "",
       "displayName": "Outlast",
-      "aliases": [],
+      "aliases": [
+        "Outlast"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5313,7 +5476,9 @@
       "processName": "Outlast2",
       "windowClass": "",
       "displayName": "Outlast 2",
-      "aliases": [],
+      "aliases": [
+        "Outlast 2"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5324,7 +5489,9 @@
       "processName": "LittleNightmares",
       "windowClass": "",
       "displayName": "Little Nightmares",
-      "aliases": [],
+      "aliases": [
+        "Little Nightmares"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5374,7 +5541,9 @@
       "processName": "AlanWake",
       "windowClass": "",
       "displayName": "Alan Wake",
-      "aliases": [],
+      "aliases": [
+        "Alan Wake"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5385,7 +5554,9 @@
       "processName": "QuantumBreak",
       "windowClass": "",
       "displayName": "Quantum Break",
-      "aliases": [],
+      "aliases": [
+        "Quantum Break"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5396,7 +5567,9 @@
       "processName": "Hellblade",
       "windowClass": "",
       "displayName": "Hellblade: Senua's Sacrifice",
-      "aliases": [],
+      "aliases": [
+        "Hellblade Senua's Sacrifice"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5407,7 +5580,9 @@
       "processName": "Hellblade2",
       "windowClass": "",
       "displayName": "Hellblade II: Senua's Saga",
-      "aliases": [],
+      "aliases": [
+        "Hellblade II Senua's Saga"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5418,7 +5593,9 @@
       "processName": "JurassicWorldEvolution",
       "windowClass": "",
       "displayName": "Jurassic World Evolution",
-      "aliases": [],
+      "aliases": [
+        "Jurassic World Evolution"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5429,7 +5606,9 @@
       "processName": "DCS",
       "windowClass": "",
       "displayName": "DCS World",
-      "aliases": [],
+      "aliases": [
+        "DCS World"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5453,7 +5632,9 @@
       "processName": "TheCrew2",
       "windowClass": "",
       "displayName": "The Crew 2",
-      "aliases": [],
+      "aliases": [
+        "The Crew 2"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5464,7 +5645,9 @@
       "processName": "TheCrewMotorfest",
       "windowClass": "",
       "displayName": "The Crew Motorfest",
-      "aliases": [],
+      "aliases": [
+        "The Crew Motorfest"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5488,7 +5671,9 @@
       "processName": "Dirt5",
       "windowClass": "",
       "displayName": "DiRT 5",
-      "aliases": [],
+      "aliases": [
+        "DiRT 5"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5499,7 +5684,9 @@
       "processName": "GridLegends",
       "windowClass": "",
       "displayName": "GRID Legends",
-      "aliases": [],
+      "aliases": [
+        "GRID Legends"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5510,7 +5697,9 @@
       "processName": "rFactor2",
       "windowClass": "",
       "displayName": "rFactor 2",
-      "aliases": [],
+      "aliases": [
+        "rFactor 2"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5521,7 +5710,9 @@
       "processName": "iRacingSimulator",
       "windowClass": "",
       "displayName": "iRacing",
-      "aliases": [],
+      "aliases": [
+        "iRacing"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5532,7 +5723,9 @@
       "processName": "F123",
       "windowClass": "",
       "displayName": "F1 23",
-      "aliases": [],
+      "aliases": [
+        "F1 23"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -5543,7 +5736,9 @@
       "processName": "HaloWars2",
       "windowClass": "",
       "displayName": "Halo Wars 2",
-      "aliases": [],
+      "aliases": [
+        "Halo Wars 2"
+      ],
       "backends": [
         "wgc",
         "dxgi",

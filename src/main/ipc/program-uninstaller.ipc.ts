@@ -21,6 +21,14 @@ export function registerProgramUninstallerIpc(getWindow: WindowGetter): void {
     if (win && !win.isDestroyed()) win.webContents.send(IPC.UNINSTALLER_PROGRESS, data)
   }
 
+  /**
+   * Drop a program from the module-level cache after a successful uninstall so
+   * a stale entry can never be targeted again by id.
+   */
+  const invalidateCacheFor = (programId: string): void => {
+    cachedPrograms = cachedPrograms.filter((p) => p.id !== programId)
+  }
+
   ipcMain.handle(IPC.UNINSTALLER_LIST, async (): Promise<UninstallerListResult> => {
     getLogger().info('program-uninstaller', 'Listing installed programs')
     const programs = await getInstalledProgramsFull()
@@ -102,6 +110,7 @@ export function registerProgramUninstallerIpc(getWindow: WindowGetter): void {
     const leftovers = await scanLeftoversForProgram(program)
     if (leftovers.length === 0) {
       getLogger().success('program-uninstaller', `Uninstalled ${program.displayName} — no leftovers found`)
+      invalidateCacheFor(programId)
       return {
         success: true,
         programName: program.displayName,
@@ -134,6 +143,7 @@ export function registerProgramUninstallerIpc(getWindow: WindowGetter): void {
       'program-uninstaller',
       `Uninstalled ${program.displayName}: ${cleaned}/${leftovers.length} leftovers cleaned`,
     )
+    invalidateCacheFor(programId)
     return {
       success: true,
       programName: program.displayName,
@@ -195,6 +205,7 @@ export function registerProgramUninstallerIpc(getWindow: WindowGetter): void {
 
     if (leftovers.length === 0) {
       getLogger().success('program-uninstaller', `Force removed ${program.displayName} — no leftovers`)
+      invalidateCacheFor(programId)
       return {
         success: true,
         programName: program.displayName,
@@ -227,6 +238,7 @@ export function registerProgramUninstallerIpc(getWindow: WindowGetter): void {
       'program-uninstaller',
       `Force removed ${program.displayName}: ${cleaned}/${leftovers.length} leftovers cleaned`,
     )
+    invalidateCacheFor(programId)
     return {
       success: true,
       programName: program.displayName,

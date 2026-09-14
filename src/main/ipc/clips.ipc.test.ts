@@ -522,7 +522,7 @@ describe('CLIPS_GET_CONFIG', () => {
     expect(cfg.bframes).toBe(3)
     expect(cfg.lookahead).toBe(16)
     expect(cfg.encoderPreset).toBe('p5')
-    expect(cfg.outputDirectory).toContain('DiNhoClips')
+    expect(cfg.outputDirectory).toContain('DiNho Clips')
     expect(cfg.forceSoftware).toBe(false)
     expect(cfg.pushToTalk).toBe('hold')
     expect(cfg.pushToTalkKeys).toEqual([5, 20])

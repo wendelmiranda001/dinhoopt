@@ -304,7 +304,7 @@ export function registerBrowserCleanerIpc(getWindow: WindowGetter): void {
           phase: 'cleaning',
           category: CleanerType.Browser,
           currentPath,
-          progress: (processed / total) * 100,
+          progress: total > 0 ? (processed / total) * 100 : 100,
           itemsFound: total,
           sizeFound: cleanedSize,
         })

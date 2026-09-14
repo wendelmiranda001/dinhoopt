@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
-import { _electron as electron } from 'playwright'
 import type { ElectronApplication, Page } from 'playwright'
+import { _electron as electron } from 'playwright'
 import { createLicenseE2EMarker } from './license-e2e'
 
 let electronApp: ElectronApplication
@@ -10,7 +10,10 @@ let page: Page
 test.beforeAll(async () => {
   createLicenseE2EMarker(resolve(__dirname, '.e2e-userdata-compliance'))
   electronApp = await electron.launch({
-    args: [resolve(__dirname, '../out/main/index.js'), `--dinho-data-dir=${resolve(__dirname, '.e2e-userdata-compliance')}`],
+    args: [
+      resolve(__dirname, '../out/main/index.js'),
+      `--dinho-data-dir=${resolve(__dirname, '.e2e-userdata-compliance')}`,
+    ],
     env: { ...process.env, NODE_ENV: 'test', DINHO_E2E: '1' },
   })
   page = await electronApp.firstWindow()
