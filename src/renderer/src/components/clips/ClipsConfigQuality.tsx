@@ -16,17 +16,21 @@ export function TipBadge({
   const active = activeTip === id
   return (
     <span className="relative inline-flex" data-tip={id}>
-      <button
-        type="button"
+      <span
+        role="button"
+        tabIndex={0}
         className="inline-flex h-3.5 w-3.5 cursor-pointer items-center justify-center rounded-full text-[9px] font-bold transition-all duration-150"
         style={{
           background: active ? 'rgba(139,92,246,0.2)' : 'rgba(113,113,122,0.15)',
           color: active ? 'var(--accent)' : 'var(--text-dim)',
         }}
         onClick={() => setActiveTip(active ? null : id)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') setActiveTip(active ? null : id)
+        }}
       >
         ?
-      </button>
+      </span>
     </span>
   )
 }
