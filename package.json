@@ -1,6 +1,6 @@
 {
   "name": "dinho-optimizer",
-  "version": "2.1.0",
+  "version": "2.0.0",
   "description": "DiNho Optimizer — Otimizador de sistema Windows",
   "repository": "optdinho/optdinho",
   "main": "./out/main/index.js",
@@ -87,7 +87,7 @@
     "better-sqlite3": "^13.0.3"
   },
   "engines": {
-    "node": ">=22.1.0"
+    "node": ">=22.0.0"
   },
   "allowScripts": {
     "better-sqlite3@13.0.3": true,
