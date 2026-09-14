@@ -77,6 +77,14 @@ nsis:
   allowToChangeInstallationDirectory: false
   deleteAppDataOnUninstall: false
   artifactName: DiNho-Optimizer-Setup-${version}.${ext}
+  # The app auto-elevates at first launch (src/main/index.ts), so a running
+  # instance is ELEVATED. A user-level installer cannot terminate it before
+  # copying files (taskkill Access denied -> CHECK_APP_RUNNING gives up with
+  # appCannotBeClosed and the install aborts). perMachine makes the installer
+  # request admin, so CHECK_APP_RUNNING's kill succeeds and runAfterFinish
+  # relaunches the app after the install. installSection.nsh also uninstalls a
+  # previous per-user (HKCU) install, so migration is automatic.
+  perMachine: true
   runAfterFinish: true
   createStartMenuShortcut: true
   createDesktopShortcut: true
