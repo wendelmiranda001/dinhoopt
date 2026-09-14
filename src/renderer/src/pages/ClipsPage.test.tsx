@@ -58,6 +58,7 @@ vi.mock('lucide-react', () => {
     'Settings',
     'Star',
     'Trash2',
+    'TriangleAlert',
     'Upload',
     'Video',
     'X',
@@ -354,6 +355,63 @@ describe('ClipsPage', () => {
     render(<ClipsPage />)
     showSettings()
     expect(await screen.findByText('forceSoftware')).toBeTruthy()
+  })
+
+  it('shows calibrated machine profile badge when adaptive quality is active', async () => {
+    mockGetStatus.mockResolvedValue({
+      running: true,
+      capturing: true,
+      uptime: 120,
+      fps: 30,
+      replayTimeSeconds: 120,
+      calibrationTier: 'Strong',
+    })
+    render(<ClipsPage />)
+    showSettings()
+    await screen.findByText('recordingQuality')
+    expect(screen.getByText('calibrationActive')).toBeTruthy()
+  })
+
+  it('hides calibration badge when no tier was reported', async () => {
+    mockGetStatus.mockResolvedValue({
+      running: true,
+      capturing: true,
+      uptime: 120,
+      fps: 30,
+      replayTimeSeconds: 120,
+    })
+    render(<ClipsPage />)
+    showSettings()
+    await screen.findByText('recordingQuality')
+    expect(screen.queryByText('calibrationActive')).toBeNull()
+  })
+
+  it('shows dropped frames badge when drop counters are non-zero', async () => {
+    mockGetStatus.mockResolvedValue({
+      running: true,
+      capturing: true,
+      uptime: 120,
+      fps: 30,
+      replayTimeSeconds: 120,
+      droppedFrames: 7,
+      gpuBusyDrops: 3,
+    })
+    render(<ClipsPage />)
+    expect(await screen.findByText(/droppedFrames/)).toBeTruthy()
+    expect(screen.getByText('(GPU: 3)')).toBeTruthy()
+  })
+
+  it('does not show dropped frames badge when counters are zero', async () => {
+    mockGetStatus.mockResolvedValue({
+      running: true,
+      capturing: true,
+      uptime: 120,
+      fps: 30,
+      replayTimeSeconds: 120,
+    })
+    render(<ClipsPage />)
+    expect(await screen.findByText('recording')).toBeTruthy()
+    expect(screen.queryByText(/droppedFrames/)).toBeNull()
   })
 
   it('calls setConfig when force software toggle is clicked', async () => {

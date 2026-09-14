@@ -635,7 +635,7 @@ public sealed class EncoderManagerTests
 
     private static FfmpegEncoder CreateUninitializedEncoder(bool hardware)
     {
-        var enc = (FfmpegEncoder)System.Runtime.Serialization.FormatterServices
+        var enc = (FfmpegEncoder)System.Runtime.CompilerServices.RuntimeHelpers
             .GetUninitializedObject(typeof(FfmpegEncoder));
         typeof(FfmpegEncoder).GetField("_useHardware",
             BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(enc, hardware);

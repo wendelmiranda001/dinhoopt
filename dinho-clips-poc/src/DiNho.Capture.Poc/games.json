@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "games": [
     {
       "processName": "FiveM_GTAProcess",
@@ -3224,7 +3224,9 @@
       "processName": "SplitFiction",
       "windowClass": "UnrealWindow",
       "displayName": "Split Fiction",
-      "aliases": ["SplitFiction"],
+      "aliases": [
+        "SplitFiction"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3246,7 +3248,9 @@
       "processName": "OblivionRemastered",
       "windowClass": "UnrealWindow",
       "displayName": "Oblivion Remastered",
-      "aliases": ["OblivionRemastered"],
+      "aliases": [
+        "OblivionRemastered"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3304,7 +3308,9 @@
       "processName": "Avowed",
       "windowClass": "UnrealWindow",
       "displayName": "Avowed",
-      "aliases": ["Avowed"],
+      "aliases": [
+        "Avowed"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3326,7 +3332,9 @@
       "processName": "ManorLords",
       "windowClass": "UnrealWindow",
       "displayName": "Manor Lords",
-      "aliases": ["ManorLords"],
+      "aliases": [
+        "ManorLords"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3360,7 +3368,9 @@
       "processName": "DeltaForce",
       "windowClass": "UnrealWindow",
       "displayName": "Delta Force",
-      "aliases": ["DeltaForce"],
+      "aliases": [
+        "DeltaForce"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3370,7 +3380,9 @@
       "processName": "ArcRaiders",
       "windowClass": "UnrealWindow",
       "displayName": "ARC Raiders",
-      "aliases": ["ArcRaiders"],
+      "aliases": [
+        "ArcRaiders"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3392,7 +3404,9 @@
       "processName": "OnceHuman",
       "windowClass": "",
       "displayName": "Once Human",
-      "aliases": ["OnceHuman"],
+      "aliases": [
+        "OnceHuman"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3426,7 +3440,9 @@
       "processName": "PEAK",
       "windowClass": "UnityWndClass",
       "displayName": "PEAK",
-      "aliases": ["PEAK"],
+      "aliases": [
+        "PEAK"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3448,7 +3464,9 @@
       "processName": "OuterWorlds2",
       "windowClass": "UnrealWindow",
       "displayName": "The Outer Worlds 2",
-      "aliases": ["OuterWorlds2"],
+      "aliases": [
+        "OuterWorlds2"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3471,7 +3489,9 @@
       "processName": "StellarBlade",
       "windowClass": "UnrealWindow",
       "displayName": "Stellar Blade",
-      "aliases": ["StellarBlade"],
+      "aliases": [
+        "StellarBlade"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3481,7 +3501,9 @@
       "processName": "RiseOfRonin",
       "windowClass": "Katana Engine",
       "displayName": "Rise of the Ronin",
-      "aliases": ["RiseOfRonin"],
+      "aliases": [
+        "RiseOfRonin"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3515,7 +3537,9 @@
       "processName": "NBA2K26",
       "windowClass": "",
       "displayName": "NBA 2K26",
-      "aliases": ["NBA 2K26"],
+      "aliases": [
+        "NBA 2K26"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3525,7 +3549,9 @@
       "processName": "NBA2K25",
       "windowClass": "",
       "displayName": "NBA 2K25",
-      "aliases": ["NBA 2K25"],
+      "aliases": [
+        "NBA 2K25"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3535,7 +3561,9 @@
       "processName": "WWE2K25",
       "windowClass": "",
       "displayName": "WWE 2K25",
-      "aliases": ["WWE 2K25"],
+      "aliases": [
+        "WWE 2K25"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3545,7 +3573,9 @@
       "processName": "hl2_win64",
       "windowClass": "Valve001",
       "displayName": "Team Fortress 2 (Windows)",
-      "aliases": ["Team Fortress"],
+      "aliases": [
+        "Team Fortress"
+      ],
       "backends": [
         "wgc",
         "dxgi",
@@ -3569,7 +3599,9 @@
       "processName": "Gears5",
       "windowClass": "UnrealWindow",
       "displayName": "Gears 5",
-      "aliases": ["Gears5"],
+      "aliases": [
+        "Gears5"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3591,7 +3623,9 @@
       "processName": "F124",
       "windowClass": "",
       "displayName": "F1 24",
-      "aliases": ["F1 24"],
+      "aliases": [
+        "F1 24"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3601,7 +3635,9 @@
       "processName": "F125",
       "windowClass": "",
       "displayName": "F1 25",
-      "aliases": ["F1 25"],
+      "aliases": [
+        "F1 25"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3623,7 +3659,9 @@
       "processName": "LostArk",
       "windowClass": "",
       "displayName": "Lost Ark",
-      "aliases": ["Lost Ark"],
+      "aliases": [
+        "Lost Ark"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3717,7 +3755,9 @@
       "processName": "LastEpoch",
       "windowClass": "UnityWndClass",
       "displayName": "Last Epoch",
-      "aliases": ["LastEpoch"],
+      "aliases": [
+        "LastEpoch"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3739,7 +3779,9 @@
       "processName": "BF2042",
       "windowClass": "Frostbite",
       "displayName": "Battlefield 2042",
-      "aliases": ["BF2042"],
+      "aliases": [
+        "BF2042"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3834,7 +3876,9 @@
       "processName": "Fallout3",
       "windowClass": "Gamebryo",
       "displayName": "Fallout 3",
-      "aliases": ["Fallout3"],
+      "aliases": [
+        "Fallout3"
+      ],
       "backends": [
         "wgc",
         "dxgi"
@@ -3869,11 +3913,1921 @@
       "processName": "Deathloop",
       "windowClass": "Void",
       "displayName": "DEATHLOOP",
-      "aliases": ["Deathloop"],
+      "aliases": [
+        "Deathloop"
+      ],
       "backends": [
         "wgc",
         "dxgi"
       ]
+    },
+    {
+      "processName": "AlienIsolation",
+      "windowClass": "",
+      "displayName": "Alien: Isolation",
+      "aliases": [
+        "AI"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "MGS_TPP",
+      "windowClass": "",
+      "displayName": "METAL GEAR SOLID V: The Phantom Pain",
+      "aliases": [
+        "MGSV",
+        "Phantom Pain"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "RiseOfTheTombRaider",
+      "windowClass": "",
+      "displayName": "Rise of the Tomb Raider",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "SOTTR",
+      "windowClass": "",
+      "displayName": "Shadow of the Tomb Raider",
+      "aliases": [
+        "SOTTR"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "TombRaider",
+      "windowClass": "",
+      "displayName": "Tomb Raider (2013)",
+      "aliases": [
+        "TR2013"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "MadMax",
+      "windowClass": "",
+      "displayName": "Mad Max",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "JustCause3",
+      "windowClass": "",
+      "displayName": "Just Cause 3",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "JustCause4",
+      "windowClass": "",
+      "displayName": "Just Cause 4",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Mafia2",
+      "windowClass": "",
+      "displayName": "Mafia II",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Mafia3",
+      "windowClass": "",
+      "displayName": "Mafia III",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "SR3",
+      "windowClass": "",
+      "displayName": "Saints Row: The Third",
+      "aliases": [
+        "SRTT"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "SaintsRowIV",
+      "windowClass": "",
+      "displayName": "Saints Row IV",
+      "aliases": [
+        "SRIV"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "SaintsRow",
+      "windowClass": "",
+      "displayName": "Saints Row (2022)",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "SleepingDogs",
+      "windowClass": "",
+      "displayName": "Sleeping Dogs",
+      "aliases": [
+        "HD2"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "WatchDogs",
+      "windowClass": "",
+      "displayName": "Watch Dogs",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "FarCry3",
+      "windowClass": "",
+      "displayName": "Far Cry 3",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "FarCry4",
+      "windowClass": "",
+      "displayName": "Far Cry 4",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "FarCryPrimal",
+      "windowClass": "",
+      "displayName": "Far Cry Primal",
+      "aliases": [
+        "FC Primal"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "FarCryNewDawn",
+      "windowClass": "",
+      "displayName": "Far Cry New Dawn",
+      "aliases": [
+        "FC New Dawn"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "TheDivision",
+      "windowClass": "",
+      "displayName": "Tom Clancy's The Division",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "GRW",
+      "windowClass": "",
+      "displayName": "Tom Clancy's Ghost Recon Wildlands",
+      "aliases": [
+        "Ghost Recon Wildlands"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Prey",
+      "windowClass": "",
+      "displayName": "Prey (2017)",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Thief",
+      "windowClass": "",
+      "displayName": "Thief",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "HitmanAbsolution",
+      "windowClass": "",
+      "displayName": "Hitman: Absolution",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "HITMAN2",
+      "windowClass": "",
+      "displayName": "Hitman 2",
+      "aliases": [
+        "Hitman 2 (2018)"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "DeusExMD",
+      "windowClass": "",
+      "displayName": "Deus Ex: Mankind Divided",
+      "aliases": [
+        "DXMD"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "DragonAgeInquisition",
+      "windowClass": "",
+      "displayName": "Dragon Age: Inquisition",
+      "aliases": [
+        "DAI"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "DragonAgeOrigins",
+      "windowClass": "",
+      "displayName": "Dragon Age: Origins",
+      "aliases": [
+        "DAO"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "DragonAge2",
+      "windowClass": "",
+      "displayName": "Dragon Age II",
+      "aliases": [
+        "DA2"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Morrowind",
+      "windowClass": "",
+      "displayName": "Morrowind",
+      "aliases": [
+        "TES III"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "WoLong",
+      "windowClass": "",
+      "displayName": "Wo Long: Fallen Dynasty",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "nioh",
+      "windowClass": "",
+      "displayName": "Nioh",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "DynastyWarriorsOrigins",
+      "windowClass": "",
+      "displayName": "Dynasty Warriors: Origins",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "CodeVein",
+      "windowClass": "",
+      "displayName": "CODE VEIN",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "MonsterHunterWorld",
+      "windowClass": "",
+      "displayName": "Monster Hunter: World",
+      "aliases": [
+        "MHW"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "TalesOfArise",
+      "windowClass": "",
+      "displayName": "Tales of Arise",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Outward",
+      "windowClass": "",
+      "displayName": "Outward",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "TheSurge",
+      "windowClass": "",
+      "displayName": "The Surge",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "MortalShell",
+      "windowClass": "",
+      "displayName": "Mortal Shell",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "LOTF2",
+      "windowClass": "",
+      "displayName": "Lords of the Fallen (2023)",
+      "aliases": [
+        "LOTF 2023"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "OctopathTraveler",
+      "windowClass": "",
+      "displayName": "OCTOPATH TRAVELER",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "TriangleStrategy",
+      "windowClass": "",
+      "displayName": "Triangle Strategy",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "DragonQuestXI",
+      "windowClass": "",
+      "displayName": "DRAGON QUEST XI",
+      "aliases": [
+        "DQ11"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "P4G",
+      "windowClass": "",
+      "displayName": "Persona 4 Golden",
+      "aliases": [
+        "Persona 4"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "BravelyD2",
+      "windowClass": "",
+      "displayName": "BRAVELY DEFAULT II",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "SeaOfStars",
+      "windowClass": "",
+      "displayName": "Sea of Stars",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Dredge",
+      "windowClass": "",
+      "displayName": "Dredge",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Spiritfarer",
+      "windowClass": "",
+      "displayName": "Spiritfarer",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Gw2-64",
+      "windowClass": "",
+      "displayName": "Guild Wars 2",
+      "aliases": [
+        "Gw2"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "AlbionOnline",
+      "windowClass": "",
+      "displayName": "Albion Online",
+      "aliases": [
+        "Albion-Online"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "exefile",
+      "windowClass": "",
+      "displayName": "EVE Online",
+      "aliases": [
+        "EVE"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "InfinityNikki",
+      "windowClass": "",
+      "displayName": "Infinity Nikki",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "CivilizationV",
+      "windowClass": "",
+      "displayName": "Sid Meier's Civilization V",
+      "aliases": [
+        "Civ5"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "XCOM2",
+      "windowClass": "",
+      "displayName": "XCOM 2",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "PhoenixPoint",
+      "windowClass": "",
+      "displayName": "Phoenix Point",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "PillarsOfEternity",
+      "windowClass": "",
+      "displayName": "Pillars of Eternity",
+      "aliases": [
+        "PoE1"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "PillarsOfEternity2",
+      "windowClass": "",
+      "displayName": "Pillars of Eternity II: Deadfire",
+      "aliases": [
+        "PoE2"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Tyranny",
+      "windowClass": "",
+      "displayName": "Tyranny",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Pathfinder_Kingmaker",
+      "windowClass": "",
+      "displayName": "Pathfinder: Kingmaker",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "PathfinderWrathOfTheRighteous",
+      "windowClass": "",
+      "displayName": "Pathfinder: Wrath of the Righteous",
+      "aliases": [
+        "Pathfinder WotR"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Wasteland2",
+      "windowClass": "",
+      "displayName": "Wasteland 2",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Wasteland3",
+      "windowClass": "",
+      "displayName": "Wasteland 3",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "GrimDawn",
+      "windowClass": "",
+      "displayName": "Grim Dawn",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Torchlight2",
+      "windowClass": "",
+      "displayName": "Torchlight II",
+      "aliases": [
+        "Torchlight 2"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Shogun2",
+      "windowClass": "",
+      "displayName": "Total War: SHOGUN 2",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Rome2",
+      "windowClass": "",
+      "displayName": "Total War: ROME II",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Attila",
+      "windowClass": "",
+      "displayName": "Total War: ATTILA",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Three_Kingdoms",
+      "windowClass": "",
+      "displayName": "Total War: THREE KINGDOMS",
+      "aliases": [
+        "3K"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Warhammer2",
+      "windowClass": "",
+      "displayName": "Total War: WARHAMMER II",
+      "aliases": [
+        "TWWH2"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "AoE3DE",
+      "windowClass": "",
+      "displayName": "Age of Empires III: DE",
+      "aliases": [
+        "AoE3"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "AOMRetold",
+      "windowClass": "",
+      "displayName": "Age of Mythology: Retold",
+      "aliases": [
+        "AOM"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "TheyAreBillions",
+      "windowClass": "",
+      "displayName": "They Are Billions",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Northgard",
+      "windowClass": "",
+      "displayName": "Northgard",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "DuneSpiceWars",
+      "windowClass": "",
+      "displayName": "Dune: Spice Wars",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "AgeOfWonders4",
+      "windowClass": "",
+      "displayName": "Age of Wonders 4",
+      "aliases": [
+        "AoW4"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Humankind",
+      "windowClass": "",
+      "displayName": "HUMANKIND",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "ck2",
+      "windowClass": "",
+      "displayName": "Crusader Kings II",
+      "aliases": [
+        "CK2"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Anno1800",
+      "windowClass": "",
+      "displayName": "Anno 1800",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Tropico6",
+      "windowClass": "",
+      "displayName": "Tropico 6",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "TwoPointHospital",
+      "windowClass": "",
+      "displayName": "Two Point Hospital",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "TwoPointCampus",
+      "windowClass": "",
+      "displayName": "Two Point Campus",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "SurvivingMars",
+      "windowClass": "",
+      "displayName": "Surviving Mars",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "PrisonArchitect",
+      "windowClass": "",
+      "displayName": "Prison Architect",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Banished",
+      "windowClass": "",
+      "displayName": "Banished",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "PlanetCoaster",
+      "windowClass": "",
+      "displayName": "Planet Coaster",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "PlanetBase",
+      "windowClass": "",
+      "displayName": "Planetbase",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Frostpunk",
+      "windowClass": "",
+      "displayName": "Frostpunk",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "AgainstTheStorm",
+      "windowClass": "",
+      "displayName": "Against the Storm",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Icarus",
+      "windowClass": "",
+      "displayName": "Icarus",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "gmod",
+      "windowClass": "",
+      "displayName": "Garry's Mod",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "EnterTheGungeon",
+      "windowClass": "",
+      "displayName": "Enter the Gungeon",
+      "aliases": [
+        "ETG"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "isaac-ng",
+      "windowClass": "",
+      "displayName": "The Binding of Isaac: Rebirth",
+      "aliases": [
+        "BoI"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "RogueLegacy2",
+      "windowClass": "",
+      "displayName": "Rogue Legacy 2",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "CryptOfTheNecroDancer",
+      "windowClass": "",
+      "displayName": "Crypt of the NecroDancer",
+      "aliases": [
+        "CotND"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "LoopHero",
+      "windowClass": "",
+      "displayName": "Loop Hero",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "CultOfTheLamb",
+      "windowClass": "",
+      "displayName": "Cult of the Lamb",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "HiFiRush",
+      "windowClass": "",
+      "displayName": "Hi-Fi RUSH",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Psychonauts2",
+      "windowClass": "",
+      "displayName": "Psychonauts 2",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "BombRushCyberfunk",
+      "windowClass": "",
+      "displayName": "Bomb Rush Cyberfunk",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "KatanaZERO",
+      "windowClass": "",
+      "displayName": "Katana ZERO",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Broforce",
+      "windowClass": "",
+      "displayName": "Broforce",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "RainWorld",
+      "windowClass": "",
+      "displayName": "Rain World",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Starbound",
+      "windowClass": "",
+      "displayName": "Starbound",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Astroneer",
+      "windowClass": "",
+      "displayName": "Astroneer",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "MK11",
+      "windowClass": "",
+      "displayName": "Mortal Kombat 11",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Injustice2",
+      "windowClass": "",
+      "displayName": "Injustice 2",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "GuiltyGearStrive",
+      "windowClass": "",
+      "displayName": "GUILTY GEAR -STRIVE-",
+      "aliases": [
+        "GGST"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Tekken7",
+      "windowClass": "",
+      "displayName": "TEKKEN 7",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "StreetFighterV",
+      "windowClass": "",
+      "displayName": "Street Fighter V",
+      "aliases": [
+        "SFV"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Brawlhalla",
+      "windowClass": "",
+      "displayName": "Brawlhalla",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "FIFA22",
+      "windowClass": "",
+      "displayName": "FIFA 22",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "FIFA21",
+      "windowClass": "",
+      "displayName": "FIFA 21",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "NBA2K24",
+      "windowClass": "",
+      "displayName": "NBA 2K24",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "NBA2K23",
+      "windowClass": "",
+      "displayName": "NBA 2K23",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "WWE2K24",
+      "windowClass": "",
+      "displayName": "WWE 2K24",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Madden24",
+      "windowClass": "",
+      "displayName": "Madden NFL 24",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Amnesia",
+      "windowClass": "",
+      "displayName": "Amnesia: The Dark Descent",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Soma",
+      "windowClass": "",
+      "displayName": "SOMA",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Outlast",
+      "windowClass": "",
+      "displayName": "Outlast",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Outlast2",
+      "windowClass": "",
+      "displayName": "Outlast 2",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "LittleNightmares",
+      "windowClass": "",
+      "displayName": "Little Nightmares",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "TheEvilWithin",
+      "windowClass": "",
+      "displayName": "The Evil Within",
+      "aliases": [
+        "TEW"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "evilwithin2",
+      "windowClass": "",
+      "displayName": "The Evil Within 2",
+      "aliases": [
+        "TEW2"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "re7",
+      "windowClass": "",
+      "displayName": "Resident Evil 7",
+      "aliases": [
+        "RE7"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "AlanWake",
+      "windowClass": "",
+      "displayName": "Alan Wake",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "QuantumBreak",
+      "windowClass": "",
+      "displayName": "Quantum Break",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Hellblade",
+      "windowClass": "",
+      "displayName": "Hellblade: Senua's Sacrifice",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Hellblade2",
+      "windowClass": "",
+      "displayName": "Hellblade II: Senua's Saga",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "JurassicWorldEvolution",
+      "windowClass": "",
+      "displayName": "Jurassic World Evolution",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "DCS",
+      "windowClass": "",
+      "displayName": "DCS World",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "NFSHeat",
+      "windowClass": "",
+      "displayName": "Need for Speed Heat",
+      "aliases": [
+        "NFS Heat"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "TheCrew2",
+      "windowClass": "",
+      "displayName": "The Crew 2",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "TheCrewMotorfest",
+      "windowClass": "",
+      "displayName": "The Crew Motorfest",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "DirtRally2",
+      "windowClass": "",
+      "displayName": "DiRT Rally 2.0",
+      "aliases": [
+        "DR2"
+      ],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "Dirt5",
+      "windowClass": "",
+      "displayName": "DiRT 5",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "GridLegends",
+      "windowClass": "",
+      "displayName": "GRID Legends",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "rFactor2",
+      "windowClass": "",
+      "displayName": "rFactor 2",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "iRacingSimulator",
+      "windowClass": "",
+      "displayName": "iRacing",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "F123",
+      "windowClass": "",
+      "displayName": "F1 23",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
+    },
+    {
+      "processName": "HaloWars2",
+      "windowClass": "",
+      "displayName": "Halo Wars 2",
+      "aliases": [],
+      "backends": [
+        "wgc",
+        "dxgi",
+        "hybrid"
+      ]
     }
+  ],
+  "nonGames": [
+    "explorer",
+    "SearchHost",
+    "Taskmgr",
+    "regedit",
+    "msconfig",
+    "resmon",
+    "perfmon",
+    "dxdiag",
+    "mstsc",
+    "dwm",
+    "winlogon",
+    "csrss",
+    "lsass",
+    "services",
+    "svchost",
+    "SystemSettings",
+    "startmenuexperiencehost",
+    "searchapp",
+    "shellexperiencehost",
+    "widgetsexe",
+    "RuntimeBroker",
+    "backgroundTaskHost",
+    "textinputhost",
+    "compattelrunner",
+    "ctfmon",
+    "dllhost",
+    "smartscreen",
+    "taskhostw",
+    "wininit",
+    "fontdrvhost",
+    "LockApp",
+    "LogonUI",
+    "SearchUI",
+    "gamebar",
+    "gamebarpresencewriter",
+    "GamingServices",
+    "chrome",
+    "msedge",
+    "firefox",
+    "opera",
+    "brave",
+    "vivaldi",
+    "yandex",
+    "tor",
+    "waterfox",
+    "palemoon",
+    "arc",
+    "sidekick",
+    "iridium",
+    "maxthon",
+    "msedgewebview2",
+    "edgewebview2",
+    "Code",
+    "code-insiders",
+    "cursor",
+    "windsurf",
+    "zed",
+    "vscodium",
+    "codium",
+    "notepad++",
+    "devenv",
+    "visualstudio",
+    "idea64",
+    "rider64",
+    "pycharm64",
+    "goland64",
+    "clion64",
+    "webstorm64",
+    "datagrip64",
+    "webstorm",
+    "eclipse",
+    "netbeans",
+    "androidstudio",
+    "studio64",
+    "unity",
+    "unityhub",
+    "blender",
+    "maya",
+    "3dsmax",
+    "acad",
+    "Revit",
+    "SketchUp",
+    "SLDWORKS",
+    "FreeCAD",
+    "photoshop",
+    "photoshopele",
+    "illustrator",
+    "premiere",
+    "afterfx",
+    "indesign",
+    "lightroom",
+    "audition",
+    "davinciresolve",
+    "filmora",
+    "vegas",
+    "kdenlive",
+    "shotcut",
+    "obs64",
+    "obs32",
+    "streamlabs",
+    "XSplitBroadcaster",
+    "ffmpeg",
+    "ffprobe",
+    "docker",
+    "podman",
+    "kubectl",
+    "minikube",
+    "vagrant",
+    "terraform",
+    "git",
+    "gitbash",
+    "gitk",
+    "lazygit",
+    "node",
+    "npm",
+    "npx",
+    "pnpm",
+    "yarn",
+    "bun",
+    "deno",
+    "python",
+    "pip",
+    "conda",
+    "dotnet",
+    "powershell",
+    "pwsh",
+    "cmd",
+    "wt",
+    "windowsTerminal",
+    "conhost",
+    "wsl",
+    "wslhost",
+    "bash",
+    "zsh",
+    "nvim",
+    "vim",
+    "emacs",
+    "atom",
+    "sublime_text",
+    "notepad",
+    "wordpad",
+    "write",
+    "mspaint",
+    "snippingtool",
+    "vlc",
+    "mpv",
+    "mpc-hc",
+    "mpc-be",
+    "potplayer",
+    "kmplayer",
+    "smplayer",
+    "kodi",
+    "plex",
+    "jellyfin",
+    "darktable",
+    "gimp",
+    "krita",
+    "inkscape",
+    "audacity",
+    "foobar2000",
+    "winamp",
+    "spotify",
+    "deezer",
+    "discord",
+    "slack",
+    "msteams",
+    "telegram",
+    "whatsapp",
+    "signal",
+    "zoom",
+    "skype",
+    "skypeforbusiness",
+    "lync",
+    "wechat",
+    "qq",
+    "viber",
+    "element",
+    "thunderbird",
+    "outlook",
+    "winword",
+    "excel",
+    "powerpnt",
+    "onenote",
+    "msaccess",
+    "mspub",
+    "wps",
+    "wpp",
+    "et",
+    "wpspdf",
+    "onedrive",
+    "onedrivesetup",
+    "dropbox",
+    "megasync",
+    "pcloud",
+    "GoogleDriveFS",
+    "nextcloud",
+    "syncthing",
+    "steam",
+    "steamwebhelper",
+    "steamservice",
+    "steamclient",
+    "epicgameslauncher",
+    "epicwebhelper",
+    "EABackgroundService",
+    "eadesktop",
+    "origin",
+    "ealink",
+    "battlenet",
+    "agent",
+    "goggalaxy",
+    "riotclient",
+    "riotclientservices",
+    "minecraft launcher",
+    "Playnite.Desktop",
+    "heroic",
+    "Notion",
+    "Obsidian",
+    "Logseq",
+    "HandBrake",
+    "Notepad3",
+    "ShareX",
+    "Greenshot",
+    "snagit",
+    "reaper",
+    "calibre",
+    "SumatraPDF",
+    "Acrobat",
+    "FoxitReader",
+    "Twitch Studio",
+    "ccleaner",
+    "hwinfo64",
+    "hwinfo32",
+    "cpuz",
+    "gpuz",
+    "MSIAfterburner",
+    "RTSS",
+    "processhacker",
+    "procexp64",
+    "procmon64",
+    "Everything",
+    "VirtualBox",
+    "VBoxHeadless",
+    "vmware",
+    "vmware-vmx",
+    "vmnat",
+    "com.docker.backend",
+    "lghub",
+    "lghub_agent",
+    "RazerCentral",
+    "RazerSynapse3",
+    "SteelSeriesGG",
+    "iCUE",
+    "radeonsoftware",
+    "nvcontainer",
+    "GeForceExperience",
+    "easyanticheat",
+    "BEService",
+    "avgui",
+    "avast",
+    "avastui",
+    "msmpeng",
+    "avp",
+    "ekrn",
+    "cmdagent",
+    "protonvpn",
+    "nordvpn",
+    "openvpn",
+    "wireguard",
+    "tailscale",
+    "mullvad",
+    "TeamViewer",
+    "AnyDesk",
+    "rustdesk",
+    "parsec",
+    "Moonlight",
+    "Sunshine",
+    "remoting_host"
   ]
 }

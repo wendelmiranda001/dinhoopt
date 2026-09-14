@@ -102,6 +102,9 @@
   "needTwoClips": "Precisa de pelo menos 2 clipes para mesclar",
   "noiseSuppression": "Redução de Ruído",
   "adaptiveQuality": "Qualidade Adaptativa",
+  "calibrationActive": "Qualidade adaptativa — perfil calibrado da máquina: {{tier}}",
+  "droppedFrames": "Frames perdidos",
+  "droppedFramesTooltip": "Quadros descartados nesta sessão de captura. 'GPU' indica descartes por encoder ocupado (gpuBusyDrops)."
   "stretchToFit": "Remover bordas pretas",
   "stretchToFitTooltip": "Estica a imagem para preencher o quadro 16:9, removendo as barras pretas (letterbox). Desativa a preservação da proporção — pode distorcer a imagem se o jogo rodar em resolução diferente.",
   "sharpness": "Nitidez",

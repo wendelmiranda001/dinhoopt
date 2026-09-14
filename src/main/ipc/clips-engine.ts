@@ -41,6 +41,7 @@ let _engineReplayBufferAudioPackets = 0
 let _engineReplayBufferAudioBytes = 0
 let _engineDroppedFrames = 0
 let _engineGpuBusyDrops = 0
+let _engineCalibrationTier = ''
 
 // ─── Lazy getter for getCurrentStatus (breaks circular dep) ───
 
@@ -83,6 +84,7 @@ function statusUpdater(src: Record<string, unknown>): void {
   if (typeof src.replayBufferAudioBytes === 'number') _engineReplayBufferAudioBytes = src.replayBufferAudioBytes
   if (typeof src.droppedFrames === 'number') _engineDroppedFrames = src.droppedFrames
   if (typeof src.gpuBusyDrops === 'number') _engineGpuBusyDrops = src.gpuBusyDrops
+  if (typeof src.calibrationTier === 'string') _engineCalibrationTier = src.calibrationTier
   if (typeof src.outputDirectory === 'string' && src.outputDirectory) {
     const engineDir = src.outputDirectory as string
     if (C.outputDirectory && C.outputDirectory !== engineDir) {
@@ -133,6 +135,7 @@ export function readEngineStatus(): {
   replayBufferAudioBytes: number
   droppedFrames: number
   gpuBusyDrops: number
+  calibrationTier: string
 } {
   return {
     capturing: _engineCapturing,
@@ -152,6 +155,7 @@ export function readEngineStatus(): {
     replayBufferAudioBytes: _engineReplayBufferAudioBytes,
     droppedFrames: _engineDroppedFrames,
     gpuBusyDrops: _engineGpuBusyDrops,
+    calibrationTier: _engineCalibrationTier,
   }
 }
 

@@ -115,7 +115,10 @@ public sealed partial class EngineCoordinator
                 // Calibração por capacidade da máquina (defaults calibrados p/ PCs fracos)
                 // roda ANTES do RamManager — que continua ajustando em runtime por cima.
                 // Override explícito do usuário sempre vence. Não persiste em disco.
-                TryApplyMachineCalibration(_config, out _);
+                var calibrationApplied = TryApplyMachineCalibration(_config, out var appliedTier);
+                var calibrationTier = calibrationApplied ? appliedTier.ToString() : "";
+                if (calibrationApplied)
+                    Log.I("EngineCoordinator", $"Calibração de máquina aplicada: tier={calibrationTier}");
 
                 // RamManager — resolve o perfil ANTES de criar o encoder, para que a
                 // qualidade configurada pelo usuário (Cq/Maxrate/Bufsize/Bframes/Lookahead)
@@ -207,6 +210,7 @@ public sealed partial class EngineCoordinator
                     s.Recording = true;
                     s.Encoder = _encoder.GetType().Name.Replace("Encoder", "");
                     s.ActivePipelines = 1;
+                    s.CalibrationTier = calibrationTier;
                 });
 
                 string encodedDesc = _outputWidth > 0 ? $"{_outputWidth}x{_outputHeight}" : $"{_captureWidth}x{_captureHeight}";
@@ -337,7 +341,11 @@ public sealed partial class EngineCoordinator
                 _dxgiManager?.Dispose();
                 _dxgiManager = null;
 
-                _status.Update(s => s.Recording = false);
+                _status.Update(s =>
+                {
+                    s.Recording = false;
+                    s.CalibrationTier = "";
+                });
             }
         }
     }
@@ -437,7 +445,11 @@ public sealed partial class EngineCoordinator
             _dxgiManager?.Dispose();
             _dxgiManager = null;
 
-            _status.Update(s => s.Recording = false);
+            _status.Update(s =>
+            {
+                s.Recording = false;
+                s.CalibrationTier = "";
+            });
             Log.I("EngineCoordinator", "Captura parada.");
 
             // Restaura visibilidade da janela DnHo no recording

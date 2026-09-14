@@ -48,6 +48,8 @@ export interface ClipsEngineStatus {
   replayBufferAudioBytes?: number
   droppedFrames?: number
   gpuBusyDrops?: number
+  /** Perfil calibrado da máquina aplicado na última captura (Weak/Medium/Strong) */
+  calibrationTier?: string
 }
 
 export interface ClipInfo {

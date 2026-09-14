@@ -1,5 +1,6 @@
 import { ChevronDown } from 'lucide-react'
 import { useState } from 'react'
+import { QUALITY_PRESETS, type QualityPresetKey } from './clips-quality-presets'
 import { TogglePill } from './clips-utils'
 import type { ClipsState } from './useClipsState'
 
@@ -53,68 +54,20 @@ export function QualitySection({
     <div className="space-y-3">
       {/* Quick Preset */}
       <div className="flex gap-1.5">
-        {[
-          {
-            id: 'muito-alta',
-            label: t('presetMuitoAlta'),
-            sub: 'CQ 16 \u00b7 1080p',
-            icon: '\u25cf\u25cf\u25cf',
-            config: {
-              cq: 16,
-              maxrateKbps: 65000,
-              bufsizeKbps: 130000,
-              encoderPreset: 'p5',
-              bframes: 3,
-              lookahead: 16,
-              bitrateKbps: 65000,
-              width: 1920,
-              height: 1080,
-              fps: 60,
-            },
-          },
-          {
-            id: 'alta',
-            label: t('presetAlta'),
-            sub: 'CQ 18 \u00b7 1080p',
-            icon: '\u25cf\u25cf\u25cb',
-            config: {
-              cq: 18,
-              maxrateKbps: 55000,
-              bufsizeKbps: 110000,
-              encoderPreset: 'p5',
-              bframes: 2,
-              lookahead: 16,
-              bitrateKbps: 55000,
-              width: 1920,
-              height: 1080,
-              fps: 60,
-            },
-          },
-          {
-            id: 'boa',
-            label: t('presetBoa'),
-            sub: 'CQ 20 \u00b7 720p',
-            icon: '\u25cf\u25cb\u25cb',
-            config: {
-              cq: 20,
-              maxrateKbps: 40000,
-              bufsizeKbps: 80000,
-              encoderPreset: 'p5',
-              bframes: 2,
-              lookahead: 16,
-              bitrateKbps: 40000,
-              width: 1280,
-              height: 720,
-              fps: 60,
-            },
-          },
-        ].map((p) => {
-          const active = config.cq === p.config.cq && config.maxrateKbps === p.config.maxrateKbps
+        {(
+          [
+            { id: 'muito-alta', label: t('presetMuitoAlta'), sub: 'CQ 16 \u00b7 1080p', icon: '\u25cf\u25cf\u25cf' },
+            { id: 'alta', label: t('presetAlta'), sub: 'CQ 18 \u00b7 1080p', icon: '\u25cf\u25cf\u25cb' },
+            { id: 'boa', label: t('presetBoa'), sub: 'CQ 20 \u00b7 720p', icon: '\u25cf\u25cb\u25cb' },
+          ] as Array<{ id: QualityPresetKey; label: string; sub: string; icon: string }>
+        ).map((p) => {
+          const preset = QUALITY_PRESETS[p.id]
+          const active = config.cq === preset.cq && config.maxrateKbps === preset.maxrateKbps
           return (
             <button
               key={p.id}
               type="button"
-              onClick={() => handleConfigUpdate(p.config)}
+              onClick={() => handleConfigUpdate(preset)}
               className={`group relative flex-1 rounded-xl border px-2.5 py-2 text-left transition-all ${
                 active ? 'border-transparent' : 'hover:border-white/10'
               }`}
@@ -431,6 +384,14 @@ export function QualitySection({
             onToggle={() => handleConfigUpdate({ adaptiveQuality: !(config.adaptiveQuality ?? true) })}
           />
         </div>
+        {(config.adaptiveQuality ?? true) && _status.calibrationTier ? (
+          <div
+            className="mt-2 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[10px]"
+            style={{ background: 'rgba(59,130,246,0.12)', color: '#60a5fa' }}
+          >
+            <span>{t('calibrationActive', { tier: _status.calibrationTier })}</span>
+          </div>
+        ) : null}
       </div>
 
       {/* Buffer Usage */}

@@ -1656,5 +1656,16 @@ public sealed partial class EngineCoordinator
         "Flameshot", "Gyazo", "Monosnap",
     };
 
+    static EngineCoordinator()
+    {
+        MergeCatalogNonGames();
+    }
+
+    private static void MergeCatalogNonGames()
+    {
+        foreach (var process in GameDatabase.ReadCatalogNonGames())
+            NonGameProcesses.Add(process);
+    }
+
     private const uint WS_EX_NOREDIRECTIONBITMAP = 0x00200000;
 }

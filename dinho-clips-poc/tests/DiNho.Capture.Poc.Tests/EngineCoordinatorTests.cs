@@ -9,6 +9,7 @@ using DiNho.Capture.Poc.Watchdog;
 
 namespace DiNho.Capture.Poc.Tests;
 
+[Collection("VideoPacketPool")]
 public sealed class EngineCoordinatorTests
 {
     private static readonly Type CoordinatorType = typeof(EngineCoordinator);
@@ -1444,6 +1445,7 @@ public sealed class EngineCoordinatorTests
     public void PostSaveTrim_TrimsIdleToQuarterOfMaxIdleBytes()
     {
         const long maxIdleBytes = 8L * 1024 * 1024;
+        var originalMaxIdleBytes = VideoPacketPool.MaxIdleBytes;
         VideoPacketPool.MaxIdleBytes = maxIdleBytes;
         VideoPacketPool.ResetForTest();
         try
@@ -1462,6 +1464,7 @@ public sealed class EngineCoordinatorTests
         finally
         {
             VideoPacketPool.ResetForTest();
+            VideoPacketPool.MaxIdleBytes = originalMaxIdleBytes;
         }
     }
 

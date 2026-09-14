@@ -23,6 +23,8 @@ public class GameDatabase
     public int Version { get; set; }
     [System.Text.Json.Serialization.JsonPropertyName("games")]
     public List<GameEntry> Games { get; set; } = [];
+    [System.Text.Json.Serialization.JsonPropertyName("nonGames")]
+    public List<string> NonGames { get; set; } = [];
 
     private Dictionary<string, GameEntry> _byWindowClass = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, GameEntry> _byProcessName = new(StringComparer.OrdinalIgnoreCase);
@@ -53,13 +55,7 @@ public class GameDatabase
         if (!string.IsNullOrEmpty(jsonPath))
             candidates.Add(jsonPath);
 
-        var baseDir = AppContext.BaseDirectory;
-        candidates.Add(Path.Combine(baseDir, "games.json"));
-
-        // Also try project root for development
-        var projectRoot = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", ".."));
-        candidates.Add(Path.Combine(projectRoot, "dinho-clips-poc", "src", "DiNho.Capture.Poc", "games.json"));
-        candidates.Add(Path.Combine(projectRoot, "games.json"));
+        candidates.AddRange(CatalogPaths());
 
         foreach (var candidate in candidates)
         {
@@ -73,6 +69,7 @@ public class GameDatabase
                     {
                         Games = db.Games;
                         Version = db.Version;
+                        NonGames = db.NonGames;
                         BuildIndexes();
                         _loaded = true;
                         Log.I("GameDatabase", $"Loaded {Games.Count} games from {candidate}");
@@ -88,6 +85,44 @@ public class GameDatabase
 
             Log.W("GameDatabase", "No games.json found, using hardcoded fallback");
         }
+    }
+
+    private static IEnumerable<string> CatalogPaths()
+    {
+        var baseDir = AppContext.BaseDirectory;
+        yield return Path.Combine(baseDir, "games.json");
+
+        var projectRoot = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", ".."));
+        yield return Path.Combine(projectRoot, "dinho-clips-poc", "src", "DiNho.Capture.Poc", "games.json");
+        yield return Path.Combine(projectRoot, "games.json");
+    }
+
+    // Lê o catálogo da nonGames do arquivo físico, independente do estado de
+    // instância/lazy-load, para que o merge no EngineCoordinator seja determinístico.
+    public static HashSet<string> ReadCatalogNonGames()
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var candidate in CatalogPaths())
+        {
+            try
+            {
+                if (!File.Exists(candidate)) continue;
+                var json = File.ReadAllText(candidate);
+                var db = JsonSerializer.Deserialize<GameDatabase>(json);
+                if (db?.NonGames is { Count: > 0 })
+                {
+                    foreach (var process in db.NonGames)
+                        result.Add(process);
+                    return result;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.E("GameDatabase", $"Failed to read nonGames from {candidate}: {ex.Message}");
+            }
+        }
+
+        return result;
     }
 
     private void BuildIndexes()

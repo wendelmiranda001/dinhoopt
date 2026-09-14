@@ -12,7 +12,7 @@ public sealed class NalParsingTests
         var method = typeof(FfmpegEncoder).GetMethod("FindAnnexBAccessUnitBoundary",
             BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(method);
-        return (int)method!.Invoke(null, [buf, len, hadSlice]);
+        return (int)method!.Invoke(null, [buf, len, hadSlice])!;
     }
 
     private static bool InvokeCheckKeyFrame(FfmpegEncoder encoder, byte[] data)
@@ -23,7 +23,7 @@ public sealed class NalParsingTests
         return (bool)method!.Invoke(encoder, [data])!;
     }
 
-    private static void SetEncoderField(FfmpegEncoder encoder, string fieldName, object value)
+    private static void SetEncoderField(FfmpegEncoder encoder, string fieldName, object? value)
     {
         var field = typeof(FfmpegEncoder).GetField(fieldName,
             BindingFlags.NonPublic | BindingFlags.Instance);
@@ -41,7 +41,7 @@ public sealed class NalParsingTests
 
     private static FfmpegEncoder CreateEncoderForTest()
     {
-        var enc = (FfmpegEncoder)System.Runtime.Serialization.FormatterServices
+        var enc = (FfmpegEncoder)System.Runtime.CompilerServices.RuntimeHelpers
             .GetUninitializedObject(typeof(FfmpegEncoder));
         var bf = BindingFlags.NonPublic | BindingFlags.Instance;
         typeof(FfmpegEncoder).GetField("_outputChannel", bf)!.SetValue(enc,

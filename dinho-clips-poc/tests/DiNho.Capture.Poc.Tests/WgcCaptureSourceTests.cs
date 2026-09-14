@@ -292,7 +292,7 @@ public sealed class WgcCaptureSourceTests
             // o RCW seria desconectado e o QI a seguir falharia com
             // RPC_E_DISCONNECTED (0x80010108) ou retornaria erro.
             var iidIUnknown = Guid.Parse("00000000-0000-0000-C000-000000000046");
-            var hr = Marshal.QueryInterface(ptr, ref iidIUnknown, out var ppv);
+            var hr = Marshal.QueryInterface(ptr, in iidIUnknown, out var ppv);
             try
             {
                 Assert.Equal(0, hr);

@@ -222,7 +222,7 @@ public sealed class ConfigManagerTests
     {
         var cfg = CreateClean();
 
-        cfg.Update(c => c.HotkeyBindings = null);
+        cfg.Update(c => c.HotkeyBindings = null!);
 
         Assert.NotNull(cfg.Config.HotkeyBindings);
         Assert.Empty(cfg.Config.HotkeyBindings);

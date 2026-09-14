@@ -32,7 +32,8 @@ public sealed class EngineCoordinatorGameTests : IDisposable
 
     private static EngineCoordinator CreateUninitialized()
     {
-        return (EngineCoordinator)FormatterServices.GetUninitializedObject(typeof(EngineCoordinator));
+        return (EngineCoordinator)System.Runtime.CompilerServices.RuntimeHelpers
+            .GetUninitializedObject(typeof(EngineCoordinator));
     }
 
     private static void SetField(EngineCoordinator coord, string name, object? value)
@@ -102,7 +103,9 @@ public sealed class EngineCoordinatorGameTests : IDisposable
         SetField(coord, "_appliedGameAudioOnly", false);
         SetField(coord, "_appliedGameAudioPid", 0);
         SetField(coord, "_dinhoHwnds", new List<IntPtr>());
+        #pragma warning disable CS9216 // falso positivo: SetValue(reflection) exige object; prod relê o campo como Lock (EnterScope).
         SetField(coord, "_pipelineLock", new System.Threading.Lock());
+#pragma warning restore CS9216
         SetField(coord, "_status", new EngineStatus());
         SetField(coord, "_buffer", new ReplayBuffer(TimeSpan.FromSeconds(30)));
         SetField(coord, "_gameDetector", new GameDetector());
@@ -124,7 +127,9 @@ public sealed class EngineCoordinatorGameTests : IDisposable
         SetField(coord, "_deviceLost", false);
         SetField(coord, "_hasEverBeenHealthy", false);
         SetField(coord, "_starvationStart", default(DateTime));
+        #pragma warning disable CS9216 // falso positivo: idem _pipelineLock acima.
         SetField(coord, "_exportLock", new System.Threading.Lock());
+#pragma warning restore CS9216
         SetField(coord, "_exportInProgress", false);
         SetField(coord, "_ramManager", null);
         SetField(coord, "_loopbackSource", null);
@@ -136,7 +141,9 @@ public sealed class EngineCoordinatorGameTests : IDisposable
         SetField(coord, "_cleanupTimer", null);
         SetField(coord, "_audioMixerGeneration", 0);
         SetField(coord, "_restartPending", false);
+        #pragma warning disable CS9216 // falso positivo: SetValue(reflection) exige object; prod relê o campo como Lock (EnterScope).
         SetField(coord, "_restartLock", new System.Threading.Lock());
+#pragma warning restore CS9216
         SetField(coord, "_highResTimerEnabled", false);
         SetField(coord, "_mfStarted", false);
         SetField(coord, "_audioFallback", false);
@@ -679,7 +686,7 @@ public sealed class EngineCoordinatorGameTests : IDisposable
         var result = InvokeResolveTargetGame(coord);
         Assert.IsType<GameInfo>(result);
         var target = GetField<GameInfo>(coord, "_captureTargetGame");
-        Assert.False(target.IsValid);
+        Assert.False(target!.IsValid);
     }
 
     [Fact]
@@ -784,7 +791,7 @@ public sealed class EngineCoordinatorGameTests : IDisposable
 
         InvokeOnGameChanged(coord, game);
 
-        var lastDetected = GetField<GameInfo>(coord, "_lastDetectedGame");
+        var lastDetected = GetField<GameInfo>(coord, "_lastDetectedGame")!;
         Assert.Equal("FiveM", lastDetected.ProcessName);
     }
 
@@ -813,7 +820,7 @@ public sealed class EngineCoordinatorGameTests : IDisposable
 
         InvokeOnGameChanged(coord, game);
 
-        var lastDetected = GetField<GameInfo>(coord, "_lastDetectedGame");
+        var lastDetected = GetField<GameInfo>(coord, "_lastDetectedGame")!;
         Assert.Equal("FiveM", lastDetected.ProcessName);
     }
 
@@ -1062,7 +1069,7 @@ public sealed class EngineCoordinatorGameTests : IDisposable
         var game = new GameInfo();
         InvokeOnGameChanged(coord, game);
 
-        var lastDetected = GetField<GameInfo>(coord, "_lastDetectedGame");
+        var lastDetected = GetField<GameInfo>(coord, "_lastDetectedGame")!;
         Assert.Equal("FiveM", lastDetected.ProcessName);
     }
 

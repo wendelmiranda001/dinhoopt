@@ -551,6 +551,48 @@ describe('getCurrentStatus', () => {
     expect(s.droppedFrames).toBe(7)
     expect(s.gpuBusyDrops).toBe(3)
   })
+
+  it('includes machine calibration tier when provided', async () => {
+    const child = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as never)
+    vi.mocked(existsSync).mockReturnValue(true)
+    await startEngine()
+
+    triggerPipeData(
+      `${JSON.stringify({
+        cmd: '_event',
+        payload: {
+          type: 'engineStatus',
+          calibrationTier: 'Strong',
+        },
+      })}\n`,
+    )
+    const s = getCurrentStatus()
+    expect(s.calibrationTier).toBe('Strong')
+  })
+
+  it('ignores non-string calibrationTier (typeof guard)', async () => {
+    const child = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as never)
+    vi.mocked(existsSync).mockReturnValue(true)
+    await startEngine()
+
+    triggerPipeData(
+      `${JSON.stringify({
+        cmd: '_event',
+        payload: { type: 'engineStatus', calibrationTier: 'Medium' },
+      })}\n`,
+    )
+    // Now send a non-string — should be ignored, keeping the previous valid value
+    triggerPipeData(
+      `${JSON.stringify({
+        cmd: '_event',
+        payload: { type: 'engineStatus', calibrationTier: 123 },
+      })}\n`,
+    )
+    const s = getCurrentStatus()
+    expect(s.calibrationTier).toBe('Medium')
+  })
 })
 
 // ─── sendPipeCommand ───────────────────────────────────────

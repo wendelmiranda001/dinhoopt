@@ -2,6 +2,7 @@ using DiNho.Capture.Poc.Encoders;
 
 namespace DiNho.Capture.Poc.Tests;
 
+[Collection("VideoPacketPool")]
 public sealed class VideoPacketPoolTests : IDisposable
 {
     private const long DefaultMaxIdleBytes = 256L * 1024 * 1024;

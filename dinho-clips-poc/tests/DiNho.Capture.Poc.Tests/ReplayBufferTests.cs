@@ -3,6 +3,7 @@ using DiNho.Capture.Poc.Encoders;
 
 namespace DiNho.Capture.Poc.Tests;
 
+[Collection("VideoPacketPool")]
 public sealed class ReplayBufferTests
 {
     private static string TempDir()
@@ -241,7 +242,7 @@ public sealed class ReplayBufferTests
 
         // endOffset = 30s → cutoff = 9.5s → only newest frame matches
         var (all2, _) = buf.GetSegments(endOffset: TimeSpan.FromSeconds(30));
-        Assert.Equal(1, all2.Count);
+        Assert.Single(all2);
     }
 
     [Fact]
@@ -711,9 +712,10 @@ public sealed class ReplayBufferTests
             var (_, audio) = buf.GetSegments();
             Assert.Single(audio);
             Assert.NotNull(audio[0].PcmSamples);
-            Assert.Equal(pcm.Length, audio[0].PcmSamples!.Length);
+            var samples = audio[0].PcmSamples!;
+            Assert.Equal(pcm.Length, samples.Length);
             for (int i = 0; i < pcm.Length; i++)
-                Assert.Equal(pcm[i], audio[0].PcmSamples[i]);
+                Assert.Equal(pcm[i], samples[i]);
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
@@ -1035,7 +1037,7 @@ public sealed class ReplayBufferTests
     }
 
     [Fact]
-    public void DiskSpill_ConcurrentAddAndGet_NoDeadlock()
+    public async Task DiskSpill_ConcurrentAddAndGet_NoDeadlock()
     {
         var dir = TempDir();
         try
@@ -1065,7 +1067,7 @@ public sealed class ReplayBufferTests
                 reads++;
             }
 
-            t.Wait();
+            await t;
             Assert.True(reads > 0, "Reader loop should have completed while writer ran");
         }
         finally { try { Directory.Delete(dir, true); } catch { } }

@@ -23,7 +23,8 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
     private static EngineCoordinator CreateUninitialized()
     {
-        return (EngineCoordinator)FormatterServices.GetUninitializedObject(typeof(EngineCoordinator));
+        return (EngineCoordinator)System.Runtime.CompilerServices.RuntimeHelpers
+            .GetUninitializedObject(typeof(EngineCoordinator));
     }
 
     private static void SetField(EngineCoordinator coord, string name, object? value)
@@ -62,7 +63,9 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
         SetField(coord, "_captureActive", false);
         SetField(coord, "_recording", false);
         SetField(coord, "_dinhoHwnds", new List<IntPtr>());
+        #pragma warning disable CS9216 // falso positivo: SetValue(reflection) exige object; prod relê o campo como Lock (EnterScope).
         SetField(coord, "_pipelineLock", new Lock());
+#pragma warning restore CS9216
         SetField(coord, "_watchdog", new PipelineWatchdog());
         SetField(coord, "_buffer", CreateTestBuffer());
         SetField(coord, "_status", new EngineStatus());
@@ -101,8 +104,10 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
         SetField(coord, "_cleanupTimer", null);
         SetField(coord, "_audioMixerGeneration", 0);
         SetField(coord, "_restartPending", false);
+        #pragma warning disable CS9216 // falso positivo: o mesmo do _pipelineLock acima.
         SetField(coord, "_restartLock", new System.Threading.Lock());
         SetField(coord, "_exportLock", new System.Threading.Lock());
+#pragma warning restore CS9216
         SetField(coord, "_exportInProgress", false);
         SetField(coord, "_highResTimerEnabled", false);
         SetField(coord, "_mfStarted", false);
@@ -1507,7 +1512,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
     #region ReinitializePipelineAsync
 
     [Fact]
-    public void ReinitializePipelineAsync_NotActive_SetsNeedsReinitFalse()
+    public async Task ReinitializePipelineAsync_NotActive_SetsNeedsReinitFalse()
     {
         var coord = CreateWithMinimalDeps();
         SetField(coord, "_captureActive", false);
@@ -1518,7 +1523,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         // ReinitializePipelineAsync is async Task
         var task = (Task)method.Invoke(coord, null)!;
-        task.Wait(TimeSpan.FromSeconds(3));
+        await task;
 
         Assert.False(GetField<bool>(coord, "_needsReinit"));
     }
@@ -1741,6 +1746,15 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
         using var status = new EngineStatus();
         status.Update(s => s.GpuBusyDrops = 42);
         Assert.Equal(42, status.Current.GpuBusyDrops);
+    }
+
+    [Fact]
+    public void EngineStatus_CalibrationTier_CanUpdate()
+    {
+        using var status = new EngineStatus();
+        Assert.Equal("", status.Current.CalibrationTier);
+        status.Update(s => s.CalibrationTier = "Strong");
+        Assert.Equal("Strong", status.Current.CalibrationTier);
     }
 
     private sealed class RecordingLogger : ILogger

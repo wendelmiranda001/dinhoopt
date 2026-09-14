@@ -18,7 +18,7 @@ public sealed class FfmpegEncoderTests
         return (T)field!.GetValue(encoder)!;
     }
 
-    private static void SetField(FfmpegEncoder encoder, string name, object value)
+    private static void SetField(FfmpegEncoder encoder, string name, object? value)
     {
         var field = typeof(FfmpegEncoder).GetField(name, BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.NotNull(field);

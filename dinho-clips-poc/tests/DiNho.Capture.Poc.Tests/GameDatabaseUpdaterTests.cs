@@ -5,6 +5,7 @@ using System.Text.Json;
 
 namespace DiNho.Capture.Poc.Tests;
 
+[Collection("GlobalGameState")]
 public sealed class GameDatabaseUpdaterTests : IDisposable
 {
     private readonly MockHandler _mockHandler;
@@ -28,6 +29,15 @@ public sealed class GameDatabaseUpdaterTests : IDisposable
 
     public void Dispose()
     {
+        // Updater tests Reload the process-global GameDatabase.Instance with a
+        // temp games.json (often a single game). Restore the real ship DB so later
+        // tests (e.g. KnownGames/GameInfo lookups) see the full catalog again.
+        var builtIn = Path.Combine(AppContext.BaseDirectory, "games.json");
+        if (File.Exists(builtIn))
+        {
+            GameDatabase.Instance.Reload(builtIn);
+        }
+
         _httpClient.Dispose();
         _mockHandler.Dispose();
         try { Directory.Delete(_tempDir, recursive: true); } catch { }

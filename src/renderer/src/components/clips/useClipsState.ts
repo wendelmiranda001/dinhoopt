@@ -3,6 +3,7 @@ import type { TFunction } from 'i18next'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { QUALITY_PRESETS, type QualityPresetKey } from './clips-quality-presets'
 import type { FilterTab } from './clips-utils'
 import { formatClipsDate, formatClipsSeconds, formatClipsSize, useClipsActions } from './useClipsActions'
 
@@ -76,43 +77,8 @@ export interface ClipsState {
   formatSize: (bytes: number) => string
   formatDate: (iso: string) => string
   formatSeconds: (s: number) => string
+  QUALITY_PRESETS: Record<QualityPresetKey, Partial<ClipsConfig>>
   t: TFunction<'clips'>
-}
-
-export const QUALITY_PRESETS: Record<string, Partial<ClipsConfig>> = {
-  'muito-alta': {
-    cq: 16,
-    maxrateKbps: 65000,
-    bufsizeKbps: 130000,
-    encoderPreset: 'p5',
-    bframes: 3,
-    lookahead: 16,
-    width: 1920,
-    height: 1080,
-    fps: 60,
-  },
-  alta: {
-    cq: 18,
-    maxrateKbps: 55000,
-    bufsizeKbps: 110000,
-    encoderPreset: 'p5',
-    bframes: 2,
-    lookahead: 16,
-    width: 1920,
-    height: 1080,
-    fps: 60,
-  },
-  boa: {
-    cq: 20,
-    maxrateKbps: 40000,
-    bufsizeKbps: 80000,
-    encoderPreset: 'p5',
-    bframes: 2,
-    lookahead: 16,
-    width: 1280,
-    height: 720,
-    fps: 60,
-  },
 }
 
 export function useClipsState(): ClipsState {

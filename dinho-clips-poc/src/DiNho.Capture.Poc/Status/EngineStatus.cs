@@ -25,6 +25,9 @@ public sealed class EngineStatusSnapshot
     public string OutputDirectory { get; set; } = "";
     public long DroppedFrames { get; set; } = 0;
     public long GpuBusyDrops { get; set; } = 0;
+
+    /// <summary>Perfil calibrado da máquina ("Weak"/"Medium"/"Strong"); "" = não aplicado.</summary>
+    public string CalibrationTier { get; set; } = "";
 }
 
 public sealed class EngineStatus : IDisposable
@@ -86,6 +89,7 @@ public sealed class EngineStatus : IDisposable
                 AudioFallback = _current.AudioFallback,
                 OutputDirectory = _current.OutputDirectory,
                 DroppedFrames = _current.DroppedFrames,
+                CalibrationTier = _current.CalibrationTier,
             };
             OnStatusUpdate?.Invoke(snapshot);
             Heartbeat();

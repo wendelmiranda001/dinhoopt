@@ -142,6 +142,9 @@ public sealed class EngineStatusValue
 
     [JsonPropertyName("gpuBusyDrops")]
     public long GpuBusyDrops { get; set; } = 0;
+
+    [JsonPropertyName("calibrationTier")]
+    public string CalibrationTier { get; set; } = "";
 }
 
 public sealed class NamedPipeServer : IDisposable

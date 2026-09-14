@@ -262,6 +262,7 @@ public sealed partial class EngineCoordinator
                 OutputDirectory = _config.Config.OutputDirectory,
                 DroppedFrames = s.DroppedFrames,
                 GpuBusyDrops = s.GpuBusyDrops,
+                CalibrationTier = s.CalibrationTier,
             }
         };
     }

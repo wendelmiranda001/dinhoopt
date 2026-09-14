@@ -299,4 +299,38 @@ public sealed class NonGameProcessesTests
         Assert.Contains("vnc", set);
         Assert.Contains("remotedesktop", set);
     }
+
+    [Fact]
+    public void NonGameProcesses_MergesCatalogNonGames()
+    {
+        var field = typeof(EngineCoordinator).GetField("NonGameProcesses",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+
+        var set = field.GetValue(null) as HashSet<string>;
+        Assert.NotNull(set);
+
+        // Entradas que existem APENAS no catálogo games.json ("nonGames"), não no literal C#.
+        Assert.Contains("HandBrake", set);
+        Assert.Contains("heroic", set);
+        Assert.Contains("gamebarpresencewriter", set);
+    }
+
+    [Fact]
+    public void NonGameProcesses_MergeDoesNotAddGames()
+    {
+        var field = typeof(EngineCoordinator).GetField("NonGameProcesses",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+
+        var set = field.GetValue(null) as HashSet<string>;
+        Assert.NotNull(set);
+
+        Assert.DoesNotContain("FiveM", set);
+        Assert.DoesNotContain("Fortnite", set);
+        Assert.DoesNotContain("cs2", set);
+        Assert.DoesNotContain("valorant", set);
+        Assert.DoesNotContain("GTA5", set);
+        Assert.DoesNotContain("Minecraft", set);
+    }
 }

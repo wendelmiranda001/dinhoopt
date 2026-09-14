@@ -117,4 +117,35 @@ public sealed class GameDatabaseTests
         // games.json should have version >= 2
         Assert.True(db.Version >= 2, $"Expected version >= 2, got {db.Version}");
     }
+
+    [Fact]
+    public void LoadGameDatabase_FromJson_LoadsNonGames()
+    {
+        var db = new GameDatabase();
+        var baseDir = AppContext.BaseDirectory;
+        var gamesJson = Path.Combine(baseDir, "games.json");
+        db.Load(gamesJson);
+
+        Assert.True(db.NonGames.Count >= 100, $"Expected >= 100 nonGames from JSON, got {db.NonGames.Count}");
+        Assert.Contains("HandBrake", db.NonGames);
+        Assert.Contains("heroic", db.NonGames);
+        Assert.Contains("gamebarpresencewriter", db.NonGames);
+    }
+
+    [Fact]
+    public void ReadCatalogNonGames_ReturnsDedupedSet()
+    {
+        var set = GameDatabase.ReadCatalogNonGames();
+
+        Assert.Contains("HandBrake", set);
+        Assert.Contains("heroic", set);
+        Assert.Contains("gamebarpresencewriter", set);
+        // Never has the games-boundary tests' game names
+        Assert.DoesNotContain("FiveM", set);
+        Assert.DoesNotContain("Fortnite", set);
+        Assert.DoesNotContain("cs2", set);
+        Assert.DoesNotContain("valorant", set);
+        Assert.DoesNotContain("GTA5", set);
+        Assert.DoesNotContain("Minecraft", set);
+    }
 }

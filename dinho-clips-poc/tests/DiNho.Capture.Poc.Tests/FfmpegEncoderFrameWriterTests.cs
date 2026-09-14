@@ -10,6 +10,7 @@ using Xunit;
 
 namespace DiNho.Capture.Poc.Tests;
 
+[Collection("VideoPacketPool")]
 public class FfmpegEncoderFrameWriterTests
 {
     public FfmpegEncoderFrameWriterTests() => VideoPacketPool.ResetForTest();

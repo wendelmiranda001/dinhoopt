@@ -220,7 +220,8 @@ public sealed class NamedPipeServerTests
                 ReplayBufferVideoBytes = 500000000,
                 ReplayBufferAudioPackets = 18000,
                 ReplayBufferAudioBytes = 36870912,
-                OutputDirectory = "C:\\Users\\test\\DiNhoClips"
+                OutputDirectory = "C:\\Users\\test\\DiNhoClips",
+                CalibrationTier = "Medium"
             }
         };
 
@@ -240,6 +241,7 @@ public sealed class NamedPipeServerTests
         Assert.True(dataElement.GetProperty("audioFallback").GetBoolean());
         Assert.Equal(1024, dataElement.GetProperty("memoryMB").GetInt32());
         Assert.Equal(536870912, dataElement.GetProperty("replayBufferBytes").GetInt64());
+        Assert.Equal("Medium", dataElement.GetProperty("calibrationTier").GetString());
     }
 
     // ── EngineStatusValue defaults ──────────────────────────────────
@@ -248,6 +250,7 @@ public sealed class NamedPipeServerTests
     [InlineData(nameof(EngineStatusValue.CaptureBackend), "DXGI")]
     [InlineData(nameof(EngineStatusValue.Encoder), "NONE")]
     [InlineData(nameof(EngineStatusValue.OutputDirectory), "")]
+    [InlineData(nameof(EngineStatusValue.CalibrationTier), "")]
     public void EngineStatusValue_DefaultStringFields(string propName, string expected)
     {
         var val = new EngineStatusValue();
@@ -420,8 +423,8 @@ public sealed class NamedPipeServerTests
         // MaxBroadcastQueueSize = 1000
         Assert.Equal(1000, queue.Count);
         // oldest was trimmed
-        Assert.False(queue.Contains("msg0"));
-        Assert.True(queue.Contains("msg1001"));
+        Assert.DoesNotContain("msg0", queue);
+        Assert.Contains("msg1001", queue);
     }
 
     [Fact]
@@ -473,8 +476,8 @@ public sealed class NamedPipeServerTests
 
         // MaxLongRunningResultQueueSize = 32
         Assert.Equal(32, queue.Count);
-        Assert.False(queue.Contains("msg0"));
-        Assert.True(queue.Contains("msg33"));
+        Assert.DoesNotContain("msg0", queue);
+        Assert.Contains("msg33", queue);
     }
 
     // ── Long-running commands ───────────────────────────────────────
@@ -554,7 +557,7 @@ public sealed class NamedPipeServerTests
         var payload = env.Payload!.Value;
         Assert.Equal("commandResult", payload.GetProperty("type").GetString());
         Assert.Equal("saveClip", payload.GetProperty("originalCmd").GetString());
-        Assert.NotNull(payload.GetProperty("value"));
+        Assert.NotEqual(JsonValueKind.Undefined, payload.GetProperty("value").ValueKind);
     }
 
     [Fact]
@@ -750,7 +753,8 @@ public sealed class NamedPipeServerTests
             WatchdogOk = true,
             MemoryMB = 512,
             ReplayBufferBytes = 256000,
-            OutputDirectory = "C:\\Clips"
+            OutputDirectory = "C:\\Clips",
+            CalibrationTier = "Strong"
         };
 
         var json = JsonSerializer.Serialize(val);
@@ -764,5 +768,6 @@ public sealed class NamedPipeServerTests
         Assert.Equal(16.67, parsed.LastFrameMs, 2);
         Assert.Equal(1024000, parsed.LastClipSize);
         Assert.Equal("C:\\Clips", parsed.OutputDirectory);
+        Assert.Equal("Strong", parsed.CalibrationTier);
     }
 }

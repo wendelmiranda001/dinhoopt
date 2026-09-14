@@ -143,7 +143,9 @@ public sealed class AudioMixerTests
             SampleRate = sampleRate;
             Channels = channels;
         }
-        public void Start() { }
+        public void Start() {
+            OnAudioData = _ => { };
+        }
         public void Stop() { }
         public void Dispose() { }
     }

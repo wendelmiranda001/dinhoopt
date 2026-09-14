@@ -34,7 +34,7 @@ public sealed class FfmpegAacEncoderTests
     }
 
     [Fact]
-    public void EncodeAudio_ConcurrentWriters_SerializeWrites()
+    public async Task EncodeAudio_ConcurrentWriters_SerializeWrites()
     {
         var spy = new ConcurrentSpyStream();
         var encoder = new FfmpegAacEncoder(spy, writeTimeoutMs: 500);
@@ -59,7 +59,7 @@ public sealed class FfmpegAacEncoderTests
         });
 
         gate.Set();
-        Task.WaitAll(t1, t2);
+        await Task.WhenAll(t1, t2);
 
         Assert.False(spy.SawConcurrentWrite,
             "Dois writers nunca devem escrever no stdin do AAC simultaneamente (race do _pcmBuf).");
