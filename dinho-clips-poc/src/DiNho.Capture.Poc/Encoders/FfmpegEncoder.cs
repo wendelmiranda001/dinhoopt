@@ -709,6 +709,9 @@ internal sealed partial class FfmpegEncoder : IEncoder
     /// <summary>Frames descartados por overflow da fila de entrada do writer (drop-oldest).</summary>
     public int InputQueueDroppedFrames => _frameWriter?.DroppedOverflow ?? 0;
 
+    /// <summary>Frames atualmente enfileirados no writer (aguardando escrita no stdin).</summary>
+    public int QueueDepth => _frameWriter?.QueuedCount ?? 0;
+
     // ── O3 callbacks do FrameWriter (rodam na thread FfmpegInput) ──────────
 
     private void OnFrameWrittenToStdin(TimeSpan pts)

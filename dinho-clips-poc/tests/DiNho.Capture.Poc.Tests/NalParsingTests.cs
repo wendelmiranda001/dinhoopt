@@ -1621,6 +1621,121 @@ public sealed class NalParsingTests
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // ProcessIvfFrames (AV1)
+    // ═══════════════════════════════════════════════════════════════════
+
+    private static EncodedPacket? InvokeProcessIvfFrames(FfmpegEncoder encoder, byte[] frameBlock)
+    {
+        SetEncoderField(encoder, "_ivfHeaderParsed", true);
+        SetEncoderField(encoder, "_ivfTimebaseDen", 1000u);
+        SetEncoderField(encoder, "_ivfTimebaseNum", 1u);
+        SetEncoderField(encoder, "_rawBuf", frameBlock);
+        SetEncoderField(encoder, "_rawLen", frameBlock.Length);
+        SetEncoderField(encoder, "_outputFrameIndex", 0);
+        SetEncoderField(encoder, "_codec", "av1_nvenc");
+
+        var method = typeof(FfmpegEncoder).GetMethod("ProcessIvfFrames",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(method);
+        method!.Invoke(encoder, null);
+
+        var channel = (System.Threading.Channels.ChannelReader<EncodedPacket>)GetEncoderField(encoder, "_outputChannel").GetType()
+            .GetProperty("Reader")!.GetValue(GetEncoderField(encoder, "_outputChannel"))!;
+        return channel.TryRead(out var pkt) ? pkt : null;
+    }
+
+    private static byte[] BuildIvfFrameBlock(long ptsIvf, byte[] payload)
+    {
+        var block = new byte[12 + payload.Length];
+        BitConverter.GetBytes(payload.Length).CopyTo(block, 0);
+        BitConverter.GetBytes(ptsIvf).CopyTo(block, 4);
+        System.Buffer.BlockCopy(payload, 0, block, 12, payload.Length);
+        return block;
+    }
+
+    [Fact]
+    public void ProcessIvfFrames_PrefersRealCapturePts_OverContainerPts()
+    {
+        var enc = CreateEncoderForTest();
+        SetEncoderField(enc, "_codec", "av1_nvenc");
+        var realPts = TimeSpan.FromMilliseconds(5500);
+        ((System.Collections.Concurrent.ConcurrentQueue<TimeSpan>)GetEncoderField(enc, "_inputPtsQueue")).Enqueue(realPts);
+
+        // Container diz 250ms (frame-index sintético), mas o PTS real de captura é 5500ms.
+        var packet = InvokeProcessIvfFrames(enc, BuildIvfFrameBlock(ptsIvf: 250, payload: [0x12, 0x00, 0x00]))!;
+
+        Assert.NotNull(packet);
+        Assert.Equal(5500, packet.Pts.TotalMilliseconds);
+    }
+
+    [Fact]
+    public void ProcessIvfFrames_ExtrapolatesFromLastRealPts_WhenQueueEmpty()
+    {
+        var enc = CreateEncoderForTest();
+        SetEncoderField(enc, "_codec", "av1_nvenc");
+        SetEncoderField(enc, "_lastRealPtsTicks", TimeSpan.FromSeconds(5).Ticks);
+
+        var packet = InvokeProcessIvfFrames(enc, BuildIvfFrameBlock(ptsIvf: 250, payload: [0x12, 0x00, 0x00]))!;
+
+        Assert.NotNull(packet);
+        // Extrapola do último PTS real: 5000ms + dur (timebase 1/1000 = 1ms).
+        Assert.Equal(5001, packet.Pts.TotalMilliseconds);
+    }
+
+    [Fact]
+    public void ProcessIvfFrames_RealPtsAreConsumedInOrder_AcrossFrames()
+    {
+        var enc = CreateEncoderForTest();
+        SetEncoderField(enc, "_codec", "av1_nvenc");
+        var queue = (System.Collections.Concurrent.ConcurrentQueue<TimeSpan>)GetEncoderField(enc, "_inputPtsQueue");
+        queue.Enqueue(TimeSpan.FromSeconds(10.0));
+        queue.Enqueue(TimeSpan.FromSeconds(10.0).Add(TimeSpan.FromMilliseconds(16.6)));
+
+        // Dois frames no mesmo bloco raw (layout IVF: só o payload varia).
+        var p1 = new byte[] { 0x12, 0x00, 0x00 };
+        var p2 = new byte[] { 0x13, 0x00, 0x00 };
+        var block = new byte[2 * (12 + p1.Length)];
+        BitConverter.GetBytes(p1.Length).CopyTo(block, 0);
+        System.Buffer.BlockCopy(p1, 0, block, 12, p1.Length);
+        int off = 12 + p1.Length;
+        BitConverter.GetBytes(p2.Length).CopyTo(block, off);
+        System.Buffer.BlockCopy(p2, 0, block, off + 12, p2.Length);
+
+        SetEncoderField(enc, "_ivfHeaderParsed", true);
+        SetEncoderField(enc, "_ivfTimebaseDen", 1000u);
+        SetEncoderField(enc, "_ivfTimebaseNum", 1u);
+        SetEncoderField(enc, "_rawBuf", block);
+        SetEncoderField(enc, "_rawLen", block.Length);
+        SetEncoderField(enc, "_outputFrameIndex", 0);
+
+        typeof(FfmpegEncoder).GetMethod("ProcessIvfFrames",
+            BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(enc, null);
+
+        var reader = (System.Threading.Channels.ChannelReader<EncodedPacket>)GetEncoderField(enc, "_outputChannel").GetType()
+            .GetProperty("Reader")!.GetValue(GetEncoderField(enc, "_outputChannel"))!;
+        Assert.True(reader.TryRead(out var first));
+        Assert.True(reader.TryRead(out var second));
+        Assert.Equal(10_000, first.Pts.TotalMilliseconds);
+        Assert.Equal(10_016.6, second.Pts.TotalMilliseconds, 1);
+    }
+
+    [Fact]
+    public void ProcessIvfFrames_CorrectsNonMonotonicRealPts()
+    {
+        var enc = CreateEncoderForTest();
+        SetEncoderField(enc, "_codec", "av1_nvenc");
+        SetEncoderField(enc, "_lastRealPtsTicks", TimeSpan.FromSeconds(9).Ticks);
+        var realPts = TimeSpan.FromMilliseconds(4000);
+        ((System.Collections.Concurrent.ConcurrentQueue<TimeSpan>)GetEncoderField(enc, "_inputPtsQueue")).Enqueue(realPts);
+
+        var packet = InvokeProcessIvfFrames(enc, BuildIvfFrameBlock(ptsIvf: 250, payload: [0x12, 0x00, 0x00]))!;
+
+        Assert.NotNull(packet);
+        // PTS real (4000ms) é menor que o último emitido (9000ms) → corrige para prevPts+1 tick.
+        Assert.Equal(TimeSpan.FromSeconds(9).Ticks + 1, packet.Pts.Ticks);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // Cross-method: AnnexB → AVCC roundtrip validation
     // ═══════════════════════════════════════════════════════════════════
 

@@ -1180,6 +1180,24 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
     #endregion
 
+    #region D3D11 device driver type
+
+    [Theory]
+    [InlineData(false, Vortice.Direct3D.DriverType.Hardware)]
+    [InlineData(true, Vortice.Direct3D.DriverType.Unknown)]
+    public void SelectDeviceDriverType_AdapterProvided_RulesDriverType(bool adapterProvided, Vortice.Direct3D.DriverType expected)
+    {
+        Assert.Equal(expected, EngineCoordinator.SelectDeviceDriverType(adapterProvided));
+    }
+
+    [Fact]
+    public void SelectDeviceDriverType_NullAdapter_ReturnsHardware()
+    {
+        Assert.Equal(Vortice.Direct3D.DriverType.Hardware, EngineCoordinator.SelectDeviceDriverType(null));
+    }
+
+    #endregion
+
     #region ToggleCapture
 
     [Fact]

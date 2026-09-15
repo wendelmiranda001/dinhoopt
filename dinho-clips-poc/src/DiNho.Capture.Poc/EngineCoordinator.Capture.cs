@@ -30,6 +30,20 @@ public sealed partial class EngineCoordinator
     }
 
     /// <summary>
+    /// Regra D3D11: quando um <see cref="IDXGIAdapter"/> é passado explicitamente
+    /// para D3D11CreateDevice, o <see cref="DriverType"/> DEVE ser Unknown —
+    /// Hardware + adapter não-nulo retorna E_INVALIDARG (0x80070057). Adapter nulo
+    /// = Windows escolhe o default → Hardware.
+    /// </summary>
+    internal static DriverType SelectDeviceDriverType(IDXGIAdapter? adapter) =>
+        SelectDeviceDriverType(adapter is not null);
+
+    // Overload puro para teste unitário — a regra depende só de "há adapter ou
+    // não", não do adapter em si (não dá para instanciar um IDXGIAdapter fake).
+    internal static DriverType SelectDeviceDriverType(bool adapterProvided) =>
+        adapterProvided ? DriverType.Unknown : DriverType.Hardware;
+
+    /// <summary>
     /// Aplica a estratégia de buffer do <see cref="ReplayBufferMode"/> configurado
     /// sobre o buffer ativo (RAM caps + spill). Extraído de StartCapture para
     /// permitir teste unitário direto por reflexão.
@@ -129,10 +143,25 @@ public sealed partial class EngineCoordinator
                             Log.I("EngineCoordinator", $"D3D11 device usando adapter {resolvedAdapter.Description.Description.TrimEnd('\0')} (AdapterIndex={_config.Config.AdapterIndex})");
                     }
 
+                    // D3D11 exige DriverType.Unknown quando pAdapter != NULL (senão
+                    // retorna E_INVALIDARG -2147024809). Com adapter nulo, o Windows
+                    // escolhe o default → Hardware.
+                    var driverType = SelectDeviceDriverType(resolvedAdapter);
                     var hr = Vortice.Direct3D11.D3D11.D3D11CreateDevice(
-                        resolvedAdapter, DriverType.Hardware, creationFlags,
+                        resolvedAdapter, driverType, creationFlags,
                         new[] { FeatureLevel.Level_11_1, FeatureLevel.Level_11_0 },
                         out _sharedDevice, out _, out _);
+
+                    // Fallback defensivo: o adapter resolvido (monitor do jogo em
+                    // multi-GPU) pode falhar por driver/OEM — tenta o adapter default.
+                    if ((!hr.Success || _sharedDevice is null) && resolvedAdapter is not null)
+                    {
+                        Log.W("EngineCoordinator", $"D3D11CreateDevice({driverType}, adapter resolvido) falhou: {hr} — tentando adapter default");
+                        hr = Vortice.Direct3D11.D3D11.D3D11CreateDevice(
+                            null, DriverType.Hardware, creationFlags,
+                            new[] { FeatureLevel.Level_11_1, FeatureLevel.Level_11_0 },
+                            out _sharedDevice, out _, out _);
+                    }
                     resolvedAdapter?.Dispose();
                     if (!hr.Success || _sharedDevice is null)
                     {
@@ -846,13 +875,16 @@ public sealed partial class EngineCoordinator
                         if (encoded != null)
                         {
                             _buffer.AddVideo(encoded);
-                            var elapsedMs = (Stopwatch.GetTimestamp() - beforeCapture) * 1000.0 / Stopwatch.Frequency;
+                            var afterTicks = Stopwatch.GetTimestamp();
+                            var elapsedMs = (afterTicks - beforeCapture) * 1000.0 / Stopwatch.Frequency;
                             _watchdog.ReportGoodFrame(elapsedMs);
                             _hasEverBeenHealthy = true;
+                            TraceFeedFrame(beforeCapture, frame, afterTicks);
                             LogRecoveryIfDropped();
                         }
                         else
                         {
+                            _feed.AddEncodeNull();
                             _watchdog.ReportDroppedFrame(PipelineIssue.EncodeError);
                             var isBusy = (enc as FfmpegEncoder)?.LastFrameBusyDrop ?? false;
                             ReportDrop(FfmpegEncoder.BuildEncodeDropReason(isBusy));
@@ -886,6 +918,7 @@ public sealed partial class EngineCoordinator
 
                     if (!deferred)
                     {
+                        _feed.AddFailFrame();
                         if (_starvationStart == default)
                         {
                             _starvationStart = DateTime.UtcNow;
@@ -1013,6 +1046,7 @@ public sealed partial class EngineCoordinator
                         s.DroppedFrames = _droppedFrames;
                         s.GpuBusyDrops = (_encoder as FfmpegEncoder)?.GpuBusyDrops ?? 0;
                     });
+                    LogFeedSummary();
                 }
 
                 // Log de RAM a cada ~60 frames (~1s a 60fps) — movido para o topo do
@@ -1069,6 +1103,36 @@ public sealed partial class EngineCoordinator
                      _encoder == null ? "encoder nulo" : "desconhecido";
         Log.E("Pipeline", $"Loop encerrado: {reason} diagFrames={diagFrames} loggedFirstNull={loggedFirstNullFrame} loggedFirstFail={loggedFirstFailFrame}");
         RevertMmThreadPriority();
+    }
+
+    /// <summary>
+    /// Alimenta o <see cref="FeedTelemetry"/> com os tempos por estágio do frame que
+    /// acaba de cruzar o pipeline (wait WGC / copy para o pool / convert+enqueue / total).
+    /// <paramref name="afterTicks"/> é o timestamp logo após AddVideo (janela fecha no total).
+    /// </summary>
+    private void TraceFeedFrame(long beforeCapture, CapturedFrame frame, long afterTicks)
+    {
+        long wait = frame.WaitEndTicks - frame.CaptureStartTicks;
+        long copy = frame.CopyEndTicks - frame.WaitEndTicks;
+        long convert = afterTicks - (frame.CopyEndTicks > 0 ? frame.CopyEndTicks : frame.CaptureStartTicks);
+        long total = afterTicks - beforeCapture;
+        _feed.AddGoodFrame(wait, copy, convert, total);
+        if (_encoder is FfmpegEncoder ff)
+            _feed.AddQueueDepth(ff.QueueDepth);
+    }
+
+    /// <summary>
+    /// Loga o resumo da janela corrente do feed (média wait/copy/convert/total e fps).
+    /// Chamado no bloco de status (~30 frames): a janela do FeedTelemetry decide o cadence.
+    /// </summary>
+    private void LogFeedSummary()
+    {
+        if (!_feed.TryTakeSummary(Stopwatch.GetTimestamp(), out var s))
+            return;
+        Log.I("FeedTelemetry",
+            $"fps={s.FeedFps:F1} good={s.GoodFrames} fail={s.FailFrames} enqNull={s.EncodeNulls} | " +
+            $"wait={s.WaitMs:F1}ms copy={s.CopyMs:F1}ms convert={s.ConvertMs:F1}ms total={s.TotalMs:F1}ms | " +
+            $"queue={s.QueueDepthAvg:F1} avg / {s.QueueDepthMax} max");
     }
 
     /// <summary>

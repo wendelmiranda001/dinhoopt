@@ -263,6 +263,35 @@ internal partial class FfmpegEncoder
             long ptsTicks = ptsIvf * _ivfTimebaseNum * 10_000_000L / _ivfTimebaseDen;
             long durTicks = _ivfTimebaseNum * 10_000_000L / _ivfTimebaseDen;
 
+            // Mesma resolução de PTS da rota AnnexB (EmitPacket): o container IVF traz um PTS
+            // sintético por frame-index (que avança a 60fps fantasma mesmo se a captura alimenta
+            // menos), enquanto o PTS REAL de captura está na _inputPtsQueue. Se usássemos só o
+            // ptsIvf, quando o feed cai para ~46fps o vídeo avança 46/60 do relógio de parede →
+            // drift A/V crescente de ~0,23 s/s (diagnosticado na sessão de drift do pipeline).
+            long prevPts = _lastRealPtsTicks;
+            bool usedExtrapolated = false;
+            if (_inputPtsQueue.TryDequeue(out var realPts))
+            {
+                ptsTicks = realPts.Ticks;
+                _lastRealPtsTicks = ptsTicks;
+            }
+            else if (_lastRealPtsTicks >= 0)
+            {
+                ptsTicks = _lastRealPtsTicks + durTicks;
+                _lastRealPtsTicks = ptsTicks;
+                usedExtrapolated = true;
+            }
+
+            if (prevPts >= 0 && ptsTicks <= prevPts)
+            {
+                ptsTicks = prevPts + 1;
+                _lastRealPtsTicks = ptsTicks;
+                Log.W("FfmpegEncoder", $"ProcessIvfFrames: corrected non-monotonic pts to {ptsTicks / 10000}ms (frameIndex={_outputFrameIndex})");
+            }
+
+            if (usedExtrapolated)
+                Log.D("FfmpegEncoder", $"ProcessIvfFrames: used extrapolated pts {ptsTicks / 10000}ms (frameIndex={_outputFrameIndex})");
+
             byte[] data = VideoPacketPool.Rent(frameSize);
             System.Buffer.BlockCopy(_rawBuf!, 12, data, 0, frameSize);
 

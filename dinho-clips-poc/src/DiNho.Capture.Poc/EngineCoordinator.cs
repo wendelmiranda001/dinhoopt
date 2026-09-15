@@ -78,6 +78,7 @@ public sealed partial class EngineCoordinator : IDisposable
     private CancellationTokenSource? _pipelineCts;
     private Task? _pipelineTask;
     private readonly PipelineWatchdog _watchdog = new();
+    private readonly FeedTelemetry _feed = new();
     private int _reinitCount;
     private volatile bool _needsReinit;
     private volatile bool _hasEverBeenHealthy;
