@@ -1777,4 +1777,109 @@ public sealed class NalParsingTests
         off += idrLen;
         Assert.Equal(off, avccLen);
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // G3-2.2: IVF com frameSize inválido (negativo) — não pode crashar
+    // ═══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ProcessIvfFrames_NegativeFrameSize_DoesNotCrash_AndResetsBuffer()
+    {
+        var enc = CreateEncoderForTest();
+        SetEncoderField(enc, "_codec", "av1_nvenc");
+        SetEncoderField(enc, "_ivfHeaderParsed", true);
+        SetEncoderField(enc, "_ivfTimebaseDen", 1000u);
+        SetEncoderField(enc, "_ivfTimebaseNum", 1u);
+        SetEncoderField(enc, "_outputFrameIndex", 0);
+
+        // Cabeçalho IVF válido, porém frameSize NEGATIVO (corrupção/lixo de captura).
+        // Antes do fix: VideoPacketPool.Rent(−1) lança OverflowException.
+        var block = new byte[16];
+        BitConverter.GetBytes(-1).CopyTo(block, 0); // frameSize = -1
+        BitConverter.GetBytes(0L).CopyTo(block, 4); // ptsIvf
+        block[12] = 0xDE; block[13] = 0xAD; block[14] = 0x12;
+        SetEncoderField(enc, "_rawBuf", block);
+        SetEncoderField(enc, "_rawLen", block.Length);
+
+        var method = typeof(FfmpegEncoder).GetMethod("ProcessIvfFrames",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(method);
+
+        // Não pode lançar (Rent(−1) lançaria). Buffer corrompido é resetado.
+        method!.Invoke(enc, null);
+
+        var reader = (System.Threading.Channels.ChannelReader<EncodedPacket>)GetEncoderField(enc, "_outputChannel").GetType()
+            .GetProperty("Reader")!.GetValue(GetEncoderField(enc, "_outputChannel"))!;
+        Assert.False(reader.TryRead(out _));
+
+        // Buffer corrompido foi resetado (o parser deixa de confiar nos limites).
+        Assert.Equal(0, (int)GetEncoderField(enc, "_rawLen"));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // G3-2.5: Duration do pacote reflete o gap real de PTS (feed < framerate)
+    // ═══════════════════════════════════════════════════════════════════
+
+    private static void SetPendingSlice(FfmpegEncoder enc)
+    {
+        // AVCC slice (nal type 5 = IDR) — satisfaz CheckPendingHasSlice.
+        byte[] nal = [0x00, 0x00, 0x00, 0x03, 0x65, 0x01, 0x02];
+        SetEncoderField(enc, "_pendingBuf", nal);
+        SetEncoderField(enc, "_pendingLen", nal.Length);
+        SetEncoderField(enc, "_hadSlice", true);
+    }
+
+    private static void InvokeEmitPacket(FfmpegEncoder enc)
+    {
+        var method = typeof(FfmpegEncoder).GetMethod("EmitPacket",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(method);
+        method!.Invoke(enc, null);
+    }
+
+    private static System.Threading.Channels.ChannelReader<EncodedPacket> GetOutputReader(FfmpegEncoder enc) =>
+        (System.Threading.Channels.ChannelReader<EncodedPacket>)GetEncoderField(enc, "_outputChannel").GetType()
+            .GetProperty("Reader")!.GetValue(GetEncoderField(enc, "_outputChannel"))!;
+
+    [Fact]
+    public void EmitPacket_PicksUpRealPtsGap_InDuration()
+    {
+        var enc = CreateEncoderForTest();
+        SetEncoderField(enc, "_codec", "h264_nvenc");
+        SetEncoderField(enc, "_lastRealPtsTicks", -1L);
+
+        // Frame 1: PTS real 5000ms, sem PTS anterior → duration nominal (1/60fps).
+        SetPendingSlice(enc);
+        ((System.Collections.Concurrent.ConcurrentQueue<TimeSpan>)GetEncoderField(enc, "_inputPtsQueue"))
+            .Enqueue(TimeSpan.FromMilliseconds(5000));
+        InvokeEmitPacket(enc);
+
+        // Frame 2: PTS real 5050ms → gap de 50ms (feed caiu para ~20fps).
+        SetPendingSlice(enc);
+        ((System.Collections.Concurrent.ConcurrentQueue<TimeSpan>)GetEncoderField(enc, "_inputPtsQueue"))
+            .Enqueue(TimeSpan.FromMilliseconds(5050));
+        InvokeEmitPacket(enc);
+
+        Assert.True(GetOutputReader(enc).TryRead(out var first));
+        Assert.True(GetOutputReader(enc).TryRead(out var second));
+
+        Assert.Equal(16.666, first.Duration.TotalMilliseconds, 0.5);
+        Assert.Equal(50, second.Duration.TotalMilliseconds, 0.5);
+    }
+
+    [Fact]
+    public void ProcessIvfFrames_PicksUpRealPtsGap_InDuration()
+    {
+        var enc = CreateEncoderForTest();
+        SetEncoderField(enc, "_codec", "av1_nvenc");
+        SetEncoderField(enc, "_lastRealPtsTicks", TimeSpan.FromSeconds(5).Ticks);
+        ((System.Collections.Concurrent.ConcurrentQueue<TimeSpan>)GetEncoderField(enc, "_inputPtsQueue"))
+            .Enqueue(TimeSpan.FromMilliseconds(5066.6));
+
+        var packet = InvokeProcessIvfFrames(enc, BuildIvfFrameBlock(ptsIvf: 250, payload: [0x12, 0x00, 0x00]))!;
+
+        Assert.NotNull(packet);
+        // Gap real: 5066.6ms − 5000ms = 66.6ms (não o timebase sintético de 1ms).
+        Assert.Equal(66.6, packet.Duration.TotalMilliseconds, 0.5);
+    }
 }

@@ -1112,6 +1112,63 @@ public sealed class EncoderManagerTests
         }
     }
 
+    // ── G3-2.1: cache de codec com TTL — nunca "gruda" num fallback pra sempre ──
+
+    [Fact]
+    public void CodecCache_CachedEntry_ReturnsIt()
+    {
+        FfmpegEncoder.ResetEncoderCachesForTest();
+        try
+        {
+            FfmpegEncoder.CacheBest("libx264");
+            Assert.True(FfmpegEncoder.TryGetCachedBestCodec(out var codec));
+            Assert.Equal("libx264", codec);
+        }
+        finally { FfmpegEncoder.ResetEncoderCachesForTest(); }
+    }
+
+    [Fact]
+    public void CodecCache_ExpiredTtl_HidesEntry()
+    {
+        FfmpegEncoder.ResetEncoderCachesForTest();
+        long old = FfmpegEncoder.CodecCacheTtlMs;
+        try
+        {
+            FfmpegEncoder.CodecCacheTtlMs = 0;
+            FfmpegEncoder.CacheBest("libx264");
+            Assert.False(FfmpegEncoder.TryGetCachedBestCodec(out _));
+        }
+        finally
+        {
+            FfmpegEncoder.CodecCacheTtlMs = old;
+            FfmpegEncoder.ResetEncoderCachesForTest();
+        }
+    }
+
+    [Fact]
+    public void CodecCache_ResetForTest_ClearsEntry()
+    {
+        FfmpegEncoder.ResetEncoderCachesForTest();
+        try
+        {
+            FfmpegEncoder.CacheBest("hevc_nvenc");
+            FfmpegEncoder.ResetEncoderCachesForTest();
+            Assert.False(FfmpegEncoder.TryGetCachedBestCodec(out _));
+        }
+        finally { FfmpegEncoder.ResetEncoderCachesForTest(); }
+    }
+
+    // ── G3-2.8: CheckFfmpegEncoder duplicado — string vazia NUNCA é "encoder disponível" ──
+
+    [Fact]
+    public void CheckFfmpegEncoder_EmptyString_ReturnsFalseWithoutProbe()
+    {
+        // EncoderManager.CheckFfmpegEncoder("") retornava TRUE porque "".Contains("") == true.
+        // A implementação canônica (com guard de string) deve ser usada por ambas.
+        Assert.False(FfmpegEncoder.CheckFfmpegEncoder(""));
+        Assert.False(EncoderManager.CheckFfmpegEncoder(""));
+    }
+
     private static FfmpegEncoder CreateUninitializedEncoder(bool hardware)
     {
         var enc = (FfmpegEncoder)System.Runtime.CompilerServices.RuntimeHelpers

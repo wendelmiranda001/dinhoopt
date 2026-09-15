@@ -131,31 +131,6 @@ public sealed class FfmpegAacEncoder : IDisposable
             return;
         }
 
-        // Sanitize NaN/Inf + clamp to [-1,1] — FFmpeg AAC encoder crashes on NaN input
-        // and MDCT can overflow on extreme values. This is the single sanitization gate.
-        int badCount = 0;
-        for (int i = 0; i < pcmSamples.Length; i++)
-        {
-            float v = pcmSamples[i];
-            if (float.IsNaN(v) || float.IsInfinity(v))
-            {
-                pcmSamples[i] = 0f;
-                badCount++;
-            }
-            else if (v > 1.0f)
-            {
-                pcmSamples[i] = 1.0f;
-                badCount++;
-            }
-            else if (v < -1.0f)
-            {
-                pcmSamples[i] = -1.0f;
-                badCount++;
-            }
-        }
-        if (badCount > 0 && _pcmWriteErrors <= 3)
-            Log.W("FfmpegAacEncoder", $"Sanitized {badCount} samples (NaN/Inf/clamp) in PCM buffer");
-
         int byteLen = pcmSamples.Length * 4;
 
         // EncodeAudio pode ser chamado por 2 threads WASAPI (loopback + mic) quando o
@@ -166,7 +141,33 @@ public sealed class FfmpegAacEncoder : IDisposable
             if (_pcmBuf == null || _pcmBuf.Length < byteLen)
                 _pcmBuf = new byte[byteLen * 2];
 
-            System.Buffer.BlockCopy(pcmSamples, 0, _pcmBuf, 0, byteLen);
+            // Sanitiza NaN/Inf + clamp para [-1,1] — FFmpeg AAC encoder crasha com NaN
+            // e o MDCT pode transbordar com valores extremos. A gravação vai para o
+            // _pcmBuf (buffer interno); o array do CHAMADOR (AudioMixer reutiliza) NUNCA
+            // é mutado — sanitizar in-place rompia o buffer PCM do mixer no próximo batch.
+            int badCount = 0;
+            for (int i = 0; i < pcmSamples.Length; i++)
+            {
+                float v = pcmSamples[i];
+                if (float.IsNaN(v) || float.IsInfinity(v))
+                {
+                    v = 0f;
+                    badCount++;
+                }
+                else if (v > 1.0f)
+                {
+                    v = 1.0f;
+                    badCount++;
+                }
+                else if (v < -1.0f)
+                {
+                    v = -1.0f;
+                    badCount++;
+                }
+                BitConverter.TryWriteBytes(_pcmBuf.AsSpan(i * 4), v);
+            }
+            if (badCount > 0 && _pcmWriteErrors <= 3)
+                Log.W("FfmpegAacEncoder", $"Sanitized {badCount} samples (NaN/Inf/clamp) in PCM buffer");
 
             // Timeout de escrita: warm-up (primeiro batch) usa timeout generoso para o
             // ffmpeg abrir; estado estável usa timeout estrito — um pipe preso marca

@@ -258,6 +258,22 @@ internal partial class FfmpegEncoder
             long ptsIvf = BitConverter.ToInt64(_rawBuf!, 4);
             int totalFrame = 12 + frameSize;
 
+            // G3: frameSize NEGATIVO = cabeçalho corrompido. Não pode prosseguir
+            // (VideoPacketPool.Rent(−1) lançaria). Reset do buffer força a re-detecção
+            // de formato na próxima leitura, igual ao guard de overflow de 2MB.
+            if (frameSize <= 0)
+            {
+                Log.W("FfmpegEncoder", $"IVF corrupt frame header: frameSize={frameSize} (rawLen={_rawLen}) — resetting buffer");
+                _rawLen = 0;
+                _ivfHeaderParsed = false;
+                _pipeFormat = PipeFormat.Unknown;
+                int drained = 0;
+                while (_inputPtsQueue.TryDequeue(out _)) drained++;
+                if (drained > 0)
+                    Log.W("FfmpegEncoder", $"drained {drained} stale PTS entries (corrupt IVF header)");
+                break;
+            }
+
             if (_rawLen < totalFrame) break;
 
             long ptsTicks = ptsIvf * _ivfTimebaseNum * 10_000_000L / _ivfTimebaseDen;
@@ -273,6 +289,9 @@ internal partial class FfmpegEncoder
             if (_inputPtsQueue.TryDequeue(out var realPts))
             {
                 ptsTicks = realPts.Ticks;
+                // G3: duration reflete o gap REAL de PTS (feed < framerate) em vez do
+                // timebase sintético — o container não dura mais rápido que o relógio.
+                durTicks = ClampRealGap(prevPts, ptsTicks, durTicks);
                 _lastRealPtsTicks = ptsTicks;
             }
             else if (_lastRealPtsTicks >= 0)
@@ -747,6 +766,12 @@ internal partial class FfmpegEncoder
             Log.W("FfmpegEncoder", $"EmitPacket: corrected non-monotonic pts to {pts / 10000}ms (frameIndex={_outputFrameIndex})");
         }
 
+        // G3: quando o feed cai abaixo do framerate nominal, o gap REAL de PTS vira a
+        // duração do frame (senão o container avança mais rápido que o relógio de parede
+        // e o áudio fica dessincronizado na duração). PTS corrigido (não-monotônico) e
+        // gaps anormais continuam com a duração nominal.
+        dur = ClampRealGap(prevPts, pts, dur);
+
         if (usedExtrapolated)
             Log.D("FfmpegEncoder", $"EmitPacket: used extrapolated pts {pts/10000}ms (frameIndex={_outputFrameIndex})");
         bool key = CheckKeyFrame(data);
@@ -763,6 +788,25 @@ internal partial class FfmpegEncoder
         _outputFrameIndex++;
         _pendingLen = 0;
         _hadSlice = false;
+    }
+
+    /// <summary>
+    /// Duração do frame a partir do gap REAL de PTS (feed &lt; framerate). Quando o encoder
+    /// recebe frames com intervalo maior que o nominal (ex.: captura caiu para 46fps), usar
+    /// a duração fixa 1/framerate faz o container avançar mais rápido que o relógio de parede.
+    /// Regras:
+    ///  - PTS ausente (prevPts &lt; 0) → duração nominal (fallback).
+    ///  - Gap real &gt;= nominal e ≤ 100ms → usa o gap (fiel ao feed).
+    ///  - Gap menor que nominal (PTS comprimido/corrigido) ou &gt; 100ms (stall) → nominal.
+    /// </summary>
+    private static long ClampRealGap(long prevPts, long currPts, long fallbackDurTicks)
+    {
+        if (prevPts < 0) return fallbackDurTicks;
+        long delta = currPts - prevPts;
+        const long MaxGapTicks = 1_000_000; // 100ms — acima disso é stall, não frame longo
+        if (delta >= fallbackDurTicks && delta <= MaxGapTicks)
+            return delta;
+        return fallbackDurTicks;
     }
 
     private bool CheckKeyFrame(byte[] data)

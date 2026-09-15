@@ -4,17 +4,83 @@ namespace DiNho.Capture.Poc.Encoders;
 
 internal partial class FfmpegEncoder
 {
+    // Cache estático de detecção (melhor codec + suporte por encoder). G3: passa a ter
+    // VALIDADE LIMITADA (TTL) — antes o cache nunca expirava: se uma sessão caiu para
+    // libx264 (ex.: limite de sessões NVENC), TODAS as sessões seguintes ficavam presas em
+    // CPU mesmo com a GPU liberada. Após o TTL o probe roda de novo e o HW volta a ser usado.
     private static readonly Dictionary<string, bool> _encoderCache = new();
+    private static readonly Dictionary<string, long> _encoderCacheTicks = new();
     private static string? _bestCodecCache;
+    private static long _bestCodecCacheTicks;
     private static readonly Lock _cacheLock = new();
+
+    /// <summary>Validade do cache de detecção (mutable para testes).</summary>
+    internal static long CodecCacheTtlMs = 60_000;
+
+    /// <summary>Limpa os caches estáticos. Uso em testes (estado estático vaza entre testes).</summary>
+    internal static void ResetEncoderCachesForTest()
+    {
+        lock (_cacheLock)
+        {
+            _bestCodecCache = null;
+            _bestCodecCacheTicks = 0;
+            _encoderCache.Clear();
+            _encoderCacheTicks.Clear();
+        }
+    }
+
+    /// <summary>Grava o melhor codec detectado (seam de teste + uso interno).</summary>
+    internal static void CacheBest(string codec)
+    {
+        lock (_cacheLock)
+        {
+            _bestCodecCache = codec;
+            _bestCodecCacheTicks = Environment.TickCount64;
+        }
+    }
+
+    /// <summary>Lê o melhor codec cacheado se ainda dentro do TTL. false = re-probe.</summary>
+    internal static bool TryGetCachedBestCodec(out string codec)
+    {
+        lock (_cacheLock)
+        {
+            if (_bestCodecCache != null && (Environment.TickCount64 - _bestCodecCacheTicks) < CodecCacheTtlMs)
+            {
+                codec = _bestCodecCache;
+                return true;
+            }
+        }
+        codec = "";
+        return false;
+    }
+
+    private static bool TryGetCachedEncoder(string enc, out bool supported)
+    {
+        lock (_cacheLock)
+        {
+            if (_encoderCache.TryGetValue(enc, out supported)
+                && (Environment.TickCount64 - _encoderCacheTicks[enc]) < CodecCacheTtlMs)
+            {
+                return true;
+            }
+        }
+        supported = false;
+        return false;
+    }
+
+    private static void CacheEncoder(string enc, bool supported)
+    {
+        lock (_cacheLock)
+        {
+            _encoderCache[enc] = supported;
+            _encoderCacheTicks[enc] = Environment.TickCount64;
+        }
+    }
 
     private string DetectBestCodec()
     {
         if (!_useHardware) return "libx264";
-        lock (_cacheLock)
-        {
-            if (_bestCodecCache != null) return _bestCodecCache;
-        }
+        if (TryGetCachedBestCodec(out var cached)) return cached;
 
         var vendorId = EncoderManager.DetectEncodingVendorId();
         var userCodec = _codec ?? "auto";
@@ -101,19 +167,11 @@ internal partial class FfmpegEncoder
         return DetectBestCodec();
     }
 
-    private static void CacheBest(string codec)
-    {
-        lock (_cacheLock) { _bestCodecCache ??= codec; }
-    }
-
     private static bool CheckFfmpegEncoderCached(string enc)
     {
-        lock (_cacheLock)
-        {
-            if (_encoderCache.TryGetValue(enc, out var cached)) return cached;
-        }
+        if (TryGetCachedEncoder(enc, out var cached)) return cached;
         var result = CheckFfmpegEncoder(enc);
-        lock (_cacheLock) { _encoderCache[enc] = result; }
+        CacheEncoder(enc, result);
         return result;
     }
 

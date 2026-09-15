@@ -176,24 +176,7 @@ public sealed class EncoderManager : IDisposable
 
     // ── GPU detection ────────────────────────────────────────────────
 
-    public static int DetectGpuVendorId()
-    {
-        try
-        {
-            using var factory = DXGI.CreateDXGIFactory1<IDXGIFactory1>();
-            for (uint i = 0; factory.EnumAdapters1(i, out var adapter).Success; i++)
-            {
-                using (adapter)
-                {
-                    var desc = adapter.Description1;
-                    if (desc.VendorId is 0x10DE or 0x1002 or 0x8086)
-                        return (int)desc.VendorId;
-                }
-            }
-        }
-        catch { }
-        return 0;
-    }
+    public static int DetectGpuVendorId() => DetectEncodingVendorId();
 
     /// <summary>Return list of GPU adapter names and vendor IDs for the UI dropdown.</summary>
     public static List<(int Index, string Name, int VendorId)> GetGpuList()
@@ -877,18 +860,22 @@ public sealed class EncoderManager : IDisposable
                 {
                     Arguments = "--query-gpu=encoder_stats.sessionCount,encoder_stats.maxSessionCount --format=csv,noheader,nounits",
                     RedirectStandardOutput = true,
+                    RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true,
                 }
             };
             process.Start();
             var outputTask = process.StandardOutput.ReadToEndAsync();
+            // G3: stderr redirecionado (não pode poluir o console do app em modo GUI).
+            var errTask = process.StandardError.ReadToEndAsync();
             if (!process.WaitForExit(3000))
             {
                 try { process.Kill(entireProcessTree: true); } catch { }
                 process.WaitForExit(2000);
             }
             var output = outputTask.Result;
+            _ = errTask.Result;
 
             if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(output))
             {
@@ -1118,26 +1105,11 @@ public sealed class EncoderManager : IDisposable
 
     internal static bool CheckFfmpegEncoder(string enc)
     {
-        try
-        {
-            using var p = new Process
-            {
-                StartInfo = FfmpegPathResolver.CreateFfmpegStartInfo(args: "-encoders", redirectOutput: true, redirectError: true)
-            };
-            p.Start();
-            // Leitura concorrente (ver CheckFfmpegAvailable) — evita deadlock de pipe.
-            var outTask = p.StandardOutput.ReadToEndAsync();
-            var errTask = p.StandardError.ReadToEndAsync();
-            if (!p.WaitForExit(2000))
-            {
-                try { p.Kill(entireProcessTree: true); } catch { }
-                p.WaitForExit(2000);
-            }
-            var o = outTask.Result;
-            _ = errTask.Result;
-            return o.Contains(enc, StringComparison.OrdinalIgnoreCase);
-        }
-        catch { return false; }
+        // G3: implementação canônica única (FfmpegEncoder) — a duplicata aqui retornava true
+        // para string VAZIA (o.Contains("") == true) e não tinha guard de whitespace.
+        if (string.IsNullOrWhiteSpace(enc))
+            return false;
+        return FfmpegEncoder.CheckFfmpegEncoder(enc);
     }
 
     public static IEncoder CreateBestEncoder(bool forceSoftware = false, ID3D11Device? sharedDevice = null, int bitrateKbps = 2000)

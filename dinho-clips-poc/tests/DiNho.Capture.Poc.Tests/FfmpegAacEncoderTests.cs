@@ -93,6 +93,30 @@ public sealed class FfmpegAacEncoderTests
     }
 
     [Fact]
+    public void EncodeAudio_DoesNotMutateCallerBuffer()
+    {
+        using var ms = new MemoryStream();
+        var encoder = new FfmpegAacEncoder(ms, writeTimeoutMs: 500);
+
+        var samples = new[] { 0.5f, float.NaN, 2.0f, -2.0f, float.PositiveInfinity, -0.25f };
+        var before = (float[])samples.Clone();
+
+        encoder.EncodeAudio(new float[384]);
+        encoder.EncodeAudio(samples);
+
+        // Sanitização NaN/Inf/clamp não pode gravar no buffer do chamador
+        // (AudioMixer reutiliza o buffer PCM entre batches).
+        for (int i = 0; i < samples.Length; i++)
+        {
+            bool same = float.IsNaN(before[i]) ? float.IsNaN(samples[i])
+                : float.IsInfinity(before[i])
+                    ? float.IsInfinity(samples[i]) && Math.Sign(before[i]) == Math.Sign(samples[i])
+                    : before[i] == samples[i];
+            Assert.True(same, $"índice {i} foi mutado pelo EncodeAudio (before={before[i]}, after={samples[i]})");
+        }
+    }
+
+    [Fact]
     public void ComputeAacWriteTimeout_Warmup_ReturnsGenerousTimeout()
     {
         Assert.Equal(FfmpegAacEncoder.StdinWriteWarmupTimeoutMs, FfmpegAacEncoder.ComputeAacWriteTimeout(0));

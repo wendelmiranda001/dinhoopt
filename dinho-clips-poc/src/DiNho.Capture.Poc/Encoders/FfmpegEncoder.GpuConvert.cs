@@ -175,12 +175,15 @@ internal partial class FfmpegEncoder
         }
 
         var texDesc = texture.Description;
-        // Allow height mismatch of 1 pixel (odd→even rounding in Initialize)
+        // Allow height mismatch of 1 pixel (odd→even rounding in Initialize).
+        // G3: mismatch NÃO descarta o frame permanentemente — cai para a conversão CPU
+        // (que acomoda dims arbitrárias da textura). Antes o frame era dropado até o
+        // restart; um mismatch transiente (stale do pool/res change) custava vídeo.
         if (texDesc.Width != _width || Math.Abs((int)texDesc.Height - _height) > 1)
         {
             _gpuConvertFails++;
-            Log.W("FfmpegEncoder", $"DIM MISMATCH guard: tex={texDesc.Width}x{texDesc.Height} esperado={_width}x{_height} — frame pulado");
-            return null;
+            Log.W("FfmpegEncoder", $"DIM MISMATCH guard: tex={texDesc.Width}x{texDesc.Height} esperado={_width}x{_height} — usando conversão CPU");
+            return ConvertCpuNv12(texture, texture.Device, dst);
         }
 
         // Odd capture height: GpuVideoConverter requires even NV12 dimensions — go straight to CPU fallback
