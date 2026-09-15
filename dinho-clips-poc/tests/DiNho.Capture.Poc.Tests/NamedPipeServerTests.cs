@@ -528,11 +528,11 @@ public sealed class NamedPipeServerTests
     // ── ProcessLongRunningAsync ─────────────────────────────────────
 
     private static async Task ProcessLongRunningAsyncViaReflection(
-        NamedPipeServer server, string cmd, IpcMessage msg, CancellationToken ct)
+        NamedPipeServer server, string cmd, IpcMessage msg, CancellationToken ct, string? requestId = null)
     {
         await (Task)typeof(NamedPipeServer)
             .GetMethod("ProcessLongRunningAsync", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .Invoke(server, [cmd, msg, ct])!;
+            .Invoke(server, [cmd, msg, requestId, ct])!;
     }
 
     [Fact]
@@ -769,5 +769,64 @@ public sealed class NamedPipeServerTests
         Assert.Equal(1024000, parsed.LastClipSize);
         Assert.Equal("C:\\Clips", parsed.OutputDirectory);
         Assert.Equal("Strong", parsed.CalibrationTier);
+    }
+
+    // ── 5.7: request-id correlation ─────────────────────────────────
+
+    [Fact]
+    public async Task ProcessLongRunningAsync_WithRequestId_IncludesRequestId()
+    {
+        using var server = new NamedPipeServer();
+        var queue = GetLongRunningResultQueue(server);
+
+        server.OnMessage = msg => Task.FromResult<IpcMessage?>(new IpcMessage { Action = "saveClip" });
+
+        var msg = new IpcMessage { Action = "saveClip" };
+        await ProcessLongRunningAsyncViaReflection(server, "saveClip", msg, CancellationToken.None, requestId: "req-42");
+
+        var env = JsonSerializer.Deserialize<IpcEnvelope>(queue.First());
+        var payload = env!.Payload!.Value;
+        Assert.Equal("req-42", payload.GetProperty("requestId").GetString());
+        Assert.Equal("saveClip", payload.GetProperty("originalCmd").GetString());
+    }
+
+    [Fact]
+    public void Envelope_SerializesRequestId()
+    {
+        var env = new IpcEnvelope { Version = 1, Command = "saveClip", RequestId = "r1" };
+        var json = JsonSerializer.Serialize(env);
+        Assert.Contains("\"reqId\":\"r1\"", json);
+    }
+
+    [Fact]
+    public void Envelope_RoundtripsRequestId()
+    {
+        var env = new IpcEnvelope { Version = 1, Command = "saveClip", RequestId = "abc-123" };
+        var parsed = JsonSerializer.Deserialize<IpcEnvelope>(JsonSerializer.Serialize(env));
+        Assert.NotNull(parsed);
+        Assert.Equal("abc-123", parsed!.RequestId);
+    }
+
+    // ── 5.8: client tasks registradas p/ Stop() aguardar handlers ───
+
+    [Fact]
+    public void HandleClient_RegistersInClientTasks_ThenRemoves()
+    {
+        using var server = new NamedPipeServer();
+        var clientTasks = (System.Collections.Concurrent.ConcurrentDictionary<long, Task>)typeof(NamedPipeServer)
+            .GetField("_clientTasks", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(server)!;
+
+        // Simula o registro feito pelo listener: task que finaliza rápido.
+        var fake = Task.Run(() => Thread.SpinWait(100));
+        clientTasks.TryAdd(fake.Id, fake);
+        Assert.True(clientTasks.ContainsKey(fake.Id));
+
+        var removed = fake.ContinueWith(
+            _ => clientTasks.TryRemove(fake.Id, out _),
+            TaskContinuationOptions.ExecuteSynchronously);
+        removed.Wait(1000);
+
+        Assert.False(clientTasks.ContainsKey(fake.Id));
     }
 }

@@ -16,8 +16,6 @@ public sealed partial class EngineCoordinator
         {
             "handshake" => HandleHandshake(msg),
             "setReplayTime" => HandleSetReplayTime(msg),
-            "startEngine" => HandleStartEngine(),
-            "stopEngine" => HandleStopEngine(),
             "setCustomGameProcess" => HandleSetCustomGameProcess(msg),
             "config" => HandleConfig(msg),
             "getGpus" => HandleGetGpus(),
@@ -71,16 +69,27 @@ public sealed partial class EngineCoordinator
         return new IpcMessage { Action = "ok" };
     }
 
-    private IpcMessage HandleStartEngine()
+    // 5.1: startEngine/stopEngine agora são AWAITados — o ACK "ok" só sai quando
+    // a operação terminou e erros viram "error" (mensagem neutra p/ não vazar detalhes).
+    private async Task<IpcMessage> HandleEngineLifecycleAsync(string action)
     {
-        _ = StartAsync();
-        return new IpcMessage { Action = "ok" };
-    }
-
-    private IpcMessage HandleStopEngine()
-    {
-        _ = StopAsync();
-        return new IpcMessage { Action = "ok" };
+        try
+        {
+            if (action == "startEngine")
+                await StartAsync();
+            else
+                await StopAsync();
+            return new IpcMessage { Action = "ok" };
+        }
+        catch (Exception ex)
+        {
+            Log.E("EngineCoordinator", $"{action} falhou: {ex.Message}");
+            return new IpcMessage
+            {
+                Action = "error",
+                Value = JsonSerializer.SerializeToElement(new { error = $"{action} failed" })
+            };
+        }
     }
 
     private IpcMessage HandleSetCustomGameProcess(IpcMessage msg)

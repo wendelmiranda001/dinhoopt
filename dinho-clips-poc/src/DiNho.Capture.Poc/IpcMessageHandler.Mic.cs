@@ -50,11 +50,17 @@ public sealed partial class EngineCoordinator
                     {
                         _audioMixer = CreateAudioMixer();
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        // 5.4: antes só fazia _recording=false e relançava — sobrava
+                        // pipeline rodando (zumbi) com estado inconsistente. Marca a
+                        // captura inativa e encerra o pipeline de verdade.
                         _audioMixer = oldMixer;
                         _recording = false;
-                        throw;
+                        _captureActive = false;
+                        Log.E("EngineCoordinator", $"setMicDevice: falha ao recriar o mixer ({ex.Message}) — encerrando captura");
+                        try { StopCapture(); }
+                        catch (Exception stopEx) { Log.W("EngineCoordinator", $"setMicDevice: StopCapture pós-falha falhou: {stopEx.Message}"); }
                     }
 
                     var pttModeAtReinit = PttModeHelper.Normalize(_config.Config.PttMode);

@@ -899,7 +899,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.False(GetField<bool>(coord, "_captureActive"));
     }
@@ -913,7 +913,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.False(GetField<bool>(coord, "_recording"));
     }
@@ -929,7 +929,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         var target = GetField<GameInfo>(coord, "_captureTargetGame");
         Assert.False(target!.IsValid);
@@ -944,7 +944,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.Equal(IntPtr.Zero, GetField<IntPtr>(coord, "_captureTargetHwnd"));
     }
@@ -960,7 +960,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.False(GetField<bool>(coord, "_gameBackgrounded"));
         Assert.Equal(0, GetField<int>(coord, "_bgDropCount"));
@@ -975,7 +975,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.Null(GetField(coord, "_encoder"));
     }
@@ -988,7 +988,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.Null(GetField(coord, "_capture"));
     }
@@ -1001,7 +1001,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.Null(GetField(coord, "_audioMixer"));
     }
@@ -1014,7 +1014,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.Null(GetField(coord, "_aacEncoder"));
     }
@@ -1027,7 +1027,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.Null(GetField(coord, "_sharedDevice"));
     }
@@ -1040,7 +1040,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.Null(GetField(coord, "_wgcPump"));
     }
@@ -1053,7 +1053,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.Null(GetField(coord, "_pipelineCts"));
     }
@@ -1066,7 +1066,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.Null(GetField(coord, "_pipelineTask"));
     }
@@ -1081,7 +1081,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.Equal(0, GetField<int>(coord, "_audioPacketCount"));
         Assert.Equal(0, GetField<int>(coord, "_maxAacDrainCount"));
@@ -1096,7 +1096,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.Null(GetField(coord, "_pttDiagTimer"));
     }
@@ -1109,7 +1109,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.Null(GetField(coord, "_dxgiManager"));
     }
@@ -1124,7 +1124,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         Assert.False(GetField<bool>(coord, "_captureActive"));
     }
@@ -1141,8 +1141,8 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
 
-        method.Invoke(coord, new object[] { false });
-        var ex = Record.Exception(() => method.Invoke(coord, new object[] { false }));
+        method.Invoke(coord, new object[] { false, false });
+        var ex = Record.Exception(() => method.Invoke(coord, new object[] { false, false }));
         Assert.Null(ex);
     }
 
@@ -1155,7 +1155,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var ex = Record.Exception(() => method.Invoke(coord, new object[] { false }));
+        var ex = Record.Exception(() => method.Invoke(coord, new object[] { false, false }));
         Assert.Null(ex);
     }
 
@@ -1227,7 +1227,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
         {
             var stop = CoordinatorType.GetMethod("StopCapture",
                 BindingFlags.Instance | BindingFlags.NonPublic)!;
-            stop.Invoke(coord, new object?[] { true });
+            stop.Invoke(coord, new object?[] { true, false });
         }
     }
 
@@ -1267,7 +1267,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { true });
+        method.Invoke(coord, new object[] { true, false });
 
         var (afterV, afterA, afterDur, _) = buffer.Stats();
         Assert.Equal(0, afterV);
@@ -1290,7 +1290,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        method.Invoke(coord, new object[] { false });
+        method.Invoke(coord, new object[] { false, false });
 
         var (v, a, _, _) = buffer.Stats();
         Assert.Equal(1, v);

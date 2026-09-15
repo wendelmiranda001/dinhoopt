@@ -16,6 +16,11 @@ public sealed class IpcEnvelope
     [JsonPropertyName("cmd")]
     public string Command { get; set; } = "";
 
+    // 5.7: request-id opcional correlaciona respostas assíncronas (commandResult)
+    // ao pedido original — o cliente envia e o engine ecoa na resposta.
+    [JsonPropertyName("reqId")]
+    public string? RequestId { get; set; }
+
     [JsonPropertyName("payload")]
     public JsonElement? Payload { get; set; }
 }
@@ -155,6 +160,10 @@ public sealed class NamedPipeServer : IDisposable
     private readonly ConcurrentQueue<string> _rawBroadcastQueue = new();
     private const int MaxBroadcastQueueSize = 1000;
 
+    // 5.8: client tasks registradas p/ Stop() aguardar o drain dos handlers ativos
+    // (antes só esperava o listener). Chave = Task.Id; limpa via ContinueWith.
+    private readonly ConcurrentDictionary<long, Task> _clientTasks = new();
+
     public Func<IpcMessage, Task<IpcMessage?>>? OnMessage { get; set; }
     public Func<EngineStatusMessage>? GetStatus { get; set; }
 
@@ -186,6 +195,16 @@ public sealed class NamedPipeServer : IDisposable
         _cts?.Cancel();
         _listenerTask?.Wait(2000);
         _listenerTask = null;
+
+        // 5.8: aguarda (com teto) os handlers de clientes ainda vivos para o
+        // drain das filas deles não se perder; útil no shutdown da engine.
+        var clients = _clientTasks.Values.ToArray();
+        if (clients.Length > 0)
+        {
+            try { Task.WaitAll(clients, TimeSpan.FromSeconds(2)); }
+            catch (AggregateException) { /* handler falhou durante shutdown — ok */ }
+            _clientTasks.Clear();
+        }
     }
 
     public void BroadcastRaw(string json)
@@ -222,7 +241,11 @@ public sealed class NamedPipeServer : IDisposable
 
                 var captured = server;
                 server = null;
-                _ = Task.Run(() => HandleClientAsync(captured, ct), ct);
+                var clientTask = Task.Run(() => HandleClientAsync(captured, ct), ct);
+                // 5.8: acompanha o handler até terminar para o Stop() poder aguardá-lo.
+                _clientTasks.TryAdd(clientTask.Id, clientTask);
+                _ = clientTask.ContinueWith(_ => _clientTasks.TryRemove(clientTask.Id, out _),
+                    TaskContinuationOptions.ExecuteSynchronously);
             }
             catch (OperationCanceledException)
             {
@@ -288,14 +311,32 @@ public sealed class NamedPipeServer : IDisposable
                         // If a malicious client sends data without \n, this will
                         // buffer unbounded memory. The 500ms iterationCts timeout
                         // mitigates slowloris-style attacks but not infinite streams.
-                        // For a trusted local IPC channel this is acceptable.
+                        // 5.10: aceitamos essa limitação para IPC local confiável
+                        // (�nico processo, pipe CurrentUserOnly), documentado — não
+                        // há superfície não-trustada nesta porta.
                         var line = await reader.ReadLineAsync(iterationCts.Token);
                         if (line == null) break;
 
                         try
                         {
                             var envelope = JsonSerializer.Deserialize<IpcEnvelope>(line);
-                            if (envelope != null)
+                            if (envelope != null && envelope.Version != 1)
+                            {
+                                // 5.9: versão não-suportada vira erro EXPLÍCITO (antes caía
+                                // no fallback IpcMessage e a resposta era descartada em silêncio).
+                                var verError = new IpcEnvelope
+                                {
+                                    Version = 1,
+                                    Command = envelope.Command,
+                                    Payload = JsonSerializer.SerializeToElement(new
+                                    {
+                                        error = $"unsupported protocol version: {envelope.Version}",
+                                        supportedVersion = 1
+                                    })
+                                };
+                                await writer.WriteLineAsync(JsonSerializer.Serialize(verError));
+                            }
+                            else if (envelope != null)
                             {
                                 if (_longRunningCommands.Contains(envelope.Command) && OnMessage != null)
                                 {
@@ -312,7 +353,8 @@ public sealed class NamedPipeServer : IDisposable
                                     {
                                         var capturedCmd = envelope.Command;
                                         var capturedMsg = msgCopy;
-                                        _ = ProcessLongRunningAsync(capturedCmd, capturedMsg, ct);
+                                        var capturedReqId = envelope.RequestId;
+                                        _ = ProcessLongRunningAsync(capturedCmd, capturedMsg, capturedReqId, ct);
                                     }
                                 }
                                 else
@@ -326,6 +368,7 @@ public sealed class NamedPipeServer : IDisposable
                                         {
                                             var env = resp.ToEnvelope();
                                             env.Command = envelope.Command;
+                                            env.RequestId = envelope.RequestId; // 5.7: ecoa o reqId ao cliente
                                             responseJson = JsonSerializer.Serialize(env);
                                         }
                                     }
@@ -400,7 +443,7 @@ public sealed class NamedPipeServer : IDisposable
         }
     }
 
-    private async Task ProcessLongRunningAsync(string originalCmd, IpcMessage msg, CancellationToken ct)
+    private async Task ProcessLongRunningAsync(string originalCmd, IpcMessage msg, string? requestId, CancellationToken ct)
     {
         try
         {
@@ -416,6 +459,7 @@ public sealed class NamedPipeServer : IDisposable
                     {
                         type = "commandResult",
                         originalCmd,
+                        requestId, // 5.7: correlaciona o resultado assíncrono ao pedido
                         value = resp.Value
                     })
                 };
@@ -430,6 +474,7 @@ public sealed class NamedPipeServer : IDisposable
                     {
                         type = "commandResult",
                         originalCmd,
+                        requestId,
                         value = new { }
                     })
                 };
@@ -447,6 +492,7 @@ public sealed class NamedPipeServer : IDisposable
                 {
                     type = "commandResult",
                     originalCmd,
+                    requestId,
                     error = ex.Message
                 })
             };

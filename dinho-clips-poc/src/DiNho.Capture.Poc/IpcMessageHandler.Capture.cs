@@ -11,7 +11,7 @@ public sealed partial class EngineCoordinator
         return action switch
         {
             "startCapture" => HandleStartCapture(msg),
-            "stopCapture" => HandleStopCapture(),
+            "stopCapture" => HandleStopCapture(msg),
             "getStatus" => HandleGetStatus(),
             "saveClip" => throw new InvalidOperationException("saveClip must be awaited"),
             _ => throw new InvalidOperationException($"Unexpected capture action: {action}")
@@ -55,9 +55,15 @@ public sealed partial class EngineCoordinator
         };
     }
 
-    private IpcMessage HandleStopCapture()
+    private IpcMessage HandleStopCapture(IpcMessage msg)
     {
-        StopCapture(clearBuffer: true);
+        // 5.5: stop IPC preserva o buffer por padrão (mesma semântica do hotkey);
+        // o caller opta por limpar com clearBuffer:true explícito.
+        var clearBuffer = false;
+        if (msg.Value is { } payload && payload.TryGetProperty("clearBuffer", out var cb))
+            clearBuffer = cb.ValueKind == JsonValueKind.True;
+
+        StopCapture(clearBuffer);
         return new IpcMessage { Action = "ok" };
     }
 

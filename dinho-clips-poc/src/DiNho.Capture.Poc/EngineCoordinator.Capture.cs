@@ -406,7 +406,7 @@ public sealed partial class EngineCoordinator
         }
     }
 
-    private void StopCapture(bool clearBuffer = false)
+    private void StopCapture(bool clearBuffer = false, bool fromPipeline = false)
     {
         lock (_pipelineLock)
         {
@@ -422,13 +422,21 @@ public sealed partial class EngineCoordinator
             _droppedFrames = 0;
 
             _pipelineCts?.Cancel();
-            try
+            // 5.2: quando o teardown foi agendado pela PRÓPRIA pipeline task, esperar
+            // por ela seria self-wait (a task só retorna depois deste método num outro
+            // Task.Run) — pula o join nesse caso. Fora disso, 3s e loga se não terminar
+            // (dispose sob pipeline vivo é o pior caso, melhor evidenciar).
+            if (!fromPipeline)
             {
-                _pipelineTask?.Wait(2000);
-            }
-            catch (AggregateException)
-            {
-                // Pipeline cancelado ou falhou, ignorar
+                try
+                {
+                    if (_pipelineTask is { } pt && !pt.Wait(3000))
+                        Log.W("EngineCoordinator", "StopCapture: pipeline não terminou em 3s — prosseguindo com dispose");
+                }
+                catch (AggregateException)
+                {
+                    // Pipeline cancelado ou falhou, ignorar
+                }
             }
             _pipelineTask = null;
             _pipelineCts?.Dispose();
@@ -983,11 +991,12 @@ public sealed partial class EngineCoordinator
                             _captureTargetGame = new GameInfo();
                             _captureTargetHwnd = IntPtr.Zero;
                             // Não chama StopCapture() aqui: PipelineLoop É a _pipelineTask,
-                            // e StopCapture() faz _pipelineTask.Wait(2000) → deadlock.
+                            // e StopCapture() faria self-wait na própria task → deadlock.
                             // Agenda o teardown completo para rodar DEPOIS que o loop
                             // sair e a task completar (evita zumbi: ffmpeg/encoder/áudio
-                            // continuam rodando com recording=false).
-                            _ = Task.Run(() => StopCapture());
+                            // continuam rodando com recording=false). fromPipeline:true
+                            // pula o join da pipeline (já está saindo).
+                            _ = Task.Run(() => StopCapture(fromPipeline: true));
                             break;
                         }
                         else

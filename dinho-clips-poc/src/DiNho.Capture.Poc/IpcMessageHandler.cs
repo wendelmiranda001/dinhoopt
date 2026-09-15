@@ -20,12 +20,15 @@ public sealed partial class EngineCoordinator
             // Config messages
             case "handshake":
             case "setReplayTime":
-            case "startEngine":
-            case "stopEngine":
             case "setCustomGameProcess":
             case "config":
             case "getGpus":
                 return HandleConfigMessages(msg, msg.Action);
+
+            // Lifecycle — awaitado: erro real vira "error" em vez de fire-and-forget.
+            case "startEngine":
+            case "stopEngine":
+                return await HandleEngineLifecycleAsync(msg.Action);
 
             // Capture messages (saveClip needs async)
             case "startCapture":
