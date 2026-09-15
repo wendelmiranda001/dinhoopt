@@ -55,8 +55,11 @@ public sealed partial class EngineCoordinator
                         // with a message pump, which is required for FrameArrived to fire.
                         _wgcPump.Invoke(() =>
                         {
-                            wgc.Initialize(device, gameHwnd);
+                            // Ordem importa (G2/audit 1.2): Session5.MinUpdateInterval
+                            // (ConfigureSession3, dentro de Initialize) lê _capIntervalTicks —
+                            // portanto SetCaptureFrameRate vem ANTES de Initialize.
                             wgc.SetCaptureFrameRate(_config.Config.Fps);
+                            wgc.Initialize(device, gameHwnd);
                             wgc.StartFramePump();
                         });
                         _capture = wgc;
@@ -98,8 +101,8 @@ public sealed partial class EngineCoordinator
             wgcDesktop = new WgcCaptureSource();
             _wgcPump.Invoke(() =>
             {
-                wgcDesktop.Initialize(_sharedDevice, IntPtr.Zero, gameMonitor);
                 wgcDesktop.SetCaptureFrameRate(_config.Config.Fps);
+                wgcDesktop.Initialize(_sharedDevice, IntPtr.Zero, gameMonitor);
                 wgcDesktop.StartFramePump();
             });
             _capture = wgcDesktop;
@@ -196,8 +199,8 @@ public sealed partial class EngineCoordinator
                     // Marshal Initialize + StartFramePump to the pump thread.
                     _wgcPump.Invoke(() =>
                     {
-                        wgc.Initialize(device, gameHwnd);
                         wgc.SetCaptureFrameRate(_config.Config.Fps);
+                        wgc.Initialize(device, gameHwnd);
                         wgc.StartFramePump();
                     });
                     _capture = wgc;
@@ -232,8 +235,8 @@ public sealed partial class EngineCoordinator
             wgcDesktop = new WgcCaptureSource();
             _wgcPump.Invoke(() =>
             {
-                wgcDesktop.Initialize(_sharedDevice, IntPtr.Zero, gameMonitor);
                 wgcDesktop.SetCaptureFrameRate(_config.Config.Fps);
+                wgcDesktop.Initialize(_sharedDevice, IntPtr.Zero, gameMonitor);
                 wgcDesktop.StartFramePump();
             });
             _capture = wgcDesktop;

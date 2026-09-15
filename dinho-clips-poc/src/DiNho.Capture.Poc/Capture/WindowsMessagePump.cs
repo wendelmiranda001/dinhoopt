@@ -19,6 +19,12 @@ internal sealed class WindowsMessagePump : IDisposable
     private readonly ManualResetEventSlim _ready = new(false);
     private volatile bool _disposed;
 
+    // G2 (audit 5.4): timeout configurável (mutable para testes) — antes o timeout de
+    // 10s era engolido silenciosamente pelo Done.Wait(); se o pump morresse (catch no
+    // Run() sai do loop), Invokes subsequentes aguardavam 10s e retornavam como se tudo
+    // estivesse OK, atribuindo um WgcCaptureSource NÃO inicializado ao _capture.
+    internal TimeSpan InvokeTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
     public WindowsMessagePump()
     {
         _thread = new Thread(Run)
@@ -41,11 +47,23 @@ internal sealed class WindowsMessagePump : IDisposable
         {
             try { action(); }
             catch (Exception ex) { error = ex; }
-            finally { done.Set(); }
+            finally
+            {
+                // G2: done pode já ter sido disposed pelo timeout — ignora (evita crash do pump thread)
+                try { done.Set(); }
+                catch (ObjectDisposedException) { }
+            }
         });
         _workAvailable.Set();
-        done.Wait(TimeSpan.FromSeconds(10));
+        var completed = done.Wait(InvokeTimeout);
         done.Dispose();
+        // G2: se o pump morreu (Run() saiu do loop) ou a ação travou, o caller (coordinator)
+        // depende de exceção para cair para o próximo backend de captura.
+        if (!completed)
+        {
+            Log.E("WGC-Pump", $"Invoke timed out after {InvokeTimeout.TotalMilliseconds}ms — pump thread pode ter morrido ou a ação travou");
+            throw new InvalidOperationException($"WindowsMessagePump.Invoke timed out after {InvokeTimeout.TotalMilliseconds}ms");
+        }
         if (error != null)
             throw new AggregateException(error);
     }

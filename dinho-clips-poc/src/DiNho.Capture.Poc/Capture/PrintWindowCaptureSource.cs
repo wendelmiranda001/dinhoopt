@@ -18,6 +18,14 @@ public sealed class PrintWindowCaptureSource : ICaptureSource
     public int Height => _windowHeight;
     public ID3D11Device? Device => _device;
 
+    /// <summary>
+    /// G2: dimensão de captura SEMPRE par (NV12/NVENC exigem W/H par).
+    /// 0 ou 1 → 0 (degenerado → branch de área-zero, evita fake "success" 1×1 que
+    /// antes alocava textura ímpar e contava como frame bom no watchdog).
+    /// 2+ → arredonda para baixo ao par (2→2, 3→2, 4→4…).
+    /// </summary>
+    internal static int ToEvenCaptureDimension(int value) => value <= 1 ? 0 : value & ~1;
+
     private ID3D11Device? _device;
     private ID3D11DeviceContext? _context;
     private bool _ownsDevice;
@@ -86,7 +94,8 @@ public sealed class PrintWindowCaptureSource : ICaptureSource
                 var desc = _cachedTexture.Description;
                 var clone = _device!.CreateTexture2D(desc);
                 _context!.CopyResource(clone, _cachedTexture);
-                return new CapturedFrame(startTicks, now, _windowWidth, _windowHeight,
+                // G2: dims reais da textura (não _windowWidth/Height stale) — mesmo princípio do WGC
+                return new CapturedFrame(startTicks, now, (int)desc.Width, (int)desc.Height,
                     success: true, clone, _device, now, now);
             }
             return new CapturedFrame(startTicks, now, 0, 0, success: false);
@@ -114,7 +123,9 @@ public sealed class PrintWindowCaptureSource : ICaptureSource
                 var desc = _cachedTexture.Description;
                 var clone = _device!.CreateTexture2D(desc);
                 _context!.CopyResource(clone, _cachedTexture);
-                return new CapturedFrame(startTicks, waitEndTicks, _windowWidth, _windowHeight,
+                // G2: dims reais da textura — antes reportava success:true com dims 0x0
+                // (mesma classe de bug do stall invisível ao watchdog)
+                return new CapturedFrame(startTicks, waitEndTicks, (int)desc.Width, (int)desc.Height,
                     success: true, clone, _device, waitEndTicks, Stopwatch.GetTimestamp());
             }
             return new CapturedFrame(startTicks, waitEndTicks, 0, 0, success: false);
@@ -130,7 +141,7 @@ public sealed class PrintWindowCaptureSource : ICaptureSource
                 var desc = _cachedTexture.Description;
                 var clone = _device!.CreateTexture2D(desc);
                 _context!.CopyResource(clone, _cachedTexture);
-                return new CapturedFrame(startTicks, waitEndTicks, _windowWidth, _windowHeight,
+                return new CapturedFrame(startTicks, waitEndTicks, (int)desc.Width, (int)desc.Height,
                     success: true, clone, _device, waitEndTicks, Stopwatch.GetTimestamp());
             }
             return new CapturedFrame(startTicks, waitEndTicks, 0, 0, success: false);
@@ -271,11 +282,13 @@ public sealed class PrintWindowCaptureSource : ICaptureSource
                 var rc = placement.rcNormalPosition;
                 int w = rc.right - rc.left;
                 int h = rc.bottom - rc.top;
-                // Clamp to reasonable values (minimized windows may report 0)
-                _windowWidth = Math.Max(1, w & ~1);
-                _windowHeight = Math.Max(1, h & ~1);
+                _windowWidth = ToEvenCaptureDimension(w);
+                _windowHeight = ToEvenCaptureDimension(h);
+                return;
             }
-            return;
+            // G2: janela minimizada mas placement não disponível — não guardar dims stale
+            _windowWidth = 0;
+            _windowHeight = 0;
         }
 
         var rect = new RECT();
@@ -286,9 +299,9 @@ public sealed class PrintWindowCaptureSource : ICaptureSource
             return;
         }
 
-        // GetClientRect returns right=width, bottom=height
-        _windowWidth = Math.Max(1, rect.right & ~1);
-        _windowHeight = Math.Max(1, rect.bottom & ~1);
+        // G2: always even (NV12/NVENC); 0 → zero-area (cached/failure branch)
+        _windowWidth = ToEvenCaptureDimension(rect.right);
+        _windowHeight = ToEvenCaptureDimension(rect.bottom);
     }
 
     private void AllocateTextures(int width, int height)

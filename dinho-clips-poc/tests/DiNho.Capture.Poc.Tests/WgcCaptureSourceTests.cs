@@ -1,4 +1,5 @@
 using DiNho.Capture.Poc.Capture;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace DiNho.Capture.Poc.Tests;
@@ -306,5 +307,73 @@ public sealed class WgcCaptureSourceTests
         {
             Marshal.Release(ptr);
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  WgcCaptureSource — lifecycle (G2): o construtor NÃO exige HW
+    //  (só Initialize() cria device/sessão). Cobre:
+    //   - self-heal exige _session (HW) → coberto analiticamente no código;
+    //     aqui fixamos a semântica do campo _capIntervalTicks.
+    //   - Dispose idempotente (antes relançava ObjectDisposedException).
+    //   - TryCaptureFrame pós-dispose → falha limpa.
+    //   - StartFramePump sem init/dispose → exceção clara.
+    // ═══════════════════════════════════════════════════════════════
+
+    private static long ReadCapIntervalTicks(WgcCaptureSource source)
+    {
+        var field = typeof(WgcCaptureSource).GetField("_capIntervalTicks", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        return (long)field.GetValue(source)!;
+    }
+
+    [Fact]
+    public void SetCaptureFrameRate_SetsCapIntervalTicks()
+    {
+        using var source = new WgcCaptureSource();
+        source.SetCaptureFrameRate(30);
+        Assert.Equal(WgcCaptureSource.ComputeCapIntervalTicks(30), ReadCapIntervalTicks(source));
+    }
+
+    [Fact]
+    public void SetCaptureFrameRate_ZeroOrNegative_DisablesCap()
+    {
+        using var source = new WgcCaptureSource();
+        source.SetCaptureFrameRate(0);
+        Assert.Equal(0, ReadCapIntervalTicks(source));
+        source.SetCaptureFrameRate(-1);
+        Assert.Equal(0, ReadCapIntervalTicks(source));
+    }
+
+    [Fact]
+    public void Dispose_IsIdempotent_SecondCallDoesNotThrow()
+    {
+        var source = new WgcCaptureSource();
+        source.Dispose();
+        source.Dispose();
+    }
+
+    [Fact]
+    public void TryCaptureFrame_AfterDispose_ReturnsFailure()
+    {
+        var source = new WgcCaptureSource();
+        source.Dispose();
+        var frame = source.TryCaptureFrame(5);
+        Assert.False(frame.Success);
+        Assert.Equal(0, frame.Width);
+        Assert.Equal(0, frame.Height);
+    }
+
+    [Fact]
+    public void StartFramePump_NotInitialized_Throws()
+    {
+        using var source = new WgcCaptureSource();
+        Assert.Throws<InvalidOperationException>(() => source.StartFramePump());
+    }
+
+    [Fact]
+    public void StartFramePump_AfterDispose_ThrowsObjectDisposed()
+    {
+        var source = new WgcCaptureSource();
+        source.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => source.StartFramePump());
     }
 }

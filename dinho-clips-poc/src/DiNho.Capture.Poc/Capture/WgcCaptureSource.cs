@@ -34,8 +34,10 @@ public sealed class WgcCaptureSource : ICaptureSource
     private readonly AutoResetEvent _frameSignal = new(false);
     private volatile bool _disposed;
     private volatile bool _hasReceivedFrame;
-    private TexturePool? _texturePool;
     private int _frameArrivedCount;
+    private int _frameArrivedFailures;
+    private int _pumpStarted;
+    private TexturePool? _texturePool;
 
     // Cap de captura (padrão OBS reset_frame_interval): só converte/codifica 1 frame
     // a cada intervalo do fps alvo. Frames excedentes do DWM são descartados antes da
@@ -64,7 +66,16 @@ public sealed class WgcCaptureSource : ICaptureSource
         capIntervalTicks <= 0 || lastTicks == 0 || nowTicks - lastTicks >= capIntervalTicks;
 
     /// <summary>Define o fps alvo do cap de captura (0 = sem cap).</summary>
-    public void SetCaptureFrameRate(int fps) => _capIntervalTicks = ComputeCapIntervalTicks(fps);
+    public void SetCaptureFrameRate(int fps)
+    {
+        _capIntervalTicks = ComputeCapIntervalTicks(fps);
+        // G2 (audit 1.2): o Coordinator quase sempre chama Initialize() ANTES de
+        // SetCaptureFrameRate() — ConfigureSession3() lia _capIntervalTicks == 0 e o
+        // Session5.MinUpdateInterval era gravado como 0 (throttle do DWM era código morto).
+        // Self-heal: se a sessão já existe, reaplica Session5 com o intervalo real.
+        if (_session is not null)
+            ConfigureSession3();
+    }
 
     public void Initialize(ID3D11Device? sharedDevice = null) =>
         Initialize(sharedDevice, IntPtr.Zero, IntPtr.Zero);
@@ -203,13 +214,35 @@ public sealed class WgcCaptureSource : ICaptureSource
     /// </summary>
     public void StartFramePump()
     {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(WgcCaptureSource));
         if (_framePool is null || _session is null)
             throw new InvalidOperationException("WGC capture not initialized — call CreateFramePoolForItem() before StartFramePump()");
+        // G2: chamada dupla sobrescreveria OnFrameArrived (disparava 2x por frame);
+        // CompareExchange garante subscrição única.
+        if (Interlocked.CompareExchange(ref _pumpStarted, 1, 0) != 0)
+            return;
         _framePool.FrameArrived += OnFrameArrived;
         _session.StartCapture();
     }
 
     private void OnFrameArrived(Direct3D11CaptureFramePool sender, object args)
+    {
+        // G2: handler roda em worker thread WinRT e concorre com Dispose() (que destrói
+        // session/pool/sinal). Antes, uma exceção aqui (ex.: TryGetNextFrame/pool/sinal
+        // já dispostos) era não tratada na worker thread e derrubava o processo.
+        try
+        {
+            ProcessArrivedFrame(sender);
+        }
+        catch (Exception ex)
+        {
+            Interlocked.Increment(ref _frameArrivedFailures);
+            Log.E("WGC", $"OnFrameArrived falhou: {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    private void ProcessArrivedFrame(Direct3D11CaptureFramePool sender)
     {
         var frame = sender.TryGetNextFrame();
         if (frame is null) return;
@@ -423,6 +456,17 @@ public sealed class WgcCaptureSource : ICaptureSource
             catch (ObjectDisposedException)
             {
                 var disposedTicks = Stopwatch.GetTimestamp();
+                return new CapturedFrame(startTicks, disposedTicks, 0, 0, success: false, waitEndTicks: disposedTicks);
+            }
+
+            if (_disposed)
+            {
+                // G2: fechou a janela de corrida — um frame já pode estar sinalizado enquanto
+                // Dispose() roda. A troca atômica (mesmo padrão do produtor/consumidor) garante
+                // dispose único do frame (Dispose() também faz Interlocked.Exchange).
+                var disposedTicks = Stopwatch.GetTimestamp();
+                var stale = Interlocked.Exchange(ref _latestFrame, (Direct3D11CaptureFrame?)null);
+                stale?.Dispose();
                 return new CapturedFrame(startTicks, disposedTicks, 0, 0, success: false, waitEndTicks: disposedTicks);
             }
 
@@ -712,18 +756,18 @@ public sealed class WgcCaptureSource : ICaptureSource
 
     public void Dispose()
     {
+        if (_disposed) return; // G2: idempotente — antes, chamadas repetidas relançavam ObjectDisposedException do sinal
         _disposed = true;
-        // 1. Stop session first — prevents new frames from arriving
         _session?.Dispose();
-        // 2. Unsubscribe BEFORE disposing pool — prevents callback on disposed signal
         if (_framePool is not null)
         {
             _framePool.FrameArrived -= OnFrameArrived;
             _framePool.Dispose();
         }
-        // 3. Now safe to dispose signal (no more callbacks possible)
         _frameSignal.Dispose();
-        _latestFrame?.Dispose();
+        // G2: troca atômica do quadro pendente — evita double-dispose com TryCaptureFrame,
+        // que também usa Interlocked.Exchange (o quadro é "possuído" exatamente uma vez).
+        Interlocked.Exchange(ref _latestFrame, (Direct3D11CaptureFrame?)null)?.Dispose();
         DisposeCaptureItem();
         _texturePool?.Dispose();
         _winrtDevice?.Dispose();
