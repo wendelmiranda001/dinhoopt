@@ -525,17 +525,15 @@ if (shift > TimeSpan.Zero && shift.TotalSeconds <= 2.0)
 
                 if (obuType == 1)
                 {
-                    int seqHeaderLen = obuEnd - obuStart;
-                    var seqHeader = new byte[seqHeaderLen];
-                    System.Buffer.BlockCopy(data, obuStart, seqHeader, 0, seqHeaderLen);
-                    int seqProfile = seqHeader.Length > 0 ? (seqHeader[0] >> 5) & 0x07 : 0;
-
-                    return [
-                        0,
-                        (byte)((seqProfile << 5) | 0x1F),
-                        0x0C,
-                        0
-                    ];
+                    // Return the complete raw Sequence Header OBU (header + extensions + LEB128 size + payload).
+                    // FFmpeg's ff_av1_parse_seq_header handles raw OBU data (buf[0] & 0x80 == 0) and
+                    // derives profile/level/bitdepth, so libdav1d/muxers parse it correctly. A synthetic
+                    // 4-byte av1C (0x00 marker flag off + reserved seq_level_idx_0 0x1F) made ffmpeg treat
+                    // it as raw OBU data and fail with "No sequence header available" (AVERROR_INVALIDDATA).
+                    int obuLen = obuEnd - pos;
+                    var seqHeader = new byte[obuLen];
+                    System.Buffer.BlockCopy(data, pos, seqHeader, 0, obuLen);
+                    return seqHeader;
                 }
 
                 pos = obuEnd;

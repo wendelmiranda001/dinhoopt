@@ -782,19 +782,39 @@ Assert.Equal(TimeSpan.Zero, ClipExporter.AlignAudioToVideoPts(audio, []));
     }
 
     [Fact]
-    public void ExtractAv1Extradata_WithSeqHeader_Returns4Bytes()
+    public void ExtractAv1Extradata_WithSeqHeader_ReturnsRawObu()
     {
         byte[] seqHeaderPayload = [0x80, 0x01, 0x02, 0x03, 0x04];
         int obuSize = seqHeaderPayload.Length;
         int headerByte = (1 << 3) | 0;
-        var data = new byte[2 + leb128Size(obuSize) + obuSize];
+        var data = new byte[1 + leb128Size(obuSize) + obuSize];
         data[0] = (byte)headerByte;
         int pos = WriteLeb128(data, 1, obuSize);
         System.Buffer.BlockCopy(seqHeaderPayload, 0, data, pos, obuSize);
         var pkt = Pkt(MediaType.Video, 0, 16, data);
         var result = ClipExporter.ExtractAv1Extradata([pkt]);
         Assert.NotNull(result);
-        Assert.Equal(4, result.Length);
+        Assert.Equal(data.Length, result.Length);
+        Assert.Equal(data, result);
+    }
+
+    [Fact]
+    public void ExtractAv1Extradata_WithExtensionFlag_ReturnsFullObu()
+    {
+        byte[] seqHeaderPayload = [0xAA, 0xBB];
+        int obuSize = seqHeaderPayload.Length;
+        int headerByte = (1 << 3) | 0x04; // OBU type 1 + extension flag
+        int extByte = 0xA0;
+        var data = new byte[2 + leb128Size(obuSize) + obuSize];
+        data[0] = (byte)headerByte;
+        data[1] = (byte)extByte;
+        int pos = WriteLeb128(data, 2, obuSize);
+        System.Buffer.BlockCopy(seqHeaderPayload, 0, data, pos, obuSize);
+        var pkt = Pkt(MediaType.Video, 0, 16, data);
+        var result = ClipExporter.ExtractAv1Extradata([pkt]);
+        Assert.NotNull(result);
+        Assert.Equal(data.Length, result.Length);
+        Assert.Equal(data, result);
     }
 
     private static int leb128Size(int value)
