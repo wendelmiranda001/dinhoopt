@@ -170,4 +170,19 @@ public sealed class HotkeyManagerTests : IDisposable
         var hm = new HotkeyManager();
         hm.Dispose(); // should not throw
     }
+
+    // ── 4.7: depois de Stop()/Dispose() não dispara mais (janela entre
+    //    _disposed=true e o UnhookWindowsHookEx não pode emitir eventos) ──
+
+    [Fact]
+    public void MatchAndFire_AfterStop_DoesNotFire()
+    {
+        _hm.UpdateBindings([MakeBinding(0x70, "SaveClip")]); // F1
+        _hm.MatchAndFireHotkey(0x70);
+        Assert.Single(_fired);
+
+        _hm.Stop(); // sem hook thread → só marca _disposed
+        _hm.MatchAndFireHotkey(0x70);
+        Assert.Single(_fired); // inalterado — guard _disposed ativo
+    }
 }

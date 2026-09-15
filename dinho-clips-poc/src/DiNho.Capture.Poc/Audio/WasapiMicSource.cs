@@ -90,22 +90,7 @@ public sealed class WasapiMicSource : IAudioSource
         _running = false;
         var capture = _capture;
         if (capture != null)
-            StopInBackground(capture);
-    }
-
-    // NAudio's StopRecording()/Dispose() Join the capture thread. On endpoints that stop
-    // producing data (inert/removed) that Join can block forever. Bound it: if the thread
-    // does not return in time, abandon it so the app/tests never hang.
-    private static void StopInBackground(WasapiRecorder capture)
-    {
-        var thread = new Thread(() =>
-        {
-            try { capture.StopRecording(); } catch { }
-        })
-        { IsBackground = true };
-        thread.Start();
-        if (!thread.Join(TimeSpan.FromSeconds(2)))
-            Log.W("WasapiMicSource", "StopRecording did not finish in 2s — abandoning capture thread");
+            WasapiStopGuard.StopInBackground(capture, nameof(WasapiMicSource));
     }
 
     public void Dispose()
@@ -114,31 +99,7 @@ public sealed class WasapiMicSource : IAudioSource
         var capture = _capture;
         _capture = null;
         if (capture != null)
-        {
-            // NAudio StopRecording()/Dispose() Join the capture thread; on inert endpoints the
-            // Join blocks forever. Run everything (incl. the NAudio 3.1 Starting-race spin) on a
-            // background thread and bound the Join so app shutdown can never hang.
-            var thread = new Thread(() =>
-            {
-                try
-                {
-                    // NAudio 3.1 race: StopRecording applied before the capture thread reaches its
-                    // `captureState = Capturing` assignment is swallowed and never re-applied, leaving
-                    // the thread looping forever and Dispose's Join blocked. Wait until the thread is
-                    // capturing before stopping — deterministic on both sides.
-                    var sw = System.Diagnostics.Stopwatch.StartNew();
-                    while (capture.CaptureState == CaptureState.Starting && sw.ElapsedMilliseconds < 3000)
-                        Thread.Sleep(5);
-                }
-                catch { }
-                try { capture.StopRecording(); } catch { }
-                try { capture.Dispose(); } catch { }
-            })
-            { IsBackground = true };
-            thread.Start();
-            if (!thread.Join(TimeSpan.FromSeconds(4)))
-                Log.W("WasapiMicSource", "StopRecording/Dispose did not finish in 4s — abandoned capture thread");
-        }
+            WasapiStopGuard.DisposeInBackground(capture, nameof(WasapiMicSource));
         _device?.Dispose();
     }
 }

@@ -52,7 +52,14 @@ public sealed class WasapiProcessLoopbackSource : IAudioSource
     {
         if (_running) return;
 
-        _recorder = RecorderFactory((uint)_processId, _includeTree, _sampleRate);
+        var recorder = RecorderFactory((uint)_processId, _includeTree, _sampleRate);
+        if (recorder == null)
+        {
+            // Factory trocada pelo teste p/ simular falha de ativação sem WASAPI.
+            Log.W("WasapiProcessLoopback", "RecorderFactory devolveu null — captura não iniciou");
+            return;
+        }
+        _recorder = recorder;
         _recorder.DataAvailable += OnDataAvailable;
         _recorder.RecordingStopped += (_, _) =>
         {
@@ -88,22 +95,22 @@ public sealed class WasapiProcessLoopbackSource : IAudioSource
     {
         if (!_running) return;
         _running = false;
-        try
+        var recorder = _recorder;
+        if (recorder != null)
         {
-            _recorder?.StopRecording();
+            // StopRecording é bloqueante (Join da thread de captura). Em endpoints mortos esse
+            // Join pode travar o shutdown — roda em background com deadline (achado 4.2).
+            WasapiStopGuard.StopInBackground(recorder, nameof(WasapiProcessLoopbackSource));
             Log.I("WasapiProcessLoopback", "Parado.");
-        }
-        catch (Exception ex)
-        {
-            Log.W("WasapiProcessLoopback", $"StopRecording error: {ex.Message}");
         }
     }
 
     public void Dispose()
     {
         Stop();
-        try { _recorder?.Dispose(); }
-        catch (Exception ex) { Log.D("WasapiProcessLoopback", $"Dispose error: {ex.Message}"); }
+        var recorder = _recorder;
         _recorder = null;
+        if (recorder != null)
+            WasapiStopGuard.DisposeInBackground(recorder, nameof(WasapiProcessLoopbackSource));
     }
 }

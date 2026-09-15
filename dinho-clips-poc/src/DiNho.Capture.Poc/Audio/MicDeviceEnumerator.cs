@@ -8,6 +8,30 @@ namespace DiNho.Capture.Poc.Audio;
 internal static class MicDeviceEnumerator
 {
     /// <summary>
+    /// Query the preferred format (MixFormat) of an audio endpoint. Falls back to
+    /// (1, 16000) when the device refuses the query (e.g. no shared-mode host).
+    /// Antes retornava channels=2 / sampleRate=48000 hardcoded — dispositivos mono
+    /// ou taxas diferentes causavam silêncio ou pitch errado (achado 4.8).
+    /// </summary>
+    internal static (int channels, int sampleRate) GetDeviceFormat(NAudio.CoreAudioApi.MMDevice device)
+    {
+        try
+        {
+            using var audioClient = device.CreateAudioClient();
+            var format = audioClient.MixFormat;
+            return NormalizeFormat(format.Channels, format.SampleRate);
+        }
+        catch (Exception ex)
+        {
+            Log.W("MicDeviceEnumerator", $"MixFormat query failed, using fallback (1, 16000): {ex.Message}");
+            return (1, 16000);
+        }
+    }
+
+    internal static (int channels, int sampleRate) NormalizeFormat(int channels, int sampleRate)
+        => (channels > 0 ? channels : 1, sampleRate > 0 ? sampleRate : 16000);
+
+    /// <summary>
     /// Enumerates microphone devices on an STA thread (required by NAudio/COM MMDeviceEnumerator).
     /// If already on STA, runs inline; otherwise spawns a dedicated STA thread.
     /// </summary>
@@ -72,13 +96,14 @@ internal static class MicDeviceEnumerator
                 using (dev)
                 {
                     Log.I("MicDeviceEnumerator", $"dev id='{dev.ID}' name='{dev.FriendlyName}'");
+                    var (devChannels, devSampleRate) = GetDeviceFormat(dev);
                     list.Add(new
                     {
                         id = dev.ID,
                         name = dev.FriendlyName,
                         isDefault = dev.ID == defaultId,
-                        channels = 2,
-                        sampleRate = 48000,
+                        channels = devChannels,
+                        sampleRate = devSampleRate,
                     });
                 }
             }

@@ -10,23 +10,42 @@ namespace DiNho.Capture.Poc.Audio;
 public static class NotificationSound
 {
     private const int SampleRate = 48000;
+    private static int _playing;
 
     /// <summary>
     /// Crystal Ping v5 — clip saved confirmation.
     /// 1336Hz (-2 semitones) → 1061Hz (-6 semitones), 0.70s total.
+    /// Retorna imediatamente; a reprodução (e o Sleep de ~700ms) roda numa thread
+    /// IsBackground para não travar a thread de captura (achado 4.10).
     /// </summary>
     public static void PlayClipSaved()
     {
         try
         {
+            if (Interlocked.Exchange(ref _playing, 1) != 0)
+                return; // toque em andamento — ignora duplicata (dois saves seguidos)
+
             var samples = GenerateCrystalPingV5();
-            PlaySamples(samples);
+            var t = new Thread(() =>
+            {
+                try { PlaySamples(samples); }
+                catch { /* Notification sounds are cosmetic — never crash */ }
+                finally { Interlocked.Exchange(ref _playing, 0); }
+            })
+            {
+                IsBackground = true,
+                Name = "NotificationSound",
+            };
+            t.Start();
         }
         catch
         {
-            // Notification sounds are cosmetic — never crash the caller
+            Interlocked.Exchange(ref _playing, 0);
         }
     }
+
+    internal static int GetDurationMs(int sampleCount)
+        => (int)(sampleCount * 1000.0 / SampleRate) + 50;
 
     private static float[] GenerateCrystalPingV5()
     {
@@ -89,8 +108,7 @@ public static class NotificationSound
         player.Init(reader);
         player.Play();
 
-        // Wait for playback to finish
-        int durationMs = (int)(samples.Length * 1000.0 / SampleRate) + 50;
-        Thread.Sleep(durationMs);
+        // Aguarda o fim da reprodução (na thread de fundo — a caller já retornou)
+        Thread.Sleep(GetDurationMs(samples.Length));
     }
 }

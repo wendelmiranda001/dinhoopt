@@ -52,4 +52,24 @@ public class WasapiProcessLoopbackSourceTests
         Assert.Single(result);
         Assert.Equal(-0.5f, result[0]);
     }
+
+    // ── 4.2: Start/Stop/Dispose com factory substituída — recorder null → no-crash ──
+
+    [Fact]
+    public void Start_NullRecorderFactory_DoesNotCrashOrCapture()
+    {
+        var original = WasapiProcessLoopbackSource.RecorderFactory;
+        try
+        {
+            WasapiProcessLoopbackSource.RecorderFactory = (_, _, _) => null!;
+            using var source = new WasapiProcessLoopbackSource(12345);
+            source.Start();   // guard: recorder null → loga e não inicia
+            source.Stop();    // _running false → no-op
+            source.Dispose(); // sem recorder registrado → no-op
+        }
+        finally
+        {
+            WasapiProcessLoopbackSource.RecorderFactory = original;
+        }
+    }
 }

@@ -77,7 +77,11 @@ public sealed class HotkeyManager : IDisposable
 
     public void Start()
     {
-        if (!_hookId.IsNull) return;
+        _disposed = false;
+        if (_hookId.IsNull && _hookThread is { IsAlive: true })
+            return; // running but hook not yet registered — wait for message loop
+        if (!_hookId.IsNull)
+            return;
 
         _hookThread = new Thread(() =>
         {
@@ -140,6 +144,8 @@ public sealed class HotkeyManager : IDisposable
     private int _kbdCounter;
     private LRESULT KeyboardHookCallback(int nCode, WPARAM wParam, LPARAM lParam)
     {
+        // Acionado após Stop() — não emitir eventos entre _disposed=true e o UnhookWindowsHookEx.
+        if (_disposed) return PInvoke.CallNextHookEx(HHOOK.Null, nCode, wParam, lParam);
         try
         {
             if (nCode >= 0)
@@ -185,6 +191,7 @@ public sealed class HotkeyManager : IDisposable
 
     private LRESULT MouseHookCallback(int nCode, WPARAM wParam, LPARAM lParam)
     {
+        if (_disposed) return PInvoke.CallNextHookEx(HHOOK.Null, nCode, wParam, lParam);
         try
         {
             if (nCode < 0) return PInvoke.CallNextHookEx(HHOOK.Null, nCode, wParam, lParam);
@@ -228,6 +235,7 @@ public sealed class HotkeyManager : IDisposable
 
     internal void MatchAndFireHotkey(int vkCode)
     {
+        if (_disposed) return;
         lock (_lock)
         {
             Log.D("HotkeyManager", $"MatchAndFireHotkey: vk=0x{vkCode:X2} bindings={_bindings.Count}");
@@ -269,6 +277,13 @@ public sealed class HotkeyManager : IDisposable
             _keysDown.TryRemove(vk, out _);
     }
 
+    /// <summary>Seam de teste: levanta o evento raw como um hook real faria (sem registrar hooks).</summary>
+    internal void SimulateRawKey(int vkCode, bool isKeyDown)
+    {
+        if (_disposed) return;
+        OnRawKeyEvent?.Invoke(vkCode, isKeyDown);
+    }
+
     private static int? MapToGenericVk(int vk)
     {
         return vk switch
@@ -293,6 +308,8 @@ public sealed class HotkeyManager : IDisposable
     public void Dispose()
     {
         Stop();
+        OnHotkeyPressed = null;
+        OnRawKeyEvent = null;
     }
 }
 

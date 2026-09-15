@@ -14,7 +14,7 @@ public sealed class PushToTalkManager : IDisposable
     private readonly HotkeyManager _hotkeyManager;
     private readonly HashSet<int> _pttKeys = new();
     private readonly Lock _pttLock = new();
-    private bool _micActive;
+    private volatile bool _micActive;
     private PttMode _mode = PttMode.Hold;
 
     public bool MicActive => _micActive;

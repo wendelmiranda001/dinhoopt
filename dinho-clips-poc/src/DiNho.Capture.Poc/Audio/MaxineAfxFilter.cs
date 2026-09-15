@@ -26,6 +26,7 @@ public sealed class MaxineAfxFilter : IDisposable
     private readonly int _channels;
     private readonly byte[] _readBuf = new byte[65536];
     private int _readOffset;
+    private CancellationTokenSource? _cts;
     private bool _disposed;
     private readonly bool _isMaxineAvailable;
     private readonly string _activeFilter;
@@ -156,57 +157,103 @@ public sealed class MaxineAfxFilter : IDisposable
         if (process == null || process.HasExited || stdin == null || stdout == null)
             return input;
 
-        int byteLen = input.Length * 4;
-        var inBytes = new byte[byteLen];
-        System.Buffer.BlockCopy(input, 0, inBytes, 0, byteLen);
-
         try
         {
-            var writeTask = stdin.WriteAsync(inBytes, 0, byteLen);
-            if (!writeTask.Wait(100))
+            using var cts = new CancellationTokenSource();
+            cts.CancelAfter(5000);
+            _cts = cts;
+            var deadline = Stopwatch.StartNew();
+
+            try
             {
-                Log.W("MaxineAfxFilter", "Write timeout after 100ms, skipping frame");
+                int byteLen = input.Length * 4;
+                var inBytes = new byte[byteLen];
+                System.Buffer.BlockCopy(input, 0, inBytes, 0, byteLen);
+
+                // WriteTimeout alinhado a 2000ms (era 100ms — causava drops sob carga).
+                // O global deadline (5s) cobre a chamada inteira se a escrita travar.
+                stdin.WriteTimeout = 2000;
+                var writeTask = stdin.WriteAsync(inBytes, 0, byteLen, cts.Token);
+                if (!writeTask.Wait(5000, cts.Token))
+                {
+                    Log.W("MaxineAfxFilter", "Write timeout after 5000ms, skipping frame");
+                    return input;
+                }
+                stdin.FlushAsync(cts.Token).Wait(2000, cts.Token);
+
+                int expectedBytes = byteLen;
+                int totalRead = 0;
+
+                if (_readOffset >= _readBuf.Length)
+                {
+                    Log.W("MaxineAfxFilter", "read offset reached buffer end — resetting");
+                    _readOffset = 0;
+                }
+
+                while (totalRead < expectedBytes)
+                {
+                    if (deadline.ElapsedMilliseconds > 5000)
+                    {
+                        Log.W("MaxineAfxFilter", "Read deadline exceeded 5000ms");
+                        break;
+                    }
+
+                    var readTask = stdout.ReadAsync(
+                        _readBuf,
+                        _readOffset,
+                        Math.Min(_readBuf.Length - _readOffset, expectedBytes - totalRead),
+                        cts.Token);
+                    if (!readTask.Wait(2000, cts.Token))
+                    {
+                        Log.W("MaxineAfxFilter", $"Read timeout at {totalRead}/{expectedBytes}");
+                        break;
+                    }
+                    int read = readTask.Result;
+                    if (read <= 0) break;
+                    _readOffset += read;
+                    totalRead += read;
+                }
+
+                if (totalRead < 4)
+                {
+                    _readOffset = 0; // descarta leitura parcial — evita drift de offset que trava o filtro
+                    return input;
+                }
+
+                int sampleCount = totalRead / 4;
+                var result = new float[sampleCount];
+                System.Buffer.BlockCopy(_readBuf, 0, result, 0, totalRead);
+
+                if (_readOffset > totalRead)
+                {
+                    int leftover = _readOffset - totalRead;
+                    System.Buffer.BlockCopy(_readBuf, totalRead, _readBuf, 0, leftover);
+                    _readOffset = leftover;
+                }
+                else
+                {
+                    _readOffset = 0;
+                }
+
+                return result;
+            }
+            catch (OperationCanceledException)
+            {
+                Log.W("MaxineAfxFilter", "ffmpeg CTS cancelled (deadline exceeded)");
                 return input;
             }
-            stdin.Flush();
-
-            int expectedBytes = byteLen;
-            int totalRead = 0;
-            while (totalRead < expectedBytes)
+            catch (IOException)
             {
-                int read = stdout.Read(_readBuf, _readOffset, Math.Min(_readBuf.Length - _readOffset, expectedBytes - totalRead));
-                if (read <= 0) break;
-                _readOffset += read;
-                totalRead += read;
-            }
-
-            if (totalRead < 4)
                 return input;
-
-            int sampleCount = totalRead / 4;
-            var result = new float[sampleCount];
-            System.Buffer.BlockCopy(_readBuf, 0, result, 0, totalRead);
-
-            if (_readOffset > totalRead)
-            {
-                int leftover = _readOffset - totalRead;
-                System.Buffer.BlockCopy(_readBuf, totalRead, _readBuf, 0, leftover);
-                _readOffset = leftover;
             }
-            else
+            catch (InvalidOperationException)
             {
-                _readOffset = 0;
+                return input;
             }
-
-            return result;
         }
-        catch (IOException)
+        finally
         {
-            return input;
-        }
-        catch (InvalidOperationException)
-        {
-            return input;
+            Interlocked.Exchange(ref _cts, null);
         }
     }
 
@@ -214,6 +261,11 @@ public sealed class MaxineAfxFilter : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+
+        // Cancelar leitura/escrita em curso antes de fechar streams (achado 4.3).
+        var cts = _cts;
+        _cts = null;
+        try { cts?.Cancel(); } catch { }
 
         try { _stdin?.Dispose(); } catch { }
 

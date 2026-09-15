@@ -238,25 +238,27 @@ public sealed class AudioMixer : IDisposable
                 {
                     var (samples, offset, length, pts) = _micQueue.Peek();
                     int take = Math.Min(length - offset, needed - filled);
+                    int consumed;
 
-                    // Upmix mono mic para stereo loopback se necessário
+                    // Upmix mono mic para stereo loopback se necessário.
+                    // Cada amostra mono vira um par (L,R) — o avanço da fila deve refletir
+                    // quantas amostras foram REALMENTE escritas. O código antigo avançava
+                    // newOffset = offset + take (inteiro), pulando ~metade do mic buffer
+                    // sempre que a fila do mic excedia needed/2 (dropouts silenciosos).
                     if (_channels == 2 && loopback.Buffer.Channels == 2)
                     {
-                        for (int i = 0; i < take; i++)
-                        {
-                            if (filled + 1 >= needed) break;
-                            float s = samples[offset + i];
-                            micOut[filled++] = s;
-                            micOut[filled++] = s;
-                        }
+                        int written = UpmixMonoToStereo(samples, offset, take, micOut, filled, needed);
+                        filled += written;
+                        consumed = written / 2;
                     }
                     else
                     {
                         Array.Copy(samples, offset, micOut, filled, take);
                         filled += take;
+                        consumed = take;
                     }
 
-                    int newOffset = offset + take;
+                    int newOffset = offset + consumed;
                     _micQueue.Dequeue();
                     if (newOffset < length)
                     {
@@ -339,7 +341,7 @@ public sealed class AudioMixer : IDisposable
         }
 
         EmitPacket(outSamples, loopback.Pts,
-            micOut != null ? AudioStreamKind.Mixed : AudioStreamKind.Game, pooled);
+            micOut != null ? AudioStreamKind.Mixed : AudioStreamKind.Game, pooled, loopback.Buffer.Channels);
     }
 
     /// <summary>
@@ -377,6 +379,27 @@ public sealed class AudioMixer : IDisposable
         return result;
     }
 
+    /// <summary>
+    /// Espera-se capacity PAR (frames stereo) nesta chamada — cada amostra mono
+    /// vira um par (L,R). Retorna quantos floats foram escritos em dest (= 2×consumed).
+    /// O CÓDIGO DE CHAMADA deve avançar a fila do mic exatamente por consumed,
+    /// não por take — caso contrário amostras do mic são puladas.
+    /// </summary>
+    internal static int UpmixMonoToStereo(float[] mic, int offset, int take,
+        float[] dest, int start, int capacity)
+    {
+        if (take <= 0 || start >= capacity)
+            return 0;
+        int maxPairs = Math.Min(take, (capacity - start) / 2);
+        for (int i = 0; i < maxPairs; i++)
+        {
+            float s = mic[offset + i];
+            dest[start++] = s;
+            dest[start++] = s;
+        }
+        return maxPairs * 2;
+    }
+
     private static float[] ApplyGain(float[] samples, float gain)
     {
         var result = new float[samples.Length];
@@ -390,7 +413,7 @@ public sealed class AudioMixer : IDisposable
 
     internal static float SoftClip(float x)
     {
-        // Tanh aproximado — curva C∞ suave, saída [-1,1]
+        // Tanh real (MathF.Tanh retorna o tanh matemático, não uma aproximação)
         // Para |x| < 0.5: quase linear (preserva dynamics)
         // Para |x| > 0.5: satura suavemente (sem harmônicos agressivos)
         return MathF.Tanh(x);
@@ -433,10 +456,22 @@ public sealed class AudioMixer : IDisposable
         return output;
     }
 
-    private void EmitPacket(float[] samples, TimeSpan pts, AudioStreamKind kind, bool isPooled = false)
+    /// <summary>
+    /// Duração de um lote de amostras. Honra os canais REAIS do buffer (o antigo
+    /// usava _channels, que erra quando o loopback é mono e _channels ficou em 2).
+    /// </summary>
+    internal static TimeSpan CalcDuration(int sampleCount, int sampleRate, int channels)
+    {
+        int effCh = channels > 0 ? channels : 2;
+        if (sampleCount <= 0 || sampleRate <= 0)
+            return TimeSpan.Zero;
+        return TimeSpan.FromSeconds(sampleCount / (double)(sampleRate * effCh));
+    }
+
+    private void EmitPacket(float[] samples, TimeSpan pts, AudioStreamKind kind, bool isPooled = false, int channels = 0)
     {
         _emittedPackets++;
-        var duration = TimeSpan.FromSeconds((double)samples.Length / (_sampleRate * _channels));
+        var duration = CalcDuration(samples.Length, _sampleRate, channels > 0 ? channels : _channels);
         var packet = new EncodedPacket(samples, MediaType.Audio, pts, duration, isPooled: isPooled);
 
         var now = Stopwatch.GetTimestamp();
