@@ -423,6 +423,9 @@ public sealed partial class ClipExporter : IDisposable
             if (pkt.Type != MediaType.Audio) continue;
             fs.Write(pkt.Data, 0, pkt.DataLength);
         }
+
+        // G3: truncamento do padding zero (mesma razão do MKV — SetLength预留 ~20%)
+        fs.SetLength(fs.Position);
     }
 
     internal static void GenerateThumbnail(string videoPath, bool expectedAudio = false)

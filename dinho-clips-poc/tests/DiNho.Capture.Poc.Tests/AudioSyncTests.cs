@@ -716,7 +716,7 @@ Assert.Equal(TimeSpan.Zero, ClipExporter.AlignAudioToVideoPts(audio, []));
     }
 
     [Fact]
-    public void ExtractHvccExtradata_AllNals_ThrowsInBuildHvcc()
+    public void ExtractHvccExtradata_AllNals_ReturnsValidHvcc()
     {
         byte[] vpsPayload = new byte[10];
         byte[] spsPayload = new byte[20];
@@ -728,7 +728,9 @@ Assert.Equal(TimeSpan.Zero, ClipExporter.AlignAudioToVideoPts(audio, []));
         System.Buffer.BlockCopy(BuildHevcNal(33, spsPayload), 0, data, off, BuildHevcNal(33, spsPayload).Length); off += BuildHevcNal(33, spsPayload).Length;
         System.Buffer.BlockCopy(BuildHevcNal(34, ppsPayload), 0, data, off, BuildHevcNal(34, ppsPayload).Length);
         var pkt = MakeHevcPacket(data);
-        Assert.ThrowsAny<Exception>(() => ClipExporter.ExtractHvccExtradata([pkt]));
+        var hvcc = ClipExporter.ExtractHvccExtradata([pkt]);
+        Assert.NotNull(hvcc);
+        Assert.Equal(1, hvcc[0]); // configurationVersion
     }
 
     [Fact]
@@ -748,8 +750,9 @@ Assert.Equal(TimeSpan.Zero, ClipExporter.AlignAudioToVideoPts(audio, []));
         byte[] sps = new byte[20];
         sps[0] = 0x01;
         byte[] pps = new byte[5];
-        var ex = Assert.Throws<IndexOutOfRangeException>(() => ClipExporter.BuildHvcc(vps, sps, pps));
-        Assert.NotNull(ex);
+        var hvcc = ClipExporter.BuildHvcc(vps, sps, pps);
+        Assert.NotNull(hvcc);
+        Assert.Equal(1, hvcc[0]); // configurationVersion
     }
 
     [Fact]
@@ -759,8 +762,9 @@ Assert.Equal(TimeSpan.Zero, ClipExporter.AlignAudioToVideoPts(audio, []));
         byte[] sps = new byte[20];
         sps[0] = 0x01;
         byte[] pps = new byte[5];
-        var ex = Assert.Throws<IndexOutOfRangeException>(() => ClipExporter.BuildHvcc(vps, sps, pps));
-        Assert.NotNull(ex);
+        var hvcc = ClipExporter.BuildHvcc(vps, sps, pps);
+        Assert.NotNull(hvcc);
+        Assert.Equal(35 + 10 + 20 + 5, hvcc.Length); // 70 = 35 header + data
     }
 
     // ════════════════════════════════════════════════════════════

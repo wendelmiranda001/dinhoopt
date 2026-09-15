@@ -790,4 +790,111 @@ Assert.Equal(1.0, audio[0].Pts.TotalSeconds, 3);
         Assert.Throws<System.InvalidOperationException>(() =>
             ClipExporter.GenerateThumbnail(@"Z:\nonexistent\file.mp4"));
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  BuildHvcc — guarda de tamanho mínimo (3.1 CRITICAL)
+    //  Streams HEVC truncados/corruptos podem ter SPS < 13 bytes.
+    //  Sem esta guarda, sps[12] lançava IndexOutOfRangeException e
+    //  o clipe inteiro era perdido silenciosamente.
+    // ═══════════════════════════════════════════════════════════════
+
+    private static byte[] MakeValidHvccInput() => new byte[]
+    {
+        // vps (4 bytes), sps (13 bytes), pps (1 byte) — valores mínimos validadores
+        0x40, 0x01, 0x0C, 0x01,  // VPS: 4 bytes (não inspecionados por Profile/Tier)
+        0x42, 0x01, 0x01, 0x01, 0x60, // SPS[0..4]: profile/compat
+        0, 0, 0, 0, 0,           // SPS[5..9]
+        0, 0,                     // SPS[10..11]
+        0x5D,                     // SPS[12]: generalLevelIdc
+        0x01                      // PPS: 1 byte
+    };
+
+    [Fact]
+    public void BuildHvcc_ShortSps_ReturnsNull()
+    {
+        var vps = MakeValidHvccInput()[..4];
+        var sps = new byte[10]; // < 13
+        var pps = new byte[] { 0x01 };
+        Assert.Null(ClipExporter.BuildHvcc(vps, sps, pps));
+    }
+
+    [Fact]
+    public void BuildHvcc_ShortVps_ReturnsNull()
+    {
+        var vps = new byte[2]; // < 4
+        var sps = new byte[13];
+        var pps = new byte[] { 0x01 };
+        Assert.Null(ClipExporter.BuildHvcc(vps, sps, pps));
+    }
+
+    [Fact]
+    public void BuildHvcc_EmptyPps_ReturnsNull()
+    {
+        var vps = new byte[4];
+        var sps = new byte[13];
+        var pps = Array.Empty<byte>(); // 0
+        Assert.Null(ClipExporter.BuildHvcc(vps, sps, pps));
+    }
+
+    [Fact]
+    public void BuildHvcc_ValidLengths_ReturnsNonEmpty()
+    {
+        var input = MakeValidHvccInput();
+        var vps = input[..4];
+        var sps = input[4..17];
+        var pps = input[17..];
+        var result = ClipExporter.BuildHvcc(vps, sps, pps);
+        Assert.NotNull(result);
+        Assert.NotEmpty(result);
+        Assert.Equal(1, result[0]); // version
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  SetLength truncation (3.3) — arquivos temp não ficam com
+    //  ~20% de zeros no final (SetLength预留 + sem truncamento final)
+    // ═══════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void WriteMatroskaFile_WithEstimatedSize_TruncatesToActualContent()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"test_mkv_{Guid.NewGuid():N}.mkv");
+        try
+        {
+            var pkt1 = new EncodedPacket(new byte[80], MediaType.Video, TimeSpan.Zero, TimeSpan.FromMilliseconds(33), isKeyFrame: true);
+            var pkt2 = new EncodedPacket(new byte[80], MediaType.Video, TimeSpan.FromMilliseconds(33), TimeSpan.FromMilliseconds(33), isKeyFrame: false);
+            var packets = new List<EncodedPacket> { pkt1, pkt2 };
+
+            long hugeEstimate = 1_000_000; // 1 MB estimate para 160 bytes reais
+            ClipExporter.WriteMatroskaFile(path, packets, "h264", estimatedSize: hugeEstimate);
+
+            var fileSize = new FileInfo(path).Length;
+            // G3: com truncamento, fileSize ≪ hugeEstimate
+            Assert.True(fileSize < hugeEstimate / 10,
+                $"fileSize={fileSize} deveria ser muito menor que estimated={hugeEstimate} (truncamento falhou?)");
+            Assert.True(fileSize > 0);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public void WriteAdtsFile_WithEstimatedSize_TruncatesToActualContent()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"test_adts_{Guid.NewGuid():N}.aac");
+        try
+        {
+            // Minimal ADTS frame: 7-byte header + data
+            var adts1 = new EncodedPacket(new byte[30], MediaType.Audio, TimeSpan.Zero, TimeSpan.FromMilliseconds(23), false);
+            var adts2 = new EncodedPacket(new byte[30], MediaType.Audio, TimeSpan.FromMilliseconds(23), TimeSpan.FromMilliseconds(23), false);
+            var packets = new List<EncodedPacket> { adts1, adts2 };
+
+            long hugeEstimate = 500_000; // 500 KB para 60 bytes reais
+            ClipExporter.WriteAdtsFile(path, packets, hugeEstimate);
+
+            var fileSize = new FileInfo(path).Length;
+            Assert.True(fileSize < hugeEstimate / 10,
+                $"fileSize={fileSize} deveria ser muito menor que estimated={hugeEstimate} (truncamento falhou?)");
+            Assert.True(fileSize > 0);
+        }
+        finally { File.Delete(path); }
+    }
 }

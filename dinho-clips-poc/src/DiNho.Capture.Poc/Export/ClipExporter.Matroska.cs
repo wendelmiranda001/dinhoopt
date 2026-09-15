@@ -153,7 +153,7 @@ public sealed partial class ClipExporter
             if (packets.Count >= 2)
                 totalSec = (packets[^1].Pts - minPts).TotalSeconds + packets[^1].Duration.TotalSeconds;
             if (totalSec > 0)
-                WriteEbmlFloat(w, 0x4489, totalSec * 1_000_000.0);
+                WriteEbmlFloat(w, 0x4489, totalSec * 1000.0); // Duration em ticks de TimecodeScale (1 tick = 1ms)
             WriteEbmlString(w, 0x4D80, "DiNho Capture"); // MuxingApp
             WriteEbmlString(w, 0x5741, "DiNho Capture"); // WritingApp
         });
@@ -271,5 +271,10 @@ public sealed partial class ClipExporter
             int relTc = (int)(ptsMs - clusterBaseTimecode);
             WriteSimpleBlock(bw, 1, relTc, pkt.IsKeyFrame, pkt.Data, pkt.DataLength);
         }
+
+        // G3: truncamento do padding zero — SetLength预allocate ~20% extra; sem truncar,
+        // o MKV temporário fica com bytes zero no final (tolerado pelo ffmpeg mas não por
+        // players/MediaInfo). SetLength ao tamanho escrito real — Opera NTFS ignora.
+        fs.SetLength(fs.Position);
     }
 }

@@ -29,7 +29,7 @@ public sealed class ReplayBuffer : IDisposable
     private DiskSpillBuffer? _spill;
     private bool _diskSpillEnabled;
     private bool _spillAudioWhenEvicted;
-    private static long _lastSegmentOffsetLogTick;
+    private long _lastSegmentOffsetLogTick;
     private const double SegmentOffsetWarnMs = 100.0;
     private static readonly long SegmentOffsetLogThrottleTicks = Stopwatch.Frequency * 5;
 
@@ -429,11 +429,12 @@ public sealed class ReplayBuffer : IDisposable
             {
                 diskPkts = spill.ReadAll();
             }
-            catch (ObjectDisposedException)
+            catch (Exception ex) when (ex is ObjectDisposedException or IOException)
             {
-                // Teardown race: o buffer foi disposto (Dispose → _spill.Dispose)
-                // entre o snapshot e o ReadAll. O save já está inviável — usa só o
-                // snapshot RAM; nada a liberar (o spill Clear()/Dispose() cuidou).
+                // ObjectDisposedException: teardown race — o buffer foi disposto entre snapshot e ReadAll.
+                // IOException: disco cheio, arquivo corrompido/bloqueado, acesso negado — mesma ação:
+                // usa só o snapshot RAM; nada a liberar.
+                Log.W("ReplayBuffer", $"GetSegments spill read failed: {ex.GetType().Name}: {ex.Message} — usando só RAM");
                 diskPkts = null;
             }
             if (diskPkts != null)

@@ -300,8 +300,10 @@ public sealed class DiskSpillBuffer : IDisposable
     private void CloseActiveStream()
     {
         if (_activeStream == null) return;
-        try { _activeStream.Flush(false); } catch { }
-        try { _activeStream.Close(); } catch { }
+        try { _activeStream.Flush(false); }
+        catch (Exception ex) { Log.W("DiskSpillBuffer", $"CloseActiveStream Flush failed: {ex.GetType().Name}: {ex.Message}"); }
+        try { _activeStream.Close(); }
+        catch (Exception ex) { Log.W("DiskSpillBuffer", $"CloseActiveStream Close failed: {ex.GetType().Name}: {ex.Message}"); }
         _activeStream = null;
     }
 
@@ -361,28 +363,33 @@ public sealed class DiskSpillBuffer : IDisposable
                     read += n;
                 }
 
+                // G3: leitura parcial de segmento truncado (crash durante Write, disco cheio,
+                // segmento deletado por CleanupOrphans) — antes aceitava silenciosamente bytes
+                // stale do pool; agora trunca efetivamente e loga para diagnóstico.
+                if (read < entry.Length)
+                    Log.W("DiskSpillBuffer", $"Partial read: {read}/{entry.Length} bytes seg={entry.Segment} — truncando");
+
+                int effectiveLength = read;
+
                 if (entry.Type == MediaType.Audio)
                 {
                     // Production audio is always AAC ADTS bytes (PcmSamples == null).
-                    // Preserve the raw bytes verbatim — converting them to float PCM
-                    // corrupted audio (Data=[]/DataLength=0) and killed the AAC track
-                    // in saved clips (missing audio, save 14:31).
                     if (entry.IsPcm)
                     {
-                        var pcm = new float[entry.Length / sizeof(float)];
-                        SysCopyBlock(buf, 0, pcm, 0, entry.Length);
+                        var pcm = new float[effectiveLength / sizeof(float)];
+                        SysCopyBlock(buf, 0, pcm, 0, effectiveLength);
                         result.Add(new EncodedPacket(pcm, entry.Type, entry.Pts, entry.Duration));
                     }
                     else
                     {
                         result.Add(new EncodedPacket(buf, entry.Type, entry.Pts, entry.Duration,
-                            isKeyFrame: false, isPooled: false, width: 0, height: 0, entry.Length));
+                            isKeyFrame: false, isPooled: false, width: 0, height: 0, effectiveLength));
                     }
                 }
                 else
                 {
                     result.Add(new EncodedPacket(buf, entry.Type, entry.Pts, entry.Duration,
-                        entry.IsKeyFrame, isPooled: true, entry.Width, entry.Height, entry.Length));
+                        entry.IsKeyFrame, isPooled: true, entry.Width, entry.Height, effectiveLength));
                 }
             }
 

@@ -437,9 +437,13 @@ if (shift > TimeSpan.Zero && shift.TotalSeconds <= 2.0)
         return BuildHvcc(vps, sps, pps);
     }
 
-    internal static byte[] BuildHvcc(byte[] vps, byte[] sps, byte[] pps)
+    internal static byte[]? BuildHvcc(byte[] vps, byte[] sps, byte[] pps)
     {
         // Bug 3 fix: Use vps/sps/pps directly — emulation prevention bytes preserved per spec.
+        // G3: guarda de tamanho mínimo (equivale ao BuildAvcc guard) — streams HEVC
+        // truncados ou corruptos podem ter SPS curto; sem isto, sps[12] lança
+        // IndexOutOfRangeException e o clipe inteiro é perdido silenciosamente.
+        if (vps.Length < 4 || sps.Length < 13 || pps.Length < 1) return null;
 
         int profileSpace = (sps[0] >> 6) & 0x03;
         bool tierFlag = (sps[0] & 0x20) != 0;
@@ -447,7 +451,10 @@ if (shift > TimeSpan.Zero && shift.TotalSeconds <= 2.0)
         int generalProfileCompat = (sps[1] << 24) | (sps[2] << 16) | (sps[3] << 8) | sps[4];
         int generalLevelIdc = sps[12];
 
-        int len = 23 + 2 + vps.Length + 2 + sps.Length + 2 + pps.Length;
+        // G3: len subestimado em 6 bytes — o cálculo anterior contava 23 como header total
+        // mas só incluía os 3 bytes NAL (type+2) do VPS; SPS e PPS adicionam mais 3+2 cada.
+        // Correct: 20 (profile) + 3*(NAL header+length) = 20 + 3*5 = 35, then + data.
+        int len = 35 + vps.Length + sps.Length + pps.Length;
         var hvcc = new byte[len];
         hvcc[0] = 1;
         hvcc[1] = (byte)((profileSpace << 6) | (tierFlag ? 0x20 : 0) | profileIdc);
