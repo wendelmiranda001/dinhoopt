@@ -1,5 +1,6 @@
 using DiNho.Capture.Poc.GameDetection;
 using System.Reflection;
+using System.Text.Json;
 
 namespace DiNho.Capture.Poc.Tests;
 
@@ -147,5 +148,103 @@ public sealed class GameDatabaseTests
         Assert.DoesNotContain("valorant", set);
         Assert.DoesNotContain("GTA5", set);
         Assert.DoesNotContain("Minecraft", set);
+    }
+
+    // ── 6.7: Reload sob lock — patching _loaded com _loadLock significa que
+    //    Load() concorrente NÃO pode "pular" o reload. ──
+
+    [Fact]
+    public void Reload_WhenPreviouslyLoaded_ReplacesDataset()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "DiNhoGDBTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmpDir);
+        try
+        {
+            var pathA = Path.Combine(tmpDir, "a.json");
+            var pathB = Path.Combine(tmpDir, "b.json");
+            File.WriteAllText(pathA, JsonSerializer.Serialize(new
+            {
+                version = 10,
+                games = new[] { new { processName = "gameA.exe", windowClass = "WinA", displayName = "Game A" } }
+            }));
+            File.WriteAllText(pathB, JsonSerializer.Serialize(new
+            {
+                version = 11,
+                games = new[] { new { processName = "gameB.exe", windowClass = "WinB", displayName = "Game B" } }
+            }));
+
+            var db = new GameDatabase();
+            db.Load(pathA);
+
+            Assert.True(db.IsLoaded);
+            Assert.NotNull(db.FindByProcessName("gameA.exe"));
+            Assert.Null(db.FindByProcessName("gameB.exe"));
+
+            db.Reload(pathB);
+
+            Assert.True(db.IsLoaded);
+            Assert.Equal(11, db.Version);
+            Assert.NotNull(db.FindByProcessName("gameB.exe"));
+            Assert.Null(db.FindByProcessName("gameA.exe"));
+        }
+        finally { try { Directory.Delete(tmpDir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task Reload_ConcurrentLoadNeverLeavesUnloaded()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "DiNhoGDBTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmpDir);
+        try
+        {
+            var pathA = Path.Combine(tmpDir, "a.json");
+            var pathB = Path.Combine(tmpDir, "b.json");
+            File.WriteAllText(pathA, JsonSerializer.Serialize(new
+            {
+                version = 10,
+                games = new[] { new { processName = "gameA.exe", windowClass = "WinA", displayName = "Game A" } }
+            }));
+            File.WriteAllText(pathB, JsonSerializer.Serialize(new
+            {
+                version = 11,
+                games = new[] { new { processName = "gameB.exe", windowClass = "WinB", displayName = "Game B" } }
+            }));
+
+            var db = new GameDatabase();
+            db.Load(pathA);
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+            var exceptions = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
+
+            var reloader = Task.Run(() =>
+            {
+                while (!cts.IsCancellationRequested)
+                {
+                    try { db.Reload(pathB); } catch (Exception ex) { exceptions.Enqueue(ex); }
+                    try { db.Reload(pathA); } catch (Exception ex) { exceptions.Enqueue(ex); }
+                }
+            });
+
+            var reader = Task.Run(() =>
+            {
+                while (!cts.IsCancellationRequested)
+                {
+                    try
+                    {
+                        _ = db.IsLoaded;
+                        _ = db.GameCount;
+                        _ = db.FindByProcessName("gameA.exe");
+                        _ = db.FindByProcessName("gameB.exe");
+                    }
+                    catch (Exception ex) { exceptions.Enqueue(ex); }
+                }
+            });
+
+            await Task.WhenAll(reloader, reader);
+
+            Assert.Empty(exceptions);
+            Assert.True(db.IsLoaded);
+        }
+        finally { try { Directory.Delete(tmpDir, true); } catch { } }
     }
 }

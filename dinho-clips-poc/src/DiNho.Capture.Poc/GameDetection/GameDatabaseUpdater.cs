@@ -111,6 +111,27 @@ public sealed class GameDatabaseUpdater
             var tmpPath = targetPath + ".tmp";
             try
             {
+                // 6.6: validar o schema ANTES de sobrescrever. RemoteGameDatabase
+                // só checa games.Count (List<object>); games.json é consumido como
+                // GameDatabase real. Um schema incompatível da CDN nunca deve
+                // corromper o arquivo local — mantém o último bom.
+                try
+                {
+                    var parsed = JsonSerializer.Deserialize<GameDatabase>(json);
+                    if (parsed?.Games is not { Count: > 0 }
+                        || parsed.Games.Any(g =>
+                            string.IsNullOrEmpty(g.ProcessName) && string.IsNullOrEmpty(g.WindowClass)))
+                    {
+                        Log.W("GameDatabaseUpdater", "Remote games.json failed schema validation, keeping local file");
+                        return false;
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    Log.W("GameDatabaseUpdater", $"Remote games.json is not a valid GameDatabase schema: {ex.Message}");
+                    return false;
+                }
+
                 await File.WriteAllTextAsync(tmpPath, json);
                 File.Move(tmpPath, targetPath, overwrite: true);
             }

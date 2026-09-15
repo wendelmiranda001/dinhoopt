@@ -117,6 +117,7 @@ public sealed class PipelineWatchdog
     public PipelineHealth GetHealth()
     {
         var p95 = 0.0;
+        var avg = 0.0;
         lock (_frameTimesMs)
         {
             if (_frameTimesMs.Count > 0)
@@ -124,7 +125,11 @@ public sealed class PipelineWatchdog
                 var sorted = new List<double>(_frameTimesMs.Select(f => f.durationMs));
                 sorted.Sort();
                 p95 = sorted[(int)(sorted.Count * 0.95)];
+                // 6.11: Average/Count DEVEM ser computados sob o MESMO lock do p95 —
+                // o antigo enumerava fora do lock enquanto o produtor fazia
+                // RemoveFirst/AddLast a cada frame (InvalidOperationException).
             }
+            avg = _frameTimesMs.Count > 0 ? _frameTimesMs.Average(f => f.durationMs) : 0;
         }
 
         var level = _consecutiveGood >= ConsecutiveGoodReset
@@ -138,7 +143,7 @@ public sealed class PipelineWatchdog
             Level = level,
             TotalFrames = _totalFrames,
             DroppedFrames = _droppedFrames,
-            AvgFrameTimeMs = _frameTimesMs.Count > 0 ? _frameTimesMs.Average(f => f.durationMs) : 0,
+            AvgFrameTimeMs = avg,
             P95FrameTimeMs = p95,
             LastIssue = _lastIssue,
             ConsecutiveGoodFrames = _consecutiveGood,

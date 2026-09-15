@@ -258,4 +258,106 @@ public sealed class ConfigManagerTests
 
         Assert.True(cfg.Config.StretchToFit);
     }
+
+    // ── 6.1: migração de config antiga (SaveClipVk/etc.) deve rodar mesmo quando
+    //    os defaults iniciais do deserializador casam o gate do "novo formato" ──
+
+    [Fact]
+    public void Load_OldFormatWithCustomVks_MigratesBindings()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "DiNhoTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        var tempFile = Path.Combine(tempDir, "config.json");
+        File.WriteAllText(tempFile, """
+            {
+              "SaveClipVk": 114,
+              "ToggleCaptureVk": 115,
+              "ToggleMicVk": 116,
+              "ReplayTimeSeconds": 300
+            }
+            """);
+        try
+        {
+            var cfg = new ConfigManager(tempFile);
+
+            Assert.Equal(3, cfg.Config.HotkeyBindings.Count);
+            Assert.Equal(114, cfg.Config.HotkeyBindings[0].Vk);
+            Assert.Equal("SaveClip", cfg.Config.HotkeyBindings[0].Action);
+            Assert.Equal(115, cfg.Config.HotkeyBindings[1].Vk);
+            Assert.Equal("ToggleCapture", cfg.Config.HotkeyBindings[1].Action);
+            Assert.Equal(116, cfg.Config.HotkeyBindings[2].Vk);
+            Assert.Equal("ToggleMic", cfg.Config.HotkeyBindings[2].Action);
+            Assert.Equal(300, cfg.Config.ReplayTimeSeconds);
+
+            // A migração deve persistir o novo formato no disco
+            var persisted = File.ReadAllText(tempFile);
+            Assert.Contains("\"Hotkeys\"", persisted);
+            Assert.DoesNotContain("SaveClipVk", persisted);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public void Load_OldFormatSingleCustomSaveVk_MigratesWithDefaultsForOthers()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "DiNhoTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        var tempFile = Path.Combine(tempDir, "config.json");
+        File.WriteAllText(tempFile, """{ "SaveClipVk": 16 }""");
+        try
+        {
+            var cfg = new ConfigManager(tempFile);
+
+            Assert.Equal(16, cfg.Config.HotkeyBindings[0].Vk);
+            Assert.Equal("SaveClip", cfg.Config.HotkeyBindings[0].Action);
+            Assert.Equal(3, cfg.Config.HotkeyBindings.Count);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    // ── 6.2: config corrompida deve ser SOBRESCRITA por defaults no boot,
+    //    não deixada corrompida para perpetuar o erro. ──
+
+    [Fact]
+    public void Load_CorruptedJson_OverwritesFileWithDefaults()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "DiNhoTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        var tempFile = Path.Combine(tempDir, "config.json");
+        File.WriteAllText(tempFile, "{ not valid json !!!");
+        try
+        {
+            var cfg = new ConfigManager(tempFile);
+
+            Assert.Equal(60, cfg.Config.Fps);
+            var persisted = File.ReadAllText(tempFile);
+            Assert.Contains("\"Fps\"", persisted); // arquivo regravado com defaults
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    // ── 6.3: anti-path-traversal deve exigir o separador após o perfil ──
+
+    [Fact]
+    public void ValidateAndFix_RejectsSiblingDirectorySharingProfilePrefix()
+    {
+        var cfg = CreateClean();
+        var profileDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        // Sem o separador, "C:\Users\Windows2" é prefixo de "C:\Users\Windows".
+        var sibling = profileDir + "2";
+        var raw = new AppConfig { OutputDirectory = sibling };
+
+        cfg.ValidateAndFix(raw);
+
+        Assert.Equal("", raw.OutputDirectory);
+    }
 }

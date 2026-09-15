@@ -350,6 +350,80 @@ public sealed class GameDatabaseUpdaterTests : IDisposable
         Assert.Equal(remoteVersion, savedDb.Version);
     }
 
+    // ── 6.6: NÃO sobrescrever o games.json local se o schema remoto nāo for
+    //    um GameDatabase válido. O antigo valia apenas games.Count>0 (List<object>)
+    //    e movia o arquivo ANTES do Reload — arquivo local corrompido. ──
+
+    [Fact]
+    public async Task DoesNotOverwriteExisting_WhenRemoteSchemaInvalid()
+    {
+        var localVersion = GameDatabase.Instance.Version;
+        var seedJson = JsonSerializer.Serialize(new
+        {
+            version = localVersion,
+            games = new[]
+            {
+                new { processName = "oldgame.exe", windowClass = "OldWindow", displayName = "Old Game" }
+            }
+        });
+        File.WriteAllText(Path.Combine(_tempDir, "games.json"), seedJson);
+
+        // List<object> com valores não-objeto: passa na checagem antiga (Count>0)
+        // mas falha Deserialize<GameDatabase> — exatamente o schema da CDN corrupta.
+        _mockHandler.Response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(new
+            {
+                version = localVersion + 1,
+                games = new object[] { 1, 2, 3 }
+            }))
+        };
+
+        var result = await _updater.CheckForUpdateAsync();
+
+        Assert.False(result);
+        var savedJson2 = File.ReadAllText(Path.Combine(_tempDir, "games.json"));
+        var savedDb = JsonSerializer.Deserialize<GameDatabase>(savedJson2);
+        Assert.NotNull(savedDb);
+        Assert.Equal(localVersion, savedDb.Version);
+    }
+
+    [Fact]
+    public async Task DoesNotOverwriteExisting_WhenRemoteEntriesLackIdentity()
+    {
+        var localVersion = GameDatabase.Instance.Version;
+        var seedJson = JsonSerializer.Serialize(new
+        {
+            version = localVersion,
+            games = new[]
+            {
+                new { processName = "oldgame.exe", windowClass = "OldWindow", displayName = "Old Game" }
+            }
+        });
+        File.WriteAllText(Path.Combine(_tempDir, "games.json"), seedJson);
+
+        // Entradas sem processName E sem windowClass são inúteis ao indexador.
+        _mockHandler.Response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(new
+            {
+                version = localVersion + 1,
+                games = new[]
+                {
+                    new { processName = "", windowClass = "", displayName = "Ghost" }
+                }
+            }))
+        };
+
+        var result = await _updater.CheckForUpdateAsync();
+
+        Assert.False(result);
+        var savedJson2 = File.ReadAllText(Path.Combine(_tempDir, "games.json"));
+        var savedDb = JsonSerializer.Deserialize<GameDatabase>(savedJson2);
+        Assert.NotNull(savedDb);
+        Assert.Equal(localVersion, savedDb.Version);
+    }
+
     [Fact]
     public async Task RetriesAndSucceeds_AfterTransientFailure()
     {

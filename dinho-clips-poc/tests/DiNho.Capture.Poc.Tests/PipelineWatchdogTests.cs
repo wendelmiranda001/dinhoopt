@@ -4,6 +4,63 @@ namespace DiNho.Capture.Poc.Tests;
 
 public sealed class PipelineWatchdogTests
 {
+    // ── 6.11: GetHealth precisa ler _frameTimesMs sob lock — enumerar LinkedEntity
+    //    fora do lock enquanto o produtor faz RemoveFirst/AddLast lança
+    //    InvalidOperationException sob contenção. ──
+
+    [Fact]
+    public async Task GetHealth_ConcurrentWithFrameUpdates_NeverThrows()
+    {
+        var wd = new PipelineWatchdog();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var exceptions = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
+
+        var writer = Task.Run(() =>
+        {
+            int i = 0;
+            while (!cts.IsCancellationRequested)
+            {
+                wd.ReportGoodFrame(5.0 + (i % 25));
+                // 2 aquisições por iteração: enumeração + possível RemoveFirst no produtor
+                if (i++ % 3 == 0)
+                    wd.ReportDroppedFrame(PipelineIssue.NoFrame);
+            }
+        });
+
+        var reader = Task.Run(() =>
+        {
+            while (!cts.IsCancellationRequested)
+            {
+                try
+                {
+                    var h = wd.GetHealth();
+                    _ = h.AvgFrameTimeMs;
+                    _ = h.P95FrameTimeMs;
+                    _ = h.TotalFrames;
+                }
+                catch (Exception ex)
+                {
+                    exceptions.Enqueue(ex);
+                }
+            }
+        });
+
+        await Task.WhenAll(writer, reader);
+
+        Assert.Empty(exceptions);
+    }
+
+    [Fact]
+    public void GetHealth_AvgUnderLock_MatchesExpectedMean()
+    {
+        var wd = new PipelineWatchdog();
+        for (int i = 0; i < 10; i++)
+            wd.ReportGoodFrame(16.0);
+
+        var h = wd.GetHealth();
+        Assert.Equal(16.0, h.AvgFrameTimeMs, 3);
+    }
+
     [Fact]
     public void InitialHealth_IsYellow()
     {

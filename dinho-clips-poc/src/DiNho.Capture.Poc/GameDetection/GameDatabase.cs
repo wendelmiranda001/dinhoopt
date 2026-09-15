@@ -26,8 +26,8 @@ public class GameDatabase
     [System.Text.Json.Serialization.JsonPropertyName("nonGames")]
     public List<string> NonGames { get; set; } = [];
 
-    private Dictionary<string, GameEntry> _byWindowClass = new(StringComparer.OrdinalIgnoreCase);
-    private Dictionary<string, GameEntry> _byProcessName = new(StringComparer.OrdinalIgnoreCase);
+    private volatile Dictionary<string, GameEntry> _byWindowClass = new(StringComparer.OrdinalIgnoreCase);
+    private volatile Dictionary<string, GameEntry> _byProcessName = new(StringComparer.OrdinalIgnoreCase);
     private volatile bool _loaded;
     private readonly Lock _loadLock = new();
 
@@ -39,8 +39,14 @@ public class GameDatabase
 
     public void Reload(string jsonPath)
     {
-        _loaded = false;
-        Load(jsonPath);
+        // 6.7: _loaded=false fora do lock permitia que um Load concorrente
+        // terminasse primeiro e fizesse o Reload retornar de imediato (sem
+        // recarregar). A troca agora é atômica sob o MESMO lock do Load.
+        lock (_loadLock)
+        {
+            _loaded = false;
+            LoadCore(jsonPath);
+        }
     }
 
     public void Load(string? jsonPath = null)
@@ -49,7 +55,12 @@ public class GameDatabase
         lock (_loadLock)
         {
             if (_loaded) return;
+            LoadCore(jsonPath);
+        }
+    }
 
+    private void LoadCore(string? jsonPath)
+    {
         // Try provided path, then executable directory, then fallback paths
         var candidates = new List<string>();
         if (!string.IsNullOrEmpty(jsonPath))
@@ -84,7 +95,6 @@ public class GameDatabase
         }
 
             Log.W("GameDatabase", "No games.json found, using hardcoded fallback");
-        }
     }
 
     private static IEnumerable<string> CatalogPaths()
@@ -127,32 +137,33 @@ public class GameDatabase
 
     private void BuildIndexes()
     {
-        _byWindowClass.Clear();
-        _byProcessName.Clear();
+        // 6.7: Construir dicts NOVOS e trocar referência atomicamente — leitores
+        // concorrentes nunca veem parcialidade do Clear()+Add() no velho dict.
+        var byWindowClass = new Dictionary<string, GameEntry>(StringComparer.OrdinalIgnoreCase);
+        var byProcessName = new Dictionary<string, GameEntry>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var game in Games)
         {
             if (!string.IsNullOrEmpty(game.WindowClass))
-            {
-                // Only first entry per windowClass wins
-                _byWindowClass.TryAdd(game.WindowClass, game);
-            }
-
+                byWindowClass.TryAdd(game.WindowClass, game);
             if (!string.IsNullOrEmpty(game.ProcessName))
-            {
-                _byProcessName.TryAdd(game.ProcessName, game);
-            }
+                byProcessName.TryAdd(game.ProcessName, game);
         }
+
+        _byWindowClass = byWindowClass;
+        _byProcessName = byProcessName;
     }
 
     public string? FindDisplayNameByWindowClass(string windowClass)
     {
-        return _byWindowClass.TryGetValue(windowClass, out var game) ? game.DisplayName : null;
+        var snapshot = _byWindowClass;
+        return snapshot.TryGetValue(windowClass, out var game) ? game.DisplayName : null;
     }
 
     public GameEntry? FindByProcessName(string processName)
     {
-        return _byProcessName.TryGetValue(processName, out var game) ? game : null;
+        var snapshot = _byProcessName;
+        return snapshot.TryGetValue(processName, out var game) ? game : null;
     }
 
     public GameEntry? FindByAlias(string alias)
@@ -167,7 +178,11 @@ public class GameDatabase
         {
             var byClass = FindDisplayNameByWindowClass(windowClass);
             if (byClass != null)
-                return _byWindowClass[windowClass];
+            {
+                var classSnapshot = _byWindowClass;
+                if (classSnapshot.TryGetValue(windowClass, out var game))
+                    return game;
+            }
         }
 
         if (!string.IsNullOrEmpty(processName))

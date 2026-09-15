@@ -213,29 +213,34 @@ public sealed class ConfigManager : IDisposable
             var json = File.ReadAllText(_configPath);
             var config = JsonSerializer.Deserialize<AppConfig>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-            // Migração: config antigo com campos fixos → bindings dinâmicos
-            if (config != null && config.HotkeyBindings.Count == 3 &&
-                config.HotkeyBindings[0].Vk == 0x77 &&
-                config.HotkeyBindings[0].Action == "SaveClip")
+            // Migração: config antigo com campos fixos → bindings dinâmicos.
+            // O deserializador preenche HotkeyBindings com os DEFAULTS do initializer
+            // mesmo quando o JSON antigo não tem o array "Hotkeys" — então o gate
+            // baseado em valores deserializados casa SEMPRE o "novo formato" e a
+            // migração nunca roda (achado 6.1: VKs customizados perdidos). A decisão
+            // precisa olhar o JSON bruto: presença de "Hotkeys" = novo formato;
+            // presença de "SaveClipVk" = formato antigo → migrar.
+            if (config != null)
             {
-                // Já é o novo formato, ok
-            }
-            else if (config != null)
-            {
-                // Tenta ler do formato antigo via JsonDocument
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
-                if (root.TryGetProperty("SaveClipVk", out var oldSave))
+                if (!root.TryGetProperty("Hotkeys", out _) && root.TryGetProperty("SaveClipVk", out var oldSave))
                 {
-                    var bindings = new List<HotkeyBinding>
+                    // Migra para as 3 bindings padrão SEMPRE (SaveClip/ToggleCapture/ToggleMic),
+                    // puxando o VK customizado quando presente e o default quando ausente —
+                    // nenhuma ação de hotkey pode ser perdida na migração.
+                    var def = new AppConfig().HotkeyBindings;
+                    var saveVk = oldSave.GetInt32();
+                    var capVk = root.TryGetProperty("ToggleCaptureVk", out var oldCap)
+                        ? oldCap.GetInt32() : def[1].Vk;
+                    var micVk = root.TryGetProperty("ToggleMicVk", out var oldMic)
+                        ? oldMic.GetInt32() : def[2].Vk;
+                    config.HotkeyBindings = new List<HotkeyBinding>
                     {
-                        new() { Vk = oldSave.GetInt32(), Action = "SaveClip", Enabled = true },
+                        new() { Vk = saveVk, Action = "SaveClip", Enabled = true },
+                        new() { Vk = capVk, Action = "ToggleCapture", Enabled = true },
+                        new() { Vk = micVk, Action = "ToggleMic", Enabled = true },
                     };
-                    if (root.TryGetProperty("ToggleCaptureVk", out var oldCap))
-                        bindings.Add(new() { Vk = oldCap.GetInt32(), Action = "ToggleCapture", Enabled = true });
-                    if (root.TryGetProperty("ToggleMicVk", out var oldMic))
-                        bindings.Add(new() { Vk = oldMic.GetInt32(), Action = "ToggleMic", Enabled = true });
-                    config.HotkeyBindings = bindings;
                     config.ReplayTimeSeconds = root.TryGetProperty("ReplayTimeSeconds", out var oldDur)
                         ? oldDur.GetInt32() : 300;
                     Log.I("Config", "Migrado formato antigo para bindings dinâmicos");
@@ -256,6 +261,10 @@ public sealed class ConfigManager : IDisposable
         catch (Exception ex)
         {
             Log.E("Config", $"Erro ao carregar: {ex.Message}, revertendo para defaults");
+            // 6.2: o arquivo corrompido persiste entre boots se não for regravado.
+            // Sobrescreve com defaults para o erro não se repetir em toda inicialização.
+            try { SaveToDisk(_defaults); }
+            catch { /* fail-closed: sem o reset, retorna defaults em memória mesmo assim */ }
             return CloneConfig(_defaults);
         }
     }
@@ -333,7 +342,11 @@ public sealed class ConfigManager : IDisposable
             {
                 var resolved = Path.GetFullPath(config.OutputDirectory);
                 var profileDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                if (!resolved.StartsWith(profileDir, StringComparison.OrdinalIgnoreCase))
+                // 6.3: o prefixo deve quebrar no separador, senão "C:\Users\Windows2"
+                // é tratado como "dentro de C:\Users\Windows".
+                var isInsideProfile = string.Equals(resolved, profileDir, StringComparison.OrdinalIgnoreCase)
+                    || resolved.StartsWith(profileDir.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+                if (!isInsideProfile)
                 {
                     Log.W("Config", $"OutputDirectory '{resolved}' fora do perfil do usuário — rejeitado");
                     config.OutputDirectory = "";
