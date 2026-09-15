@@ -810,7 +810,7 @@ public sealed class NamedPipeServerTests
     // ── 5.8: client tasks registradas p/ Stop() aguardar handlers ───
 
     [Fact]
-    public void HandleClient_RegistersInClientTasks_ThenRemoves()
+    public async Task HandleClient_RegistersInClientTasks_ThenRemoves()
     {
         using var server = new NamedPipeServer();
         var clientTasks = (System.Collections.Concurrent.ConcurrentDictionary<long, Task>)typeof(NamedPipeServer)
@@ -822,10 +822,10 @@ public sealed class NamedPipeServerTests
         clientTasks.TryAdd(fake.Id, fake);
         Assert.True(clientTasks.ContainsKey(fake.Id));
 
-        var removed = fake.ContinueWith(
-            _ => clientTasks.TryRemove(fake.Id, out _),
+        // Mesma remoção que o listener encadeia via ContinueWith(ExecuteSynchronously).
+        await fake.ContinueWith(
+            _ => clientTasks.TryRemove(fake.Id, out var removedTask) && removedTask is not null,
             TaskContinuationOptions.ExecuteSynchronously);
-        removed.Wait(1000);
 
         Assert.False(clientTasks.ContainsKey(fake.Id));
     }

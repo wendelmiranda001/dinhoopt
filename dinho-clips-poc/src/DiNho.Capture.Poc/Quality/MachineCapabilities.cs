@@ -21,22 +21,12 @@ public static class MachineCapabilities
     public static long DefaultRamProvider() => GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
 
     /// <summary>
-    /// Escolhe o adapter de encode: discreta NVIDIA > AMD (por VRAM); senão qualquer
-    /// suportado (iGPU). Mesma preferência de <c>EncoderManager.DetectEncodingVendorId</c>,
-    /// retornando o objeto completo (VRAM) em vez de só o vendor.
+    /// Escolhe o adapter de encode: delega ao ranking canônico (6.4) de
+    /// <c>EncoderManager.PickBestAdapter</c> — NVIDIA > AMD por VRAM, senão qualquer
+    /// suportada (iGPU). Evita divergência com <c>DetectEncodingVendorId</c>.
     /// </summary>
     public static EncoderManager.GpuAdapterInfo? PickEncodingAdapter(IReadOnlyList<EncoderManager.GpuAdapterInfo> adapters)
-    {
-        var discrete = adapters
-            .Where(a => a.VendorId is 0x10DE or 0x1002)
-            .OrderByDescending(a => a.VendorId == 0x10DE ? 2 : 1)
-            .ThenByDescending(a => a.VideoMemoryBytes)
-            .FirstOrDefault();
-        if (discrete != null)
-            return discrete;
-
-        return adapters.FirstOrDefault(a => a.VendorId is 0x10DE or 0x1002 or 0x8086);
-    }
+        => EncoderManager.PickBestAdapter(adapters);
 
     /// <summary>
     /// Coleta as capacidades. Retorna false quando a detecção falhou por completo

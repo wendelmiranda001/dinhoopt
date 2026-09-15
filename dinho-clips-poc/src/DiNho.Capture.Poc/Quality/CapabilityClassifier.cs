@@ -29,7 +29,16 @@ public static class CapabilityClassifier
         return CapabilityTier.Strong;
     }
 
-    public static MachineProfile BuildProfile(CapabilityTier tier) => tier switch
+    public static MachineProfile BuildProfile(CapabilityTier tier) =>
+        BuildProfile(tier, vendorId: 0x10DE);
+
+    /// <summary>
+    /// Perfil calibrado por tier + vendor (6.5). O preset p3 é orientado a NVENC
+    /// (preset balance esperto do tarquivo NVENC); AMD (h264_amf/h264_qsv) "mantém"
+    /// o default (p5) para não forçar cadeia pensada para NVIDIA em AMF/QSV.
+    /// Weak/Strong são vendor-independentes (conservador / default).
+    /// </summary>
+    public static MachineProfile BuildProfile(CapabilityTier tier, int vendorId) => tier switch
     {
         CapabilityTier.Weak => new MachineProfile
         {
@@ -42,7 +51,7 @@ public static class CapabilityClassifier
         },
         CapabilityTier.Medium => new MachineProfile
         {
-            EncoderPreset = "p3",
+            EncoderPreset = vendorId == 0x10DE ? "p3" : "p5",
             Multipass = true,
             Fps = 60,
             ReplaySeconds = 120,

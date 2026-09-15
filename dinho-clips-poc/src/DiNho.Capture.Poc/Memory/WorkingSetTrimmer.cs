@@ -17,19 +17,41 @@ public static class WorkingSetTrimmer
 
     internal static Action SetProcessWorkingSetSizeProbe = TrimWorkingSet;
 
-    public static void Trim()
+    // 6.9: fonte de tempo injetável p/ tests determinísticos (mesmo padrão das probes).
+    internal static Func<DateTime> NowProbe = () => DateTime.UtcNow;
+
+    /// <summary>Intervalo mínimo entre trims — evita gen2+trim consecutivos
+    /// quando um save é seguido de perto por outro save/trim de fundo.</summary>
+    internal static TimeSpan MinimumInterval { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>Último trim bem-sucedido (UTC). Reesetável em teste.</summary>
+    internal static DateTime? LastTrimUtc { get; set; }
+
+    private static readonly Lock Sync = new();
+
+    public static bool Trim()
     {
-        try
+        lock (Sync)
         {
-            GCSettings.LargeObjectHeapCompactionMode =
-                GCLargeObjectHeapCompactionMode.CompactOnce;
-            CollectGen2Probe();
-            GC.WaitForPendingFinalizers();
-            SetProcessWorkingSetSizeProbe();
-        }
-        catch (Exception ex)
-        {
-            Log.W("WorkingSetTrimmer", $"Trim falhou — fail-closed: {ex.Message}");
+            var now = NowProbe();
+            if (LastTrimUtc is { } last && now - last < MinimumInterval)
+                return false; // throttle: trim recente, pulando gen2/working-set redundante
+
+            try
+            {
+                GCSettings.LargeObjectHeapCompactionMode =
+                    GCLargeObjectHeapCompactionMode.CompactOnce;
+                CollectGen2Probe();
+                GC.WaitForPendingFinalizers();
+                SetProcessWorkingSetSizeProbe();
+                LastTrimUtc = now;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.W("WorkingSetTrimmer", $"Trim falhou — fail-closed: {ex.Message}");
+                return false; // não registra tempo: próximo Trim reaproveita o retry
+            }
         }
     }
 

@@ -7,6 +7,8 @@ public sealed class ConsoleLogger : ILogger, IDisposable
     private readonly TextWriter _writer;
     private readonly Lock _lock = new();
     private readonly bool _writeTimestamps;
+    private readonly List<string> _buffer = new();
+    private const int FlushThreshold = 64;
     private bool _disposed;
 
     public ConsoleLogger(TextWriter? writer = null, bool writeTimestamps = true)
@@ -27,8 +29,10 @@ public sealed class ConsoleLogger : ILogger, IDisposable
         var line = $"{ts}[{level,-7}] [{source}] {message}";
         lock (_lock)
         {
-            try { _writer.WriteLine(line); _writer.Flush(); }
-            catch { /* silent fail — logger nunca quebra app */ }
+            _buffer.Add(line);
+            // 6.8: bufferiza e faz flush a cada 64 linhas — evita flush síncrono
+            // por linha no hot path de captura (PipelineDiag/FeedTelemetry/RAM).
+            if (_buffer.Count >= FlushThreshold) FlushLocked();
         }
     }
 
@@ -36,6 +40,26 @@ public sealed class ConsoleLogger : ILogger, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        try { _writer.Flush(); } catch { }
+        lock (_lock)
+        {
+            FlushLocked();
+        }
+    }
+
+    private void FlushLocked()
+    {
+        if (_buffer.Count == 0) return;
+        try
+        {
+            foreach (var line in _buffer)
+                _writer.WriteLine(line);
+            _buffer.Clear();
+            _writer.Flush();
+        }
+        catch
+        {
+            // logger nunca quebra o app — descarta buffer em falha de escrita
+            _buffer.Clear();
+        }
     }
 }

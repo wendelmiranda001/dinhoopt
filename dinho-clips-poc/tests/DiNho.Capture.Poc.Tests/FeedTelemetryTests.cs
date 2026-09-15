@@ -94,14 +94,66 @@ public sealed class FeedTelemetryTests
         Assert.Equal(0.0, s.FeedFps, 3);
     }
 
-    // Order de ticks anômalos (wait negativo por jitter de QPC) não deve quebrar soma.
+    // Order de ticks anômalos (wait negativo por jitter de QPC) NÃO entra na média
+    // — outlier > 100ms é excluído do cálculo, preservando a média dos frames saudáveis.
     [Fact]
-    public void TicksAnomalos_NaoQuebramAgregacao()
+    public void TicksAnomalos_SaoExcluidosDaMedia()
     {
         var t = Create(5.0);
         t.AddGoodFrame(-1_000, 500, 4_000, 20_000);
         var s = t.TryTakeSummary(5_000_000, out var summary);
         Assert.True(s);
-        Assert.Equal(-1.0, summary.WaitMs, 3);
+        // 1 frame outlier → excluded, GoodFrames still 1 but mean = 0 (no good frames used)
+        Assert.Equal(0.0, summary.WaitMs, 3);
+        Assert.Equal(1, summary.GoodFrames);
+    }
+
+    // Spike de 500ms no wait não distorce a média dos demais frames.
+    [Fact]
+    public void SingleSpike_DoesNotSkewMean()
+    {
+        var t = Create(5.0);
+        // 4 normais: wait=2ms (2000 ticks @1MHz)
+        t.AddGoodFrame(2_000, 500, 4_000, 21_000);
+        t.AddGoodFrame(2_000, 500, 4_000, 21_000);
+        t.AddGoodFrame(2_000, 500, 4_000, 21_000);
+        t.AddGoodFrame(2_000, 500, 4_000, 21_000);
+        // 1 spike: wait=500ms (500_000 ticks) → excluded
+        t.AddGoodFrame(500_000, 500, 4_000, 521_000);
+
+        Assert.True(t.TryTakeSummary(5_000_000, out var s));
+        Assert.Equal(5, s.GoodFrames);
+        Assert.Equal(2.0, s.WaitMs, 3);  // spike excluded → mean = 2.0
+    }
+
+    // Frames todos normais → média inalterada.
+    [Fact]
+    public void AllNormal_NoExclusion()
+    {
+        var t = Create(5.0);
+        t.AddGoodFrame(1_000, 500, 4_000, 20_000);
+        t.AddGoodFrame(3_000, 500, 4_000, 20_000);
+        Assert.True(t.TryTakeSummary(5_000_000, out var s));
+        Assert.Equal(2.0, s.WaitMs, 3); // mean of 1ms and 3ms
+        Assert.Equal(2, s.GoodFrames);
+    }
+
+    // Múltiplos outliers: só frames limpos contam na média.
+    [Fact]
+    public void MultipleOutliers_ExcludeAll()
+    {
+        var t = Create(5.0);
+        // 1 outlier wait
+        t.AddGoodFrame(500_000, 500, 4_000, 521_000);
+        // 1 outlier convert
+        t.AddGoodFrame(2_000, 500, 500_000, 521_000);
+        // 1 normal
+        t.AddGoodFrame(2_000, 500, 4_000, 21_000);
+
+        Assert.True(t.TryTakeSummary(5_000_000, out var s));
+        Assert.Equal(3, s.GoodFrames);
+        // Only the 1 normal frame used for mean
+        Assert.Equal(2.0, s.WaitMs, 3);
+        Assert.Equal(4.0, s.ConvertMs, 3);
     }
 }

@@ -128,4 +128,67 @@ public sealed class MachineCapabilityTests
         Assert.Equal(0, p.MaxHeight);
         Assert.Equal(120, p.ReplaySeconds);
     }
+
+    // ── 6.5: calibração por vendor ──────────────────────────────────
+
+    [Fact]
+    public void BuildProfile_Medium_Nvidia_UsesP3()
+    {
+        var p = CapabilityClassifier.BuildProfile(CapabilityTier.Medium, vendorId: 0x10DE);
+        Assert.Equal("p3", p.EncoderPreset);
+        Assert.True(p.Multipass);
+        Assert.Equal(60, p.Fps);
+        Assert.Equal(120, p.ReplaySeconds);
+    }
+
+    [Fact]
+    public void BuildProfile_Medium_Amd_KeepsDefault()
+    {
+        // Design: preset p3 só NVIDIA; AMD/Intel "mantém" o default (p5).
+        var p = CapabilityClassifier.BuildProfile(CapabilityTier.Medium, vendorId: 0x1002);
+        Assert.Equal("p5", p.EncoderPreset);
+        Assert.True(p.Multipass);
+        Assert.Equal(60, p.Fps);
+        Assert.Equal(120, p.ReplaySeconds);
+    }
+
+    [Fact]
+    public void BuildProfile_Medium_Intel_KeepsDefault()
+    {
+        var p = CapabilityClassifier.BuildProfile(CapabilityTier.Medium, vendorId: 0x8086);
+        Assert.Equal("p5", p.EncoderPreset);
+    }
+
+    [Fact]
+    public void BuildProfile_Medium_UnknownVendor_KeepsDefault()
+    {
+        var p = CapabilityClassifier.BuildProfile(CapabilityTier.Medium, vendorId: 0);
+        Assert.Equal("p5", p.EncoderPreset);
+    }
+
+    [Fact]
+    public void BuildProfile_Weak_VendorIndependent()
+    {
+        // Weak é sempre p2 (conservador), qualquer que seja o vendor.
+        Assert.Equal("p2", CapabilityClassifier.BuildProfile(CapabilityTier.Weak, 0x10DE).EncoderPreset);
+        Assert.Equal("p2", CapabilityClassifier.BuildProfile(CapabilityTier.Weak, 0x1002).EncoderPreset);
+        Assert.Equal("p2", CapabilityClassifier.BuildProfile(CapabilityTier.Weak, 0x8086).EncoderPreset);
+    }
+
+    [Fact]
+    public void BuildProfile_Strong_VendorIndependent()
+    {
+        Assert.Equal("p5", CapabilityClassifier.BuildProfile(CapabilityTier.Strong, 0x10DE).EncoderPreset);
+        Assert.Equal("p5", CapabilityClassifier.BuildProfile(CapabilityTier.Strong, 0x1002).EncoderPreset);
+        Assert.Equal("p5", CapabilityClassifier.BuildProfile(CapabilityTier.Strong, 0x8086).EncoderPreset);
+    }
+
+    // 6.5: o overload sem vendor preserva o legado (NVIDIA-oriented) —
+    // a calibração de máquina sempre passa o vendor real (EngineCoordinator.Calibration).
+    [Fact]
+    public void BuildProfile_NoVendor_Medium_PreservesLegacyP3()
+    {
+        var p = CapabilityClassifier.BuildProfile(CapabilityTier.Medium);
+        Assert.Equal("p3", p.EncoderPreset);
+    }
 }

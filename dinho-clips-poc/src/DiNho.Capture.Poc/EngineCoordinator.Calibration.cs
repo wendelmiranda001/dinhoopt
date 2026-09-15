@@ -24,7 +24,7 @@ public sealed partial class EngineCoordinator
             return false;
 
         tier = CapabilityClassifier.Classify(caps.EncodingAdapter, caps.CpuCores, caps.RamBytes);
-        var profile = CapabilityClassifier.BuildProfile(tier);
+        var profile = CapabilityClassifier.BuildProfile(tier, caps.EncodingAdapter?.VendorId ?? 0);
 
         // Defaults de referência = novos AppConfig (idênticos aos `_defaults` do ConfigManager).
         var calibrated = CalibratedDefaults.Apply(config.Config, new AppConfig(), profile);

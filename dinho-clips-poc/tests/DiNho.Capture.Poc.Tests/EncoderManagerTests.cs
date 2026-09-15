@@ -410,6 +410,89 @@ public sealed class EncoderManagerTests
         Assert.NotEqual(0, EncoderManager.DetectEncodingVendorId());
     }
 
+    // ── 6.4: ranking canônico compartilhado (PickBestAdapter) ────────
+
+    private static EncoderManager.GpuAdapterInfo MakeAdapter(string name, int vendorId, long vramBytes) => new()
+    {
+        Index = 0,
+        Name = name,
+        VendorId = vendorId,
+        VideoMemoryBytes = vramBytes,
+    };
+
+    [Fact]
+    public void PickBestAdapter_PrefersNvidiaDiscrete_OverAmd()
+    {
+        var adapters = new[]
+        {
+            MakeAdapter("AMD", 0x1002, 16L * 1024 * 1024 * 1024),
+            MakeAdapter("NVIDIA", 0x10DE, 8L * 1024 * 1024 * 1024),
+        };
+
+        var picked = EncoderManager.PickBestAdapter(adapters);
+
+        Assert.NotNull(picked);
+        Assert.Equal(0x10DE, picked!.VendorId); // NVIDIA vence mesmo com menos VRAM
+    }
+
+    [Fact]
+    public void PickBestAdapter_PrefersDiscreteOverIgpu()
+    {
+        var adapters = new[]
+        {
+            MakeAdapter("Intel iGPU", 0x8086, 16L * 1024 * 1024 * 1024),
+            MakeAdapter("AMD dGPU", 0x1002, 6L * 1024 * 1024 * 1024),
+        };
+
+        var picked = EncoderManager.PickBestAdapter(adapters);
+
+        Assert.Equal(0x1002, picked!.VendorId); // dGPU AMD vence a iGPU Intel
+    }
+
+    [Fact]
+    public void PickBestAdapter_IgpuOnly_ReturnsIgpu()
+    {
+        var adapters = new[]
+        {
+            MakeAdapter("Intel iGPU", 0x8086, 0),
+        };
+
+        var picked = EncoderManager.PickBestAdapter(adapters);
+
+        Assert.Equal(0x8086, picked!.VendorId);
+    }
+
+    [Fact]
+    public void PickBestAdapter_Empty_ReturnsNull()
+    {
+        Assert.Null(EncoderManager.PickBestAdapter(Array.Empty<EncoderManager.GpuAdapterInfo>()));
+    }
+
+    [Fact]
+    public void PickBestAdapter_UnknownVendorOnly_ReturnsNull()
+    {
+        var adapters = new[]
+        {
+            MakeAdapter("Weird GPU", 0x1234, 8L * 1024 * 1024 * 1024),
+        };
+
+        Assert.Null(EncoderManager.PickBestAdapter(adapters));
+    }
+
+    [Fact]
+    public void PickBestAdapter_AmdVram_TieBreakByMemory()
+    {
+        var adapters = new[]
+        {
+            MakeAdapter("AMD A", 0x1002, 4L * 1024 * 1024 * 1024),
+            MakeAdapter("AMD B", 0x1002, 12L * 1024 * 1024 * 1024),
+        };
+
+        var picked = EncoderManager.PickBestAdapter(adapters);
+
+        Assert.Equal("AMD B", picked!.Name); // mesmo vendor → mais VRAM
+    }
+
     // ── MapUserCodec / SupportsAv1Hardware — AV1 with zero/unknown vendor ──
 
     [Fact]

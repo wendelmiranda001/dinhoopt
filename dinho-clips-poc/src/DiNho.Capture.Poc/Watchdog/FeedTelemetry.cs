@@ -22,13 +22,20 @@ internal sealed class FeedTelemetry
     private int _goodFrames;
     private int _encodeNulls;
     private int _failFrames;
-    private double _waitTicks;
-    private double _copyTicks;
-    private double _convertTicks;
-    private double _totalTicks;
+    private readonly List<long> _waitSamples = new();
+    private readonly List<long> _copySamples = new();
+    private readonly List<long> _convertSamples = new();
+    private readonly List<long> _totalSamples = new();
     private long _queueDepthSum;
     private long _queueDepthCount;
     private int _queueDepthMax;
+
+    /// <summary>
+    /// Limite de outlier por estágio (ms). Frames com qualquer estágio acima disso —
+    /// ou com valor negativo (jitter de QPC ao reiniciar o WGC) — são excluídos da média.
+    /// </summary>
+    private const int OutlierMs = 100;
+    private readonly long _outlierTicks;
 
     /// <param name="freq">Ticks por segundo (default: <see cref="Stopwatch.Frequency"/>).</param>
     internal FeedTelemetry(double windowSeconds = 5.0, long freq = 0)
@@ -36,6 +43,7 @@ internal sealed class FeedTelemetry
         _windowSeconds = Math.Max(0.1, windowSeconds);
         _freq = freq > 0 ? freq : Stopwatch.Frequency;
         _windowTicks = (long)(_freq * _windowSeconds);
+        _outlierTicks = _freq * OutlierMs / 1000;
     }
 
     internal int GoodFrames
@@ -58,10 +66,10 @@ internal sealed class FeedTelemetry
         lock (_sync)
         {
             _goodFrames++;
-            _waitTicks += waitTicks;
-            _copyTicks += copyTicks;
-            _convertTicks += convertTicks;
-            _totalTicks += totalTicks;
+            _waitSamples.Add(waitTicks);
+            _copySamples.Add(copyTicks);
+            _convertSamples.Add(convertTicks);
+            _totalSamples.Add(totalTicks);
         }
     }
 
@@ -100,14 +108,17 @@ internal sealed class FeedTelemetry
                 return false;
             }
 
+            // 6.12: média dos frames limpos — exclui outliers por estágio (>100ms ou <0).
+            (var waitMs, var copyMs, var convertMs, var totalMs) = ComputeCleanMeans();
+
             summary = new FeedSummary(
                 GoodFrames: _goodFrames,
                 EncodeNulls: _encodeNulls,
                 FailFrames: _failFrames,
-                WaitMs: Ms(TicksToMs(_waitTicks) / Math.Max(1, _goodFrames)),
-                CopyMs: Ms(TicksToMs(_copyTicks) / Math.Max(1, _goodFrames)),
-                ConvertMs: Ms(TicksToMs(_convertTicks) / Math.Max(1, _goodFrames)),
-                TotalMs: Ms(TicksToMs(_totalTicks) / Math.Max(1, _goodFrames)),
+                WaitMs: waitMs,
+                CopyMs: copyMs,
+                ConvertMs: convertMs,
+                TotalMs: totalMs,
                 FeedFps: _goodFrames / _windowSeconds,
                 QueueDepthAvg: _queueDepthCount > 0 ? _queueDepthSum / (double)_queueDepthCount : 0,
                 QueueDepthMax: _queueDepthMax);
@@ -116,16 +127,48 @@ internal sealed class FeedTelemetry
             _goodFrames = 0;
             _encodeNulls = 0;
             _failFrames = 0;
-            _waitTicks = 0;
-            _copyTicks = 0;
-            _convertTicks = 0;
-            _totalTicks = 0;
+            _waitSamples.Clear();
+            _copySamples.Clear();
+            _convertSamples.Clear();
+            _totalSamples.Clear();
             _queueDepthSum = 0;
             _queueDepthCount = 0;
             _queueDepthMax = 0;
             return true;
         }
     }
+
+    private (double WaitMs, double CopyMs, double ConvertMs, double TotalMs) ComputeCleanMeans()
+    {
+        long waitSum = 0, copySum = 0, convertSum = 0, totalSum = 0;
+        int clean = 0;
+
+        for (int i = 0; i < _waitSamples.Count; i++)
+        {
+            var w = _waitSamples[i];
+            var c = _copySamples[i];
+            var cv = _convertSamples[i];
+            var t = _totalSamples[i];
+            if (IsOutlier(w) || IsOutlier(c) || IsOutlier(cv) || IsOutlier(t))
+                continue;
+            waitSum += w;
+            copySum += c;
+            convertSum += cv;
+            totalSum += t;
+            clean++;
+        }
+
+        if (clean == 0)
+            return (0, 0, 0, 0);
+
+        return (
+            Ms(TicksToMs(waitSum) / clean),
+            Ms(TicksToMs(copySum) / clean),
+            Ms(TicksToMs(convertSum) / clean),
+            Ms(TicksToMs(totalSum) / clean));
+    }
+
+    private bool IsOutlier(long ticks) => ticks < 0 || ticks > _outlierTicks;
 
     private double TicksToMs(double ticks) => ticks * 1000.0 / _freq;
     private static double Ms(double ms) => Math.Round(ms, 2);

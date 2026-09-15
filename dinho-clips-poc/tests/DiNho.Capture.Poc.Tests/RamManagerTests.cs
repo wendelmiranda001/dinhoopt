@@ -2,8 +2,14 @@ using DiNho.Capture.Poc.Memory;
 
 namespace DiNho.Capture.Poc.Tests;
 
-public sealed class RamManagerTests
+public sealed class RamManagerTests : IDisposable
 {
+    private readonly Func<long> _originalProbe;
+
+    public RamManagerTests() => _originalProbe = RamManager.GetAvailableRamBytesProbe;
+
+    public void Dispose() => RamManager.GetAvailableRamBytesProbe = _originalProbe;
+
     [Fact]
     public void ComputeSafeBudget_HugeRam_FullBudget()
     {
@@ -251,5 +257,91 @@ public sealed class RamManagerTests
         Assert.Equal(600, p.ReplaySeconds);
         Assert.Equal(1920, p.EncodeWidth);
         Assert.Equal(1080, p.EncodeHeight);
+    }
+
+    // ── 6.10: ResolveMaxBufferBytes (clamp explícito, sem overflow) ──
+
+    [Fact]
+    public void ResolveMaxBufferBytes_HighBitrate_ClampsToBudgetAndIntMax()
+    {
+        // Bitrate extremo + budget de 3GB → wanted >> int.MaxValue.
+        // O clamp final não pode lançar exceção nem produzir negativo.
+        int result = RamManager.ResolveMaxBufferBytes(
+            defaultMaxBufferBytes: 512 * 1024 * 1024,
+            maxrateKbps: 200_000,
+            replaySeconds: 300,
+            safeBudgetBytes: 3L * 1024 * 1024 * 1024);
+
+        Assert.True(result > 0);
+        // 3GB * 0.75 = 2.41GB > int.MaxValue → cap no int.MaxValue (sem overflow negativo).
+        Assert.Equal(int.MaxValue, result);
+    }
+
+    [Fact]
+    public void ResolveMaxBufferBytes_LowBudget_CappedBelowDefault()
+    {
+        // Budget de 150MB → limite 75% = 112MB → mesmo com default 512MB, perde pro teto.
+        int result = RamManager.ResolveMaxBufferBytes(
+            defaultMaxBufferBytes: 512 * 1024 * 1024,
+            maxrateKbps: 50_000,
+            replaySeconds: 300,
+            safeBudgetBytes: 150L * 1024 * 1024);
+
+        Assert.True(result < 512 * 1024 * 1024);
+        Assert.True(result >= 80 * 1024 * 1024); // piso nunca quebra o mínimo
+    }
+
+    [Fact]
+    public void ResolveMaxBufferBytes_FitsInBudget_RaisesToNeeded()
+    {
+        // Default 256MB; bitrate pede mais; budget cabe → usa o necessário.
+        int result = RamManager.ResolveMaxBufferBytes(
+            defaultMaxBufferBytes: 256 * 1024 * 1024,
+            maxrateKbps: 30_000,
+            replaySeconds: 180,
+            safeBudgetBytes: 2L * 1024 * 1024 * 1024);
+
+        // 30000 * 180 * 1024 * 13 / 80 = 898,560,000
+        Assert.Equal(898_560_000, result);
+        Assert.True(result <= 2L * 1024 * 1024 * 1024 * 3 / 4);
+    }
+
+    [Fact]
+    public void ResolveMaxBufferBytes_NeverAboveBudgetPortion()
+    {
+        // Invariante central: p/ qualquer entrada, resultado ≤ 75% do safe budget.
+        foreach (var budget in new[] { 200L * 1024 * 1024, 512L * 1024 * 1024, 2L * 1024 * 1024 * 1024, 8L * 1024 * 1024 * 1024 })
+        {
+            int result = RamManager.ResolveMaxBufferBytes(512 * 1024 * 1024, 120_000, 600, budget);
+            long budgetLimit = budget * 3 / 4;
+            Assert.True(result <= budgetLimit, $"result {result} > budgetLimit {budgetLimit} for budget {budget}");
+            Assert.True(result >= 80 * 1024 * 1024);
+        }
+    }
+
+    // ── 6.10: ResolveProfile honra o teto RAM no cenário real ─────────
+
+    [Fact]
+    public void ResolveProfile_LimitedRam_NeverBlowsBudgetPortion()
+    {
+        // 1.5GB disponíveis → safe budget ~900MB → limite 75% ~675MB.
+        RamManager.GetAvailableRamBytesProbe = () => 1536L * 1024 * 1024;
+        using var rm = new RamManager(1920, 1080, 300, 24);
+        var p = rm.ResolveProfile();
+
+        Assert.True(p.MaxBufferBytes > 0);
+        Assert.True(p.MaxBufferBytes <= 1536L * 1024 * 1024, "buffer nunca acima da RAM disponível");
+    }
+
+    [Fact]
+    public void ResolveProfile_HugeRam_NoOverflowKeepsPositive()
+    {
+        // 64GB → budgetLimit ~48GB > int.MaxValue → sem overflow negativo.
+        RamManager.GetAvailableRamBytesProbe = () => 64L * 1024 * 1024 * 1024;
+        using var rm = new RamManager(1920, 1080, 1800, 24, configuredMaxrateKbps: 200_000);
+        var p = rm.ResolveProfile();
+
+        Assert.True(p.MaxBufferBytes > 0, $"MaxBufferBytes must stay positive, got {p.MaxBufferBytes}");
+        Assert.True(p.MaxBufferBytes <= int.MaxValue);
     }
 }

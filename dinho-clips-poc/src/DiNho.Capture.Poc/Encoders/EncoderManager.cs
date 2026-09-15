@@ -227,23 +227,31 @@ public sealed class EncoderManager : IDisposable
         return adapters;
     }
 
+    /// <summary>
+    /// Ranking canônico do adapter de encode (6.4): discreta NVIDIA > AMD por VRAM, senão
+    /// qualquer suportada (iGPU Intel). ÚNICA fonte da verdade — usado por
+    /// <c>DetectEncodingVendorId</c> e por <c>MachineCapabilities.PickEncodingAdapter</c>
+    /// (que antes duplicava esta lógica e podia divergir silenciosamente).
+    /// </summary>
+    public static GpuAdapterInfo? PickBestAdapter(IReadOnlyList<GpuAdapterInfo> adapters)
+    {
+        var discrete = adapters
+            .Where(a => a.VendorId is 0x10DE or 0x1002)
+            .OrderByDescending(a => a.VendorId == 0x10DE ? 2 : 1) // NVIDIA first
+            .ThenByDescending(a => a.VideoMemoryBytes)
+            .FirstOrDefault();
+        if (discrete != null) return discrete;
+
+        return adapters.FirstOrDefault(a => a.VendorId is 0x10DE or 0x1002 or 0x8086);
+    }
+
     /// <summary>Detect the primary encoding vendor from the list of available adapters.
     /// For hybrid laptops (iGPU + dGPU), picks the first discrete GPU with encoding support.
     /// Falls back to first adapter if no discrete GPU found.</summary>
     public static int DetectEncodingVendorId()
     {
         var adapters = DetectAllGpuAdapters();
-
-        // Prefer discrete GPU (NVIDIA > AMD > Intel) — these have dedicated encoders
-        var discrete = adapters
-            .Where(a => a.VendorId is 0x10DE or 0x1002)
-            .OrderByDescending(a => a.VendorId == 0x10DE ? 2 : 1) // NVIDIA first
-            .ThenByDescending(a => a.VideoMemoryBytes)
-            .FirstOrDefault();
-        if (discrete != null) return discrete.VendorId;
-
-        // Fallback to any supported vendor
-        return adapters.FirstOrDefault(a => a.VendorId is 0x10DE or 0x1002 or 0x8086)?.VendorId ?? 0;
+        return PickBestAdapter(adapters)?.VendorId ?? 0;
     }
 
     public static string GetPreferredCodec(int vendorId)

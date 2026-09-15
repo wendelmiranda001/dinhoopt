@@ -78,10 +78,32 @@ public sealed class RamManager : IDisposable
     public Action<int>? OnReduceReplay { get; set; }
     public Action? OnNormal { get; set; }
 
+    // 6.10: seam de RAM disponível p/ testes determinísticos do ResolveProfile.
+    internal static Func<long> GetAvailableRamBytesProbe = GetAvailableRamBytes;
+
     public static long ComputeSafeBudget(long availableBytes)
     {
         long budget = availableBytes - GameReserveBytes - CaptureOverheadBytes;
         return Math.Clamp(budget, MinBufferBytes, int.MaxValue);
+    }
+
+    /// <summary>
+    /// Clamp explícito do MaxBufferBytes (6.10): o buffer efetivo NUNCA excede
+    /// 75% do safe budget (teto de RAM), sobe até o necessário pro bitrate×replay
+    /// quando o default do perfil é pequeno, e nunca estoura int (overflow negativo
+    /// em máquinas com &gt;3GB de budget era possível antes do cast final).
+    /// </summary>
+    public static int ResolveMaxBufferBytes(
+        int defaultMaxBufferBytes,
+        long maxrateKbps,
+        int replaySeconds,
+        long safeBudgetBytes)
+    {
+        long neededBytes = maxrateKbps * replaySeconds * 1024L * 13L / 80L; // +30% headroom
+        long budgetLimit = safeBudgetBytes * 3 / 4;                        // no máx. 75% do safe budget
+        long wanted = Math.Max(defaultMaxBufferBytes, neededBytes);
+        long capped = Math.Min(wanted, budgetLimit);
+        return (int)Math.Clamp(capped, MinBufferBytes, int.MaxValue);
     }
 
     /// <summary>
@@ -168,7 +190,7 @@ public sealed class RamManager : IDisposable
 
     public CaptureProfile ResolveProfile()
     {
-        long availableBytes = GetAvailableRamBytes();
+        long availableBytes = GetAvailableRamBytesProbe();
         long budgetBytes = ComputeSafeBudget(availableBytes);
         int budgetMb = (int)(budgetBytes / (1024L * 1024L));
 
@@ -191,13 +213,12 @@ public sealed class RamManager : IDisposable
             _configuredBframes,
             _configuredLookahead);
 
-        // Override MaxBufferBytes based on actual bitrate × replay duration
+        // Override MaxBufferBytes based on actual bitrate × replay duration.
         // Fixed 512MB for Full profile is insufficient at higher bitrates
-        // (observed: 512MB holds only ~151s at 15.8 Mbps → TrimExcess evicts)
-        long neededBytes = (long)profile.MaxrateKbps * profile.ReplaySeconds * 1024L * 13L / 80L; // +30% headroom
-        long maxAllowed = Math.Min(neededBytes, int.MaxValue);
-        long budgetLimit = (long)budgetMb * 1024 * 1024 * 3 / 4; // at most 75% of safe budget
-        profile.MaxBufferBytes = (int)Math.Max(profile.MaxBufferBytes, Math.Min(maxAllowed, budgetLimit));
+        // (observed: 512MB holds only ~151s at 15.8 Mbps → TrimExcess evicts).
+        // 6.10: o clamp passa por ResolveMaxBufferBytes (nunca > 75% do safe budget).
+        profile.MaxBufferBytes = ResolveMaxBufferBytes(
+            profile.MaxBufferBytes, profile.MaxrateKbps, profile.ReplaySeconds, budgetBytes);
 
         _lastProfile = profile;
         _wasUnderPressure = level != RamProfileLevel.Full;
