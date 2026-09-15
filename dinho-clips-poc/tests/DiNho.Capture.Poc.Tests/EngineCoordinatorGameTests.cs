@@ -316,7 +316,7 @@ public sealed class EngineCoordinatorGameTests : IDisposable
         // Fuzzy match strips _b\d+_ and finds the running FiveM process if present
         // Result is valid when FiveM is running, invalid when not — both are correct
         if (System.Diagnostics.Process.GetProcessesByName("FiveM").Length > 0 ||
-            System.Diagnostics.Process.GetProcessesByName("FiveM_b3258_GTA5").Length > 0)
+            System.Diagnostics.Process.GetProcessesByName("FiveM_b3258_GTAProcess").Length > 0)
             Assert.True(result!.IsValid);
         else
             Assert.False(result!.IsValid);

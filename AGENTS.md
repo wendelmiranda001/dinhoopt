@@ -88,22 +88,12 @@ Commit format: `<type>: <description>` — Types: feat, fix, refactor, docs, tes
 - C#: ~1298 testes, 0 falhas (flakiness conhecida e documentada no ConsoleLogger/vstest, não é bug real)
 - Biome: 0 erros, 0 warnings (`noExplicitAny` habilitado e limpo)
 
-**Em andamento — G3 Plan (varredura de bugs no backend `src/main/`):**
-- Escopo: IPC handlers, services, CLI, rules, platform, constants, `index.ts` — 8 tipos de verificação por arquivo (error handling, input validation, race conditions, resource leaks, dead code, type safety, consistency, test coverage). Achados registrados em `docs/G3-SCAN-LOG.md`, severidade CRITICAL/HIGH/MEDIUM/LOW.
-- Status por sessão:
-  | # | Escopo | Status |
-  |---|--------|--------|
-  | 1 | `src/main/ipc/*.ipc.ts` (raiz) | ✅ Concluída e commitada |
-  | 2 | `src/main/ipc/{debloater,windows-tweaks,game-mode}/` | ⏳ Fixes prontos no working tree, commit pendente |
-  | 3 | `src/main/ipc/{registry-cleaner,driver-manager}/` + restantes | ⏳ Não iniciada |
-  | 4 | `src/main/services/malware-scanner/` | ✅ Concluída e commitada (`0b556db`) |
-  | 5 | `src/main/services/privacy-shield/` | ✅ Concluída e commitada (`906903b`) |
-  | 6 | `src/main/services/registry-cleaner/` | ✅ Concluída e commitada (`1bf7398` + `17115e5`) |
-  | 7 | `src/main/services/` raiz parte 1 (schedulers, updater, perf, disk, memory) | ✅ Concluída e commitada (`bc89550`) |
-  | 8 | `src/main/services/` raiz parte 2 (settings, stores, misc) | ✅ Concluída e commitada (`96cac67`) |
-  | 9 | `src/main/cli/` (router + 14+ commands) | ✅ Concluída e commitada (`7e53c06`) |
-  | 10 | `src/main/{rules,platform,constants,index.ts}` + triagem/closeout | ✅ Concluída e commitada |
-- G3 completa (S4–S10): suíte final 238 files, 2 failed pré-existentes (environment-cleaner.ipc.test.ts:536, startup-manager.ipc.test.ts:697) | 6988 passed | 1 skipped; Biome 0 erros. Detalhes em `SESSION-HISTORY.md` (2026-09-13).
+**Em andamento — A/V drift + bottleneck do feed (~46fps, FiveM + av1_nvenc 1080p60):**
+- **Probe NVENC (`--probe-nvenc [W H FPS]`)** criado e validado: av1_nvenc sustenta 204–226 fps em TODOS os presets (p1–p7) com cadeia de produção (cq18/lookahead16/multipass fullres) — **encoder NÃO é o gargalo** (corrige diagnóstico anterior que culpava o NVENC).
+- Log 2026-09-14: 25924 frames → ~46.3 fps de feed; **0 output-channel overflows / 1 input overflow** em 9min → o limite (~46fps) está na alimentação (captura→NV12→stdin), não no encodador.
+- **Bug de PTS corrigido (av1_nvenc/IVF)**: `ProcessIvfFrames` usava PTS sintético por frame-index em vez do PTS real de captura (`_inputPtsQueue`, como a rota AnnexB) ⇒ drift A/V crescente ~0,23 s/s quando feed < 60fps. Fix espelha `EmitPacket` (dequeue real / extrapola / não-monotônico). 4 testes novos.
+- **Instrumentação `FeedTelemetry` criada (TDD, 7 testes, 1459/1459 GREEN):** loga a cada ~5s o breakdown por estágio do feed — `fps good fail enqNull | wait=x ms copy=x ms convert=x ms total=x ms | queue=avg/max` (canal `FeedTelemetry` no JSONL). `wait` = WaitOne do WGC, `copy` = CopyResource p/ pool, `convert` = ConvertGpuNv12+enqueue, `total` = iteração inteira. `TryCaptureFrame` já media wait/copy (`WaitEndTicks`/`CopyEndTicks`) mas NADA disso ia pro log.
+- **Diagnóstico concluído (sessão real FiveM, 2026-09-15):** `wait`=11,6ms dominante (69% do budget), `convert`=2,5ms (GPU **NÃO** saturada — 15% do budget), `copy`=0,1ms, `queue`=0 (encoder nunca engasga). Feed = 46,9fps ≈ cadência de entrega do WGC (game render ~47fps sob carga de captura+NVENC). Encoder (probe 204–226fps) e convert (2,5ms) **NÃO são gargalo** — preset adaptativo NVENC **despriorizado**. Fix de PTS IVF confirmado: exports com PTS-DRIFT ±10ms.
 
 **GREEN (corte vertical puro commitado) — Multi-Track Audio** (Item 5, commit `14d939b: MultiTrackAudioPolicy + AudioTrackKind 5/5 + corte puro GREEN; depois colei `MultiTrackAudioPolicyTests.cs` com mais seams de teste):
 - **O que cortou GREEN:** política PURA `MultiTrackAudioPolicy.ResolveTracks` (ranking estável `AudioTrackKind`: Game default rank 0 > Discord rank 1 só com config explícita > Mic rank 2) + fails com erro claro se NENHUMA trilha disponível (nunca sessão muda). 5 testes verdes via `--filter "FullyQualifiedName~MultiTrackAudioPolicyTests"`, dll 5/5 GREEN, EXIT 0.
