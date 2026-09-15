@@ -556,6 +556,175 @@ public sealed class EncoderManager : IDisposable
         }
     }
 
+    // ── NVENC preset adaptativo ─────────────────────────────────────
+
+    /// <summary>Delegado de probe trocável nos testes. Retorna achievedFps (double?) do encode
+    /// de teste na resolução/fps alvo com o preset NVENC dado, ou null quando o probe falha.
+    /// Exceções são permitidas — degradam para o preset mais rápido (p1).</summary>
+    internal static Func<string, int, int, int, string, double?> ProbeNvencSpeedProbe = ProbeNvencSpeed;
+
+    private static readonly Lock NvencPresetCacheLock = new();
+    private static Dictionary<string, string>? _nvencPresetCache;
+
+    /// <summary>Limpa o cache de preset NVENC (usado nos testes entre cenários).</summary>
+    internal static void ResetNvencPresetCache()
+    {
+        lock (NvencPresetCacheLock) _nvencPresetCache = null;
+    }
+
+    internal static bool IsNvencCodec(string codec) =>
+        codec is "h264_nvenc" or "hevc_nvenc" or "av1_nvenc";
+
+    /// <summary>Seleciona o preset NVENC por máquina: tenta p7 (melhor qualidade), degrada até p1
+    /// (mais rápido) quando o encode real não sustenta ≥85% do fps alvo na resolução da captura.
+    /// Espelho do SelectAmfPreset — RTX 5050 sustenta só ~46fps em av1_nvenc p5 1080p60 (drift A/V
+    /// crescente): o probe acha o degrau mais pesado que a máquina segura, preservando o fps.
+    /// Cache por codec|res|fps — um probe por combinação por sessão.</summary>
+    internal static string SelectNvencPreset(string codec, int width, int height, int fps)
+    {
+        if (!IsNvencCodec(codec)) return "p4";
+        var key = $"{codec}|{width}x{height}@{fps}";
+        lock (NvencPresetCacheLock)
+        {
+            if (_nvencPresetCache != null && _nvencPresetCache.TryGetValue(key, out var cached))
+                return cached;
+        }
+
+        var result = "p1";
+        foreach (var preset in new[] { "p7", "p6", "p5", "p4", "p3", "p2", "p1" })
+        {
+            double? achieved;
+            try { achieved = ProbeNvencSpeedProbe(codec, width, height, fps, preset); }
+            catch { continue; }
+            if (achieved == null) continue;
+            if (achieved >= fps * 0.85) { result = preset; break; }
+        }
+
+        lock (NvencPresetCacheLock)
+        {
+            _nvencPresetCache ??= new Dictionary<string, string>();
+            _nvencPresetCache[key] = result;
+        }
+        return result;
+    }
+
+    /// <summary>Probe real do preset NVENC: codifica frames dummy NV12 na resolução/fps alvo com o
+    /// preset dado e mede achievedFps = frames entregues / tempo real decorrido. O encode usa a MESMA
+    /// cadeia de tune do pipeline de produção (cq=18 maxrate=55000 bufsize=110000 bf=0 lookahead=16
+    /// multipass fullres — mesma config observada na RTX 5050), então o número medido reflete o
+    /// throughput real que o pipeline teria, não um cenário idealizado. O STEADY-STATE é medido com
+    /// warmup antes (frames de aquecimento amortizam spawn + init da sessão NVENC + primeira pass do
+    /// multipass) e janela cronometrada depois — um probe de 5 frames mede só startup (~0.6s) e dá
+    /// ~7fps em TODO preset (ruído), inutilizável para comparar p1..p7.</summary>
+    internal static double? ProbeNvencSpeed(string codec, int width, int height, int fps, string preset)
+        => RunNvencThroughputProbe(codec, width, height, fps, preset, extraArgs: "");
+
+    /// <summary>Probe comum de throughput NVENC: roda o encode dummy NV12 com warmup + janela
+    /// cronometrada (steady-state) e devolve achievedFps (double?) ou null quando o ffmpeg sai com
+    /// exit != 0 (preset/opção inválida no driver real). Os parâmetros de qualidade reproduzem a
+    /// config de produção do MachineProfile Strong observada no drift A/V.
+    ///
+    /// Medição: o writer roda em background e escreve o mais rápido que o ffmpeg consome — o pipe
+    /// (64KB) atua como backpressure natural, então o instante em que cada frame é aceito pelo stdin
+    /// espelha o throughput real do encoder após o warmup (fila saturada). A medida é a taxa de
+    /// escrita dos últimos `measureFrames` frames (janela pós-warmup), compatível para comparar
+    /// presets; AV1 = mesma cadeia multipass fullres do pipeline. Sem draft em background o pipe de
+    /// stdout enche e o ffmpeg trava o stdin → deadlock (por isso o drain é concorrente e há kill
+    /// guard + timeout — nunca deixa o probe pendurar).</summary>
+    internal static double? RunNvencThroughputProbe(string codec, int width, int height, int fps, string preset, string extraArgs)
+    {
+        var tune = FfmpegEncoder.BuildEncoderTuneArgs(
+            codec, cq: 18, maxrateKbps: 55000, bufsizeKbps: 110000,
+            bframes: 0, lookahead: 16, nvencPreset: preset, multipass: true);
+        var rawFmt = FfmpegEncoder.GetRawFormatForCodec(codec);
+        var outputFmt = rawFmt == "av1" ? "ivf" : rawFmt;
+        const int warmupFrames = 30;
+        const int measureFrames = 90;
+        var args = $"-y -loglevel error -f rawvideo -pix_fmt nv12 -s {width}x{height} " +
+                   $"-r {fps} -i pipe:0 " +
+                   $"-colorspace bt709 -color_primaries bt709 -color_trc bt709 " +
+                   $"-c:v {codec} {tune} -frames:v {warmupFrames + measureFrames}{extraArgs} -f {outputFmt} pipe:1";
+        try
+        {
+            using var process = new Process
+            {
+                StartInfo = FfmpegPathResolver.CreateFfmpegStartInfo(args: args, redirectInput: true, redirectOutput: true, redirectError: true)
+            };
+            process.Start();
+            try { process.PriorityClass = ProcessPriorityClass.Idle; } catch { }
+
+            var frameSize = width * height * 3 / 2; // NV12
+            // Padrão content-like (gradiente de faixa com movimento por frame): mantém o encoder
+            // ocupado e diferencia presets — gray puro NVENC codifica em ~300fps e achata o ranking.
+            var frame = new byte[frameSize];
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var writeTimes = new double[warmupFrames + measureFrames];
+            var written = 0;
+
+            // Drain de stdout/stderr em background — sem isso o pipe (64KB) enche, o ffmpeg bloqueia
+            // o stdin e o writer pendura (deadlock).
+            var drainTask = Task.Run(() =>
+            {
+                var buf = new byte[64 * 1024];
+                int n;
+                try { while ((n = process.StandardOutput.BaseStream.Read(buf, 0, buf.Length)) > 0) { } }
+                catch { /* pipe fechado pelo kill */ }
+            });
+            var stderrTask = Task.Run(() =>
+            {
+                try { while (process.StandardError.ReadLine() != null) { } }
+                catch { /* pipe fechado pelo kill */ }
+            });
+
+            // Writer em background: escreve frames o mais rápido que o ffmpeg consome; o bloqueio do
+            // Write no pipe cheio = encoder ocupado (backpressure natural = throughput real).
+            var writerTask = Task.Run(() =>
+            {
+                try
+                {
+                    var stdin = process.StandardInput.BaseStream;
+                    for (int i = 0; i < warmupFrames + measureFrames; i++)
+                    {
+                        for (int row = 0; row < height; row++)
+                        {
+                            byte val = (byte)(16 + ((row + i * 3) % (height / 2)) * 255 / (height / 2));
+                            Array.Fill(frame, val, row * width, width);
+                        }
+                        var t0 = sw.ElapsedMilliseconds;
+                        stdin.Write(frame, 0, frameSize);
+                        var t1 = sw.ElapsedMilliseconds;
+                        writeTimes[i] = (t0 + t1) / 2.0; // meio do write = frame efetivamente aceito
+                        written = i + 1;
+                    }
+                    try { stdin.Close(); } catch { }
+                }
+                catch { /* ffmpeg morto pelo kill guard → pipe partido */ }
+            });
+
+            bool killed = false;
+            if (!process.WaitForExit(30_000))
+            {
+                killed = true;
+                try { process.Kill(entireProcessTree: true); } catch { }
+                process.WaitForExit(3000);
+            }
+            Task.WaitAll(new[] { writerTask, drainTask, stderrTask }, 8000);
+            sw.Stop();
+
+            if (!killed && process.ExitCode != 0) return null;
+            // Taxa na janela pós-warmup: últimos `measureFrames` escritos concluídos. Se o encoder
+            // parou antes (kill), só conta os frames que de fato passaram pelo pipe.
+            int end = written;
+            int startIdx = Math.Max(0, end - measureFrames);
+            if (end - startIdx < 2 || writeTimes[end - 1] <= writeTimes[startIdx]) return null;
+            return Math.Round((end - startIdx) * 1000.0 / (writeTimes[end - 1] - writeTimes[startIdx]), 2);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     // ── AMF preanalysis/TAQ adaptativo ───────────────────────────────
 
     private static readonly Lock AmfPreanalysisCacheLock = new();

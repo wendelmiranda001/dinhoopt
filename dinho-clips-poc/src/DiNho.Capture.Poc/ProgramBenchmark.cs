@@ -48,6 +48,54 @@ internal static class ProgramBenchmark
         }
     }
 
+    /// <summary>
+    /// CLI --probe-nvenc: mede achievedFps real de cada preset NVENC (p7→p1) na resolução/fps
+    /// alvo (default 1920x1080@60, override via args). Usa a MESMA cadeia de tune de produção
+    /// (cq18/lookahead16/multipass fullres) — o número medido é o throughput que o pipeline teria.
+    /// Diagnóstico do drift A/V: av1_nvenc p5 sustentava só ~46fps (0.76x) → vídeo atrasava.
+    /// </summary>
+    internal static void ProbeNvencPresets(string widthArg, string heightArg, string fpsArg)
+    {
+        int.TryParse(widthArg, out var w);
+        int.TryParse(heightArg, out var h);
+        int.TryParse(fpsArg, out var fps);
+        int width = w > 0 ? w : 1920;
+        int height = h > 0 ? h : 1080;
+        int targetFps = fps > 0 ? fps : 60;
+
+        Console.WriteLine("=== NVENC Throughput Probe ===");
+        Console.WriteLine($"Resolução: {width}x{height}@{targetFps}fps | cadeia = produção (cq18/lookahead16/multipass fullres)");
+        Console.WriteLine();
+
+        foreach (var codec in new[] { "av1_nvenc", "hevc_nvenc", "h264_nvenc" })
+        {
+            if (!EncoderManager.CheckFfmpegEncoder(codec))
+            {
+                Console.WriteLine($"  {codec}: ffmpeg sem suporte — pulado");
+                Console.WriteLine();
+                continue;
+            }
+            Console.WriteLine($"-- {codec} --");
+            double? best = null;
+            string? bestPreset = null;
+            foreach (var preset in new[] { "p7", "p6", "p5", "p4", "p3", "p2", "p1" })
+            {
+                double? achieved;
+                try { achieved = EncoderManager.ProbeNvencSpeed(codec, width, height, targetFps, preset); }
+                catch { achieved = null; }
+                string ok = achieved.HasValue && achieved >= targetFps * 0.85 ? "  ✓ sustenta" : "";
+                Console.WriteLine($"    {preset}: {(achieved.HasValue ? $"{achieved.Value:0.00} fps" : "falhou")}{ok}");
+                if (achieved.HasValue && (!best.HasValue || achieved > best))
+                {
+                    best = achieved;
+                    bestPreset = preset;
+                }
+            }
+            Console.WriteLine($"  → melhor preset que sustenta ≥{targetFps * 0.85:F0}fps: {bestPreset} ({best:0.00})");
+            Console.WriteLine();
+        }
+    }
+
     internal static void ShowHelp()
     {
         Console.WriteLine("DiNho Clips Engine v1.0.0");
@@ -60,6 +108,7 @@ internal static class ProgramBenchmark
         Console.WriteLine("  DiNho.Capture.Poc --force-software    Força encoder CPU (sem GPU)");
         Console.WriteLine("  DiNho.Capture.Poc --duration <seg>    Tempo limite de gravação (ex.: --duration 300)");
         Console.WriteLine("  DiNho.Capture.Poc --encoders          Lista e testa encoders disponíveis (ffmpeg)");
+        Console.WriteLine("  DiNho.Capture.Poc --probe-nvenc [W H FPS]  Mede achievedFps real de cada preset NVENC");
         Console.WriteLine("  DiNho.Capture.Poc --help              Mostra esta ajuda");
         Console.WriteLine();
         Console.WriteLine("Hotkeys (padrão):");

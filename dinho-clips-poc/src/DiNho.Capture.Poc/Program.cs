@@ -31,6 +31,15 @@ internal static class Program
             return;
         }
 
+        if (args.Length > 0 && args[0] == "--probe-nvenc")
+        {
+            ProgramBenchmark.ProbeNvencPresets(
+                args.Length > 1 ? args[1] : "1920",
+                args.Length > 2 ? args[2] : "1080",
+                args.Length > 3 ? args[3] : "60");
+            return;
+        }
+
         if (args.Length > 0 && (args[0] == "--bench" || args[0] == "--bench-json"))
         {
             await ProgramBenchmark.RunBenchmarkAsync(_benchJson);

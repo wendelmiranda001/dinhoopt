@@ -923,6 +923,195 @@ public sealed class EncoderManagerTests
         }
     }
 
+    // ─── SelectNvencPreset (preset NVENC adaptativo por máquina) ────────────
+
+    [Fact]
+    public void SelectNvencPreset_P7Sustains_ReturnsP7_ProbesWithCaptureDims()
+    {
+        // GPU forte: p7 sustenta ≥ 0.85× do fps alvo → fica p7 (melhor qualidade).
+        EncoderManager.ResetNvencPresetCache();
+        var calls = new System.Collections.Generic.List<(string codec, int w, int h, int fps, string preset)>();
+        var old = EncoderManager.ProbeNvencSpeedProbe;
+        try
+        {
+            EncoderManager.ProbeNvencSpeedProbe = (codec, w, h, fps, preset) =>
+            {
+                calls.Add((codec, w, h, fps, preset));
+                return fps * 0.9;
+            };
+            Assert.Equal("p7", EncoderManager.SelectNvencPreset("av1_nvenc", 1920, 1080, 60));
+            var first = Assert.Single(calls);
+            Assert.Equal("av1_nvenc", first.codec);
+            Assert.Equal(1920, first.w);
+            Assert.Equal(1080, first.h);
+            Assert.Equal(60, first.fps);
+            Assert.Equal("p7", first.preset);
+        }
+        finally
+        {
+            EncoderManager.ProbeNvencSpeedProbe = old;
+            EncoderManager.ResetNvencPresetCache();
+        }
+    }
+
+    [Fact]
+    public void SelectNvencPreset_P7Slow_P5Sustains_ReturnsP5()
+    {
+        // Escada: p7,p6 não sustentam (<0.85×) → p5 sustenta → p5 (mesma lógica do drift 46fps).
+        EncoderManager.ResetNvencPresetCache();
+        var presets = new System.Collections.Generic.List<string>();
+        var old = EncoderManager.ProbeNvencSpeedProbe;
+        try
+        {
+            EncoderManager.ProbeNvencSpeedProbe = (_, _, _, fps, preset) =>
+            {
+                presets.Add(preset);
+                return preset is "p7" or "p6" ? fps * 0.5 : fps * 0.95;
+            };
+            Assert.Equal("p5", EncoderManager.SelectNvencPreset("h264_nvenc", 1920, 1080, 60));
+            Assert.Equal(new[] { "p7", "p6", "p5" }, presets);
+        }
+        finally
+        {
+            EncoderManager.ProbeNvencSpeedProbe = old;
+            EncoderManager.ResetNvencPresetCache();
+        }
+    }
+
+    [Fact]
+    public void SelectNvencPreset_P3Sustains_ReturnsP3_MidLadder()
+    {
+        // Degrau intermediário: p7..p4 não sustentam, p3 sustenta → p3.
+        EncoderManager.ResetNvencPresetCache();
+        var presets = new System.Collections.Generic.List<string>();
+        var old = EncoderManager.ProbeNvencSpeedProbe;
+        try
+        {
+            EncoderManager.ProbeNvencSpeedProbe = (_, _, _, fps, preset) =>
+            {
+                presets.Add(preset);
+                return preset == "p3" ? fps * 0.9 : fps * 0.5;
+            };
+            Assert.Equal("p3", EncoderManager.SelectNvencPreset("hevc_nvenc", 1920, 1080, 60));
+            Assert.Equal(new[] { "p7", "p6", "p5", "p4", "p3" }, presets);
+        }
+        finally
+        {
+            EncoderManager.ProbeNvencSpeedProbe = old;
+            EncoderManager.ResetNvencPresetCache();
+        }
+    }
+
+    [Fact]
+    public void SelectNvencPreset_AllSlow_ReturnsP1()
+    {
+        // GPU muito fraca: nenhum preset sustenta → mais rápido (p1).
+        EncoderManager.ResetNvencPresetCache();
+        var presets = new System.Collections.Generic.List<string>();
+        var old = EncoderManager.ProbeNvencSpeedProbe;
+        try
+        {
+            EncoderManager.ProbeNvencSpeedProbe = (_, _, _, fps, preset) =>
+            {
+                presets.Add(preset);
+                return fps * 0.5;
+            };
+            Assert.Equal("p1", EncoderManager.SelectNvencPreset("av1_nvenc", 1920, 1080, 60));
+            Assert.Equal(new[] { "p7", "p6", "p5", "p4", "p3", "p2", "p1" }, presets);
+        }
+        finally
+        {
+            EncoderManager.ProbeNvencSpeedProbe = old;
+            EncoderManager.ResetNvencPresetCache();
+        }
+    }
+
+    [Fact]
+    public void SelectNvencPreset_ProbeThrows_DegradesToP1()
+    {
+        // Exceção no probe = não sustenta → degrada; se todos falham, p1 (fail-safe).
+        EncoderManager.ResetNvencPresetCache();
+        var presets = new System.Collections.Generic.List<string>();
+        var old = EncoderManager.ProbeNvencSpeedProbe;
+        try
+        {
+            EncoderManager.ProbeNvencSpeedProbe = (_, _, _, _, preset) =>
+            {
+                presets.Add(preset);
+                throw new System.Exception("probe boom");
+            };
+            Assert.Equal("p1", EncoderManager.SelectNvencPreset("h264_nvenc", 1920, 1080, 60));
+            Assert.Equal(new[] { "p7", "p6", "p5", "p4", "p3", "p2", "p1" }, presets);
+        }
+        finally
+        {
+            EncoderManager.ProbeNvencSpeedProbe = old;
+            EncoderManager.ResetNvencPresetCache();
+        }
+    }
+
+    [Fact]
+    public void SelectNvencPreset_ProbeReturnsNull_ReturnsP1()
+    {
+        // Probe sem medição (ffmpeg ausente/erro) → degrada até p1 (mais leve, seguro).
+        EncoderManager.ResetNvencPresetCache();
+        var old = EncoderManager.ProbeNvencSpeedProbe;
+        try
+        {
+            EncoderManager.ProbeNvencSpeedProbe = (_, _, _, _, _) => null;
+            Assert.Equal("p1", EncoderManager.SelectNvencPreset("av1_nvenc", 1920, 1080, 60));
+        }
+        finally
+        {
+            EncoderManager.ProbeNvencSpeedProbe = old;
+            EncoderManager.ResetNvencPresetCache();
+        }
+    }
+
+    [Fact]
+    public void SelectNvencPreset_NonNvencCodec_ReturnsP4_WithoutProbe()
+    {
+        // Codec não-NVENC (AMF/QSV/CPU/libx264) não passa pelo probe — retorna p4 direto.
+        EncoderManager.ResetNvencPresetCache();
+        var count = 0;
+        var old = EncoderManager.ProbeNvencSpeedProbe;
+        try
+        {
+            EncoderManager.ProbeNvencSpeedProbe = (_, _, _, fps, _) => { count++; return fps * 0.9; };
+            Assert.Equal("p4", EncoderManager.SelectNvencPreset("h264_amf", 1920, 1080, 60));
+            Assert.Equal("p4", EncoderManager.SelectNvencPreset("libx264", 1920, 1080, 60));
+            Assert.Equal(0, count);
+        }
+        finally
+        {
+            EncoderManager.ProbeNvencSpeedProbe = old;
+            EncoderManager.ResetNvencPresetCache();
+        }
+    }
+
+    [Fact]
+    public void SelectNvencPreset_CachesByCodecResolutionFps()
+    {
+        // Cache estático chaveado por codec|res|fps — 1 probe por combinação por sessão.
+        EncoderManager.ResetNvencPresetCache();
+        var count = 0;
+        var old = EncoderManager.ProbeNvencSpeedProbe;
+        try
+        {
+            EncoderManager.ProbeNvencSpeedProbe = (_, _, _, fps, _) => { count++; return fps * 0.9; };
+            Assert.Equal("p7", EncoderManager.SelectNvencPreset("av1_nvenc", 1920, 1080, 60));
+            Assert.Equal("p7", EncoderManager.SelectNvencPreset("av1_nvenc", 1920, 1080, 60));
+            Assert.Equal(1, count);
+            EncoderManager.SelectNvencPreset("av1_nvenc", 1280, 720, 60);
+            Assert.Equal(2, count);
+        }
+        finally
+        {
+            EncoderManager.ProbeNvencSpeedProbe = old;
+            EncoderManager.ResetNvencPresetCache();
+        }
+    }
+
     private static FfmpegEncoder CreateUninitializedEncoder(bool hardware)
     {
         var enc = (FfmpegEncoder)System.Runtime.CompilerServices.RuntimeHelpers
