@@ -154,7 +154,8 @@ public sealed class EngineStatusValue
 
 public sealed class NamedPipeServer : IDisposable
 {
-    private const string PipeName = "dinho-clips-engine";
+    private const string DefaultPipeName = "dinho-clips-engine";
+    private readonly string _pipeName;
     private CancellationTokenSource? _cts;
     private Task? _listenerTask;
     private readonly ConcurrentQueue<string> _rawBroadcastQueue = new();
@@ -170,6 +171,11 @@ public sealed class NamedPipeServer : IDisposable
     private Timer? _statusTimer;
     public event Action<EngineStatusMessage>? OnStatusBroadcast;
 
+    public NamedPipeServer(string? pipeName = null)
+    {
+        _pipeName = pipeName ?? DefaultPipeName;
+    }
+
     public void Start()
     {
         _cts = new CancellationTokenSource();
@@ -184,7 +190,7 @@ public sealed class NamedPipeServer : IDisposable
             }
         }, null, 2000, 2000);
 
-        Log.I("NamedPipeServer", $"Pipe: \\\\.\\pipe\\{PipeName} (protocolo envelope v1)");
+        Log.I("NamedPipeServer", $"Pipe: \\\\.\\pipe\\{_pipeName} (protocolo envelope v1)");
         Log.I("NamedPipeServer", $"Envelope: {{ \"v\": 1, \"cmd\": \"...\", \"payload\": {{...}} }}");
 
     }
@@ -231,7 +237,7 @@ public sealed class NamedPipeServer : IDisposable
             try
             {
                 server = new NamedPipeServerStream(
-                    PipeName,
+                    _pipeName,
                     PipeDirection.InOut,
                     maxNumberOfServerInstances: 1,
                     PipeTransmissionMode.Byte,
@@ -279,9 +285,7 @@ public sealed class NamedPipeServer : IDisposable
     private async Task HandleClientAsync(NamedPipeServerStream server, CancellationToken ct)
     {
         var broadcastQueue = new ConcurrentQueue<string>();
-
-        Action<EngineStatusMessage>? onStatus = null;
-        onStatus = msg =>
+        var onStatus = new Action<EngineStatusMessage>(msg =>
         {
             try
             {
@@ -292,14 +296,14 @@ public sealed class NamedPipeServer : IDisposable
                 EnqueueBounded(broadcastQueue, JsonSerializer.Serialize(msg.ToEnvelope()), MaxBroadcastQueueSize);
             }
             catch { }
-        };
+        });
         OnStatusBroadcast += onStatus;
 
         try
         {
             using (server)
             using (var reader = new StreamReader(server, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true))
-            using (var writer = new StreamWriter(server, Encoding.UTF8, bufferSize: 4096, leaveOpen: true) { AutoFlush = true })
+            using (var writer = new StreamWriter(server, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), bufferSize: 4096, leaveOpen: true) { AutoFlush = true })
             {
                 while (!ct.IsCancellationRequested && server.IsConnected)
                 {

@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using System.IO.Pipes;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using DiNho.Capture.Poc.Ipc;
 
@@ -828,5 +830,118 @@ public sealed class NamedPipeServerTests
             TaskContinuationOptions.ExecuteSynchronously);
 
         Assert.False(clientTasks.ContainsKey(fake.Id));
+    }
+
+    // ── 5.7/5.9: round-trip real via pipe (ListenLoop + HandleClientAsync) ──
+
+    private const string TestPipeName = "dinho-clips-engine";
+
+    private async Task<string> ReadLineWithTimeoutAsync(StreamReader reader, int timeoutMs = 5000)
+    {
+        var read = reader.ReadLineAsync();
+        var completed = await Task.WhenAny(read, Task.Delay(timeoutMs));
+        Assert.Same(read, completed);
+        return await read ?? "";
+    }
+
+    [Fact]
+    public async Task RoundTrip_SyncCommand_EchoesRequestId()
+    {
+        using var server = new NamedPipeServer();
+        server.OnMessage = msg => Task.FromResult<IpcMessage?>(new IpcMessage { Action = "ping", Value = msg.Value });
+        server.Start();
+        try
+        {
+            using var client = new NamedPipeClientStream(".", TestPipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+            await client.ConnectAsync(2000);
+
+            // Node-mirror: NO client StreamWriter{AutoFlush} (BOM write no ctor deadloca
+            // contra o writer AutoFlush do server). Raw bytes como o cliente Electron real.
+            using var reader = new StreamReader(client, Encoding.UTF8, false, 4096, leaveOpen: true);
+
+            var payload = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new IpcEnvelope
+            {
+                Version = 1,
+                Command = "ping",
+                RequestId = "req-77",
+                Payload = JsonSerializer.SerializeToElement(new { hello = "world" })
+            }) + "\n");
+            await client.WriteAsync(payload);
+
+            var line = await ReadLineWithTimeoutAsync(reader);
+            var env = JsonSerializer.Deserialize<IpcEnvelope>(line);
+            Assert.NotNull(env);
+            Assert.Equal("ping", env!.Command);
+            Assert.Equal("req-77", env.RequestId); // 5.7: reqId ecoado ao cliente
+            Assert.Equal("world", env.Payload!.Value.GetProperty("hello").GetString());
+        }
+        finally
+        {
+            server.Stop();
+        }
+    }
+
+    [Fact]
+    public async Task RoundTrip_VersionMismatch_ReturnsExplicitError()
+    {
+        using var server = new NamedPipeServer();
+        server.OnMessage = _ => Task.FromResult<IpcMessage?>(new IpcMessage { Action = "reply" });
+        server.Start();
+        try
+        {
+            using var client = new NamedPipeClientStream(".", TestPipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+            await client.ConnectAsync(2000);
+
+            using var reader = new StreamReader(client, Encoding.UTF8, false, 4096, leaveOpen: true);
+            using var writer = new StreamWriter(client, Encoding.UTF8, 4096, leaveOpen: true) { AutoFlush = true };
+
+            await writer.WriteLineAsync(JsonSerializer.Serialize(new IpcEnvelope { Version = 2, Command = "startCapture" }));
+
+            var line = await ReadLineWithTimeoutAsync(reader);
+            var env = JsonSerializer.Deserialize<IpcEnvelope>(line);
+            Assert.NotNull(env);
+            Assert.Equal("startCapture", env!.Command);
+            Assert.Equal("unsupported protocol version: 2", env.Payload!.Value.GetProperty("error").GetString());
+            Assert.Equal(1, env.Payload.Value.GetProperty("supportedVersion").GetInt32());
+        }
+        finally
+        {
+            server.Stop();
+        }
+    }
+
+    [Fact]
+    public async Task RoundTrip_LongRunning_EmitsAccepted_ThenCommandResultWithRequestId()
+    {
+        using var server = new NamedPipeServer();
+        server.OnMessage = _ => Task.FromResult<IpcMessage?>(new IpcMessage { Action = "saveClip" });
+        server.Start();
+        try
+        {
+            using var client = new NamedPipeClientStream(".", TestPipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+            await client.ConnectAsync(2000);
+
+            using var reader = new StreamReader(client, Encoding.UTF8, false, 4096, leaveOpen: true);
+            using var writer = new StreamWriter(client, Encoding.UTF8, 4096, leaveOpen: true) { AutoFlush = true };
+
+            await writer.WriteLineAsync(JsonSerializer.Serialize(new IpcEnvelope { Version = 1, Command = "saveClip", RequestId = "r9" }));
+
+            var acceptedLine = await ReadLineWithTimeoutAsync(reader);
+            var accepted = JsonSerializer.Deserialize<IpcEnvelope>(acceptedLine);
+            Assert.Equal("saveClip", accepted!.Command);
+            Assert.Equal("accepted", accepted.Payload!.Value.GetProperty("status").GetString());
+
+            // Resultado assíncrono (commandResult) com originalCmd + reqId correlacionado.
+            var resultLine = await ReadLineWithTimeoutAsync(reader);
+            var result = JsonSerializer.Deserialize<IpcEnvelope>(resultLine);
+            Assert.Equal("_event", result!.Command);
+            var p = result.Payload!.Value;
+            Assert.Equal("saveClip", p.GetProperty("originalCmd").GetString());
+            Assert.Equal("r9", p.GetProperty("requestId").GetString()); // 5.7
+        }
+        finally
+        {
+            server.Stop();
+        }
     }
 }
