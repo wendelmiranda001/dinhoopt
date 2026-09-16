@@ -95,12 +95,10 @@ Commit format: `<type>: <description>` — Types: feat, fix, refactor, docs, tes
 - **Instrumentação `FeedTelemetry` criada (TDD, 7 testes, 1459/1459 GREEN):** loga a cada ~5s o breakdown por estágio do feed — `fps good fail enqNull | wait=x ms copy=x ms convert=x ms total=x ms | queue=avg/max` (canal `FeedTelemetry` no JSONL). `wait` = WaitOne do WGC, `copy` = CopyResource p/ pool, `convert` = ConvertGpuNv12+enqueue, `total` = iteração inteira. `TryCaptureFrame` já media wait/copy (`WaitEndTicks`/`CopyEndTicks`) mas NADA disso ia pro log.
 - **Diagnóstico concluído (sessão real FiveM, 2026-09-15):** `wait`=11,6ms dominante (69% do budget), `convert`=2,5ms (GPU **NÃO** saturada — 15% do budget), `copy`=0,1ms, `queue`=0 (encoder nunca engasga). Feed = 46,9fps ≈ cadência de entrega do WGC (game render ~47fps sob carga de captura+NVENC). Encoder (probe 204–226fps) e convert (2,5ms) **NÃO são gargalo** — preset adaptativo NVENC **despriorizado**. Fix de PTS IVF confirmado: exports com PTS-DRIFT ±10ms.
 
-**GREEN (corte vertical puro commitado) — Multi-Track Audio** (Item 5, commit `14d939b: MultiTrackAudioPolicy + AudioTrackKind 5/5 + corte puro GREEN; depois colei `MultiTrackAudioPolicyTests.cs` com mais seams de teste):
-- **O que cortou GREEN:** política PURA `MultiTrackAudioPolicy.ResolveTracks` (ranking estável `AudioTrackKind`: Game default rank 0 > Discord rank 1 só com config explícita > Mic rank 2) + fails com erro claro se NENHUMA trilha disponível (nunca sessão muda). 5 testes verdes via `--filter "FullyQualifiedName~MultiTrackAudioPolicyTests"`, dll 5/5 GREEN, EXIT 0.
-- **Pendente (fora do corte TDD — exige WASAPI multi-stream/GPU real):** `AudioMixer` multi-track (mixers WASAPI paralelos, 1 por track), `FfmpegAacEncoder` N encoders, `ClipExporter` N streams ADTS→MKV — NÃO toca HW sem novo pedido explícito (mesma regra do Item 2).
+**DESCARTADA pelo usuário (2026-09-16) — Multi-Track Audio** (Item 5): commit `14d939b` trouxe a política pura `MultiTrackAudioPolicy.ResolveTracks` + `AudioTrackKind` (5/5 GREEN), mas o usuário **descartou a feature inteira** antes da implementação HW (AudioMixer multi-stream WASAPI, N encoders AAC, N streams ADTS→MKV) e o código morto foi **removido** (`commit <pending>`: `MultiTrackAudioPolicy.cs`, `AudioTrackKind.cs`, `AudioInputConfig.cs`, `MultiTrackAudioPolicyTests.cs`). Não reabrir sem novo pedido explícito.
 
 **Rejeitado pelo usuário — não reabrir sem novo pedido explícito:**
-AI auto-clipping (detecção de eventos), clip por comando de voz, gravação de sessão completa + bookmarks, compilação automática de highlights, compartilhamento/links instantâneos, cloud storage, app mobile.
+AI auto-clipping (detecção de eventos), clip por comando de voz, gravação de sessão completa + bookmarks, compilação automática de highlights, compartilhamento/links instantâneos, cloud storage, app mobile, **Multi-Track Audio (Item 5)**.
 
 ## Histórico Detalhado de Sessões
 
