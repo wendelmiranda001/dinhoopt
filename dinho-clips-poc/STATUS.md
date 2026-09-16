@@ -97,7 +97,7 @@ Uma vez em `libx264`, não há fallback adicional — o encoder tenta 5x e falha
 
 ### WindowClass + Known Games
 - `GameInfo.WindowClass` via `GetClassName` (P/Invoke)
-- `KnownGames.WindowClassMap`: mapeia classes como `grcWindow` (FiveM), `WINDOW` (Roblox), `SDL_app` (CS2), `UnrealWindow`, `UnityWndClass`, `FORTNITE`
+- `KnownGames.LookupWindowClass` → `GameDatabase.GetDisplayName` (games.json + fallback `HardcodedMap`): mapeia classes como `grcWindow` (FiveM), `WINDOW` (Roblox), `SDL_app` (CS2), `UnrealWindow`, `UnityWndClass`, `FORTNITE`
 - Exibido no `ToString()`: `FiveM (FiveM) [FSX]`
 
 ### RAM Monitoring

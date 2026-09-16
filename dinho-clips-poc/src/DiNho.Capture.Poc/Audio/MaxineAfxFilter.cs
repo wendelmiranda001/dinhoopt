@@ -7,8 +7,8 @@ namespace DiNho.Capture.Poc.Audio;
 
 /// <summary>
 /// NVIDIA Maxine Audio Effects (AFX) wrapper for noise suppression.
-/// Requires RTX GPU with Tensor Cores.
-/// Falls back to RNNoise (arnndn) if Maxine is not available.
+/// Requires the Maxine AFX SDK runtime (nvaudiofx64.dll) BUNDLED with the app.
+/// Falls back to RNNoise (arnndn/anlmdn) when the SDK is not integrated.
 /// 
 /// Maxine AFX provides:
 /// - Denoise: AI-based noise suppression (superior to RNNoise)
@@ -46,7 +46,9 @@ public sealed class MaxineAfxFilter : IDisposable
         _sampleRate = sampleRate;
         _channels = channels;
 
-        // Check if Maxine AFX is available (RTX GPU required)
+        // Check if the Maxine AFX SDK runtime is bundled (nvaudiofx64.dll).
+        // Detection is SDK-based, never a guess from GPU vendor DLLs — without the
+        // SDK the honest fallback is RNNoise (anlmdn), which always works.
         _isMaxineAvailable = CheckMaxineAvailability();
 
         if (_isMaxineAvailable)
@@ -91,56 +93,65 @@ public sealed class MaxineAfxFilter : IDisposable
     }
 
     /// <summary>
-    /// Check if NVIDIA Maxine AFX is available (RTX GPU with Tensor Cores).
-    /// Uses DXGI to detect NVIDIA GPU with sufficient VRAM.
+    /// Check if the NVIDIA Maxine AFX runtime is bundled with the app.
+    /// Detection is based on the actual SDK runtime DLL (nvaudiofx64.dll), NOT on
+    /// mere GPU presence: nvcuda.dll/nvml.dll only prove an NVIDIA GPU exists,
+    /// they say nothing about the Maxine SDK. Until the SDK is integrated the
+    /// filter honestly reports unavailable and falls back to RNNoise.
     /// </summary>
     private static bool CheckMaxineAvailability()
     {
         try
         {
-            // Check for NVIDIA GPU via file system (nvcuda.dll presence)
-            var systemDir = Environment.GetFolderPath(Environment.SpecialFolder.System);
-            var nvcudaPath = Path.Combine(systemDir, "nvcuda.dll");
-            
-            if (File.Exists(nvcudaPath))
+            var sdkDir = AppContext.BaseDirectory;
+            if (IsMaxineSdkPresent(sdkDir))
             {
-                // Check for RTX-specific features (Tensor Cores)
-                // RTX GPUs have nvml.dll (NVIDIA Management Library)
-                var nvmlPath = Path.Combine(systemDir, "nvml.dll");
-                if (File.Exists(nvmlPath))
-                {
-                    Log.I("MaxineAfxFilter", "NVIDIA RTX GPU detected (nvcuda.dll + nvml.dll present)");
-                    return true;
-                }
-                
-                Log.I("MaxineAfxFilter", "NVIDIA GPU detected but may not be RTX (nvml.dll not found)");
-                return false;
+                Log.I("MaxineAfxFilter", $"Maxine AFX SDK runtime found in '{sdkDir}'");
+                return true;
             }
-
-            Log.I("MaxineAfxFilter", "No NVIDIA GPU detected, Maxine AFX not available");
+            Log.I("MaxineAfxFilter", "Maxine AFX SDK runtime (nvaudiofx64.dll) not bundled — using RNNoise");
             return false;
         }
         catch (Exception ex)
         {
-            Log.W("MaxineAfxFilter", $"GPU detection failed: {ex.Message}");
+            Log.W("MaxineAfxFilter", $"Maxine SDK detection failed: {ex.Message}");
             return false;
         }
     }
 
     /// <summary>
-    /// Build Maxine AFX filter string for ffmpeg.
-    /// Note: Maxine AFX is available as VST plugin or native SDK.
-    /// For ffmpeg integration, we use arnndn (RNNoise) which is based on similar tech.
-    /// True Maxine integration would require custom P/Invoke to nvaudiofx64.dll.
+    /// True only when the actual Maxine AFX SDK runtime DLL is present in the
+    /// given directory. Pure seam for tests (no GPU/hardware required).
     /// </summary>
-    private static string BuildMaxineFilter(bool enableDenoise, bool enableDereverb)
+    internal static bool IsMaxineSdkPresent(string sdkDirectory)
     {
-        // For now, use arnndn which is the open-source equivalent
-        // TODO: When Maxine SDK is integrated, replace with native nvaudiofx filters
+        return !string.IsNullOrEmpty(sdkDirectory)
+            && File.Exists(Path.Combine(sdkDirectory, "nvaudiofx64.dll"));
+    }
+
+    /// <summary>
+    /// Build the actual ffmpeg audio filter chain.
+    /// Until the native Maxine SDK is integrated, denoise uses arnndn (RNNoise)
+    /// when a valid model file is resolvable, otherwise the built-in anlmdn.
+    /// Dereverb uses afftdn as placeholder (experimental).
+    /// </summary>
+    internal static string BuildMaxineFilter(bool enableDenoise, bool enableDereverb, string? modelDirectory = null)
+    {
+        var filterDir = string.IsNullOrEmpty(modelDirectory) ? AppContext.BaseDirectory : modelDirectory;
         var filters = new List<string>();
 
         if (enableDenoise)
-            filters.Add("arnndn=m=models/rnnoise/model.rnnn"); // Use trained model if available
+        {
+            // Model path is resolved to an absolute location — a relative path
+            // like "models/rnnoise/model.rnnn" used to silently kill the ffmpeg
+            // process (filter "available" but broken), leaving noise suppression
+            // dead while still being reported ON.
+            var modelPath = Path.Combine(filterDir, "models", "rnnoise", "model.rnnn");
+            if (File.Exists(modelPath))
+                filters.Add($"arnndn=m={modelPath}");
+            else
+                filters.Add("anlmdn");
+        }
 
         if (enableDereverb)
             filters.Add("afftdn=nf=-25"); // FFT-based denoising as placeholder
