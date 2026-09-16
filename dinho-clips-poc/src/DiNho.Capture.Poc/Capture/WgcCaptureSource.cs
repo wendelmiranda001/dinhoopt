@@ -45,10 +45,6 @@ public sealed class WgcCaptureSource : ICaptureSource
     private long _capIntervalTicks;
     private long _lastAcceptedTicks;
 
-    // Disposition (IGraphicsCaptureItem7) — captura é de Monitor, Window, ou Other.
-    // -1 = não lido ainda; 0=Other, 1=Monitor, 2=Window.
-    private int _disposition = -1;
-
     /// <summary>
     /// Intervalo de captura (ticks de Stopwatch) para o fps alvo.
     /// fps &lt;= 0 desliga o cap (aceita todos os frames). Divisão truncada:
@@ -180,7 +176,6 @@ public sealed class WgcCaptureSource : ICaptureSource
                 throw new InvalidOperationException("WGC CreateForMonitor retornou null — WGC pode não estar disponível.");
             DisposeCaptureItem();
             _captureItem = item;
-            _disposition = TryGetItemDisposition(item);
         }
 
         // HDR detection — choose optimal pixel format
@@ -595,11 +590,6 @@ public sealed class WgcCaptureSource : ICaptureSource
     private static readonly Guid S5_MIN_UPDATE_INTERVAL = new("67C0EA62-1F85-5061-925A-239BE0AC09CB");
     private static readonly Guid S6_INCLUDE_SECONDARY = new("D7419236-BE20-5E9F-BCD6-C4E98FD6AFDC");
 
-    // IGraphicsCaptureItem7 — expõe Disposition (getter-only: 0=Other, 1=Monitor, 2=Window).
-    // GUID NÃO confirmado via WinMD/netsdk/Wine — calculado a partir de padrão de offsets
-    // das interfaces derivadas de IGraphicsCaptureItem.  Se QI falhar, logamos e seguimos.
-    private static readonly Guid IID_ITEM7_DISPOSITION = new("9B89E4A4-5105-5244-9BB8-2D7B56A25945");
-
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int SetBoolDelegate(IntPtr thisPtr, int value);
 
@@ -608,9 +598,6 @@ public sealed class WgcCaptureSource : ICaptureSource
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int SetTimeSpanDelegate(IntPtr thisPtr, long durationTicks);
-
-    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-    private delegate int ReadEnumDelegate(IntPtr thisPtr, out int value);
 
     /// <summary>QI por IID na sessão e invoca o setter (vtable slot 7). Loga em Debug quando a interface não está disponível.</summary>
     private static void TrySetSessionBool(IntPtr nativePtr, Guid iid, string name, bool value)
@@ -681,69 +668,6 @@ public sealed class WgcCaptureSource : ICaptureSource
         finally
         {
             Marshal.Release(ifacePtr);
-        }
-    }
-
-    /// <summary>
-    /// QI IGraphicsCaptureItem7 no capture item para ler Disposition (0=Other, 1=Monitor, 2=Window).
-    /// GUID e slot vtable NÃO confirmados — probing slot 12..24 com fallback.
-    /// Retorna -1 se a interface não estiver disponível ou nenhum slot retornar S_OK.
-    /// </summary>
-    private static int TryGetItemDisposition(GraphicsCaptureItem item)
-    {
-        var itemIid = typeof(GraphicsCaptureItem).GUID;
-        var hr = Marshal.QueryInterface(Marshal.GetIUnknownForObject(item), in itemIid, out var itemPtr);
-        if (hr != 0 || itemPtr == IntPtr.Zero)
-        {
-            Log.D("WGC", "Disposition: QI do capture item falhou (hr=0x{hr:X8})");
-            return -1;
-        }
-        try
-        {
-            // QI por IGraphicsCaptureItem7
-            var iid7 = IID_ITEM7_DISPOSITION;
-            hr = Marshal.QueryInterface(itemPtr, in iid7, out var iface7);
-            if (hr != 0 || iface7 == IntPtr.Zero)
-            {
-                Log.D("WGC", $"Disposition: IGraphicsCaptureItem7 não disponível (hr=0x{hr:X8})");
-                return -1;
-            }
-            try
-            {
-                var vtable = Marshal.ReadIntPtr(iface7);
-                // Probing slots 12..24 — IGraphicsCaptureItem base tem 6 props (12 slots),
-                // Item2..Item7 adicionam mais. O getter de Disposition pode estar em qualquer slot
-                // além do último setter do base (slot 17).
-                for (int slot = 12; slot <= 24; slot++)
-                {
-                    try
-                    {
-                        var fnPtr = Marshal.ReadIntPtr(vtable, slot * IntPtr.Size);
-                        if (fnPtr == IntPtr.Zero) continue;
-                        var getter = Marshal.GetDelegateForFunctionPointer<ReadEnumDelegate>(fnPtr);
-                        var getHr = getter(iface7, out var value);
-                        if (getHr == 0)
-                        {
-                            Log.I("WGC", $"Disposition={value} via slot {slot}");
-                            return value;
-                        }
-                    }
-                    catch (Exception)
-                    {
-                        // Slot não é o getter — continua probing
-                    }
-                }
-                Log.D("WGC", "Disposition: nenhum slot retornou S_OK (interface existe mas getter não encontrado)");
-                return -1;
-            }
-            finally
-            {
-                Marshal.Release(iface7);
-            }
-        }
-        finally
-        {
-            Marshal.Release(itemPtr);
         }
     }
 

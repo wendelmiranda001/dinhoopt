@@ -93,6 +93,28 @@ public sealed class FfmpegAacEncoderTests
     }
 
     [Fact]
+    public void EncodeAudio_TransientErrors_ReArmsAfterConsecutiveSuccesses()
+    {
+        // 2.4: sem re-arm, 10 erros espaçados matariam o encoder (threshold de 10);
+        // com re-arm (100 writes ok consecutivos zeram o histórico), 1 erro + 9
+        // posteriores = 9 < 10 → continua saudável.
+        var stream = new TogglingFailureStream(failCount: 1);
+        using var encoder = new FfmpegAacEncoder(stream, writeTimeoutMs: 500);
+
+        var samples = new float[480];
+        encoder.EncodeAudio(samples); // falha transiente NÃO-IOException → 1 erro, ainda healthy
+
+        for (int i = 0; i < FfmpegAacEncoder.RecoverAfterConsecutiveSuccesses + 5; i++)
+            encoder.EncodeAudio(samples); // 105 writes ok → re-arm dispara no 100º
+
+        for (int i = 0; i < 9; i++)
+            encoder.EncodeAudio(samples); // 9 novas falhas espaçadas
+
+        Assert.True(encoder.IsHealthy,
+            "Após re-arm (100 writes ok), erros transientes espaçados não devem somar ao histórico antigo (1+9=10 mataria sem o reset).");
+    }
+
+    [Fact]
     public void EncodeAudio_DoesNotMutateCallerBuffer()
     {
         using var ms = new MemoryStream();
@@ -258,5 +280,41 @@ public sealed class FfmpegAacEncoderTests
 
         public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
             Task.FromException<byte[]>(new IOException("pipe closed"));
+    }
+
+    /// <summary>
+    /// Falha os primeiros <paramref name="failCount"/> writes com uma exceção
+    /// NÃO-IOException e aceita os demais. Usado para provar que o re-arm (2.4)
+    /// zera o histórico de erros após 100 writes ok consecutivos.
+    /// </summary>
+    private sealed class TogglingFailureStream : Stream
+    {
+        private readonly int _failCount;
+        private int _writes;
+        private long _bytesWritten;
+
+        public TogglingFailureStream(int failCount) => _failCount = failCount;
+        public long TotalBytesWritten => _bytesWritten;
+
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => _bytesWritten;
+        public override long Position { get => _bytesWritten; set => throw new NotSupportedException(); }
+
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            int n = Interlocked.Increment(ref _writes);
+            if (n <= _failCount)
+                return Task.FromException<byte[]>(new InvalidOperationException("falha transiente simulada"));
+            Interlocked.Add(ref _bytesWritten, count);
+            return Task.CompletedTask;
+        }
     }
 }

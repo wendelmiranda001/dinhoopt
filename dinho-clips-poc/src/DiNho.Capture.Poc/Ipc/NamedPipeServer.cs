@@ -158,6 +158,10 @@ public sealed class NamedPipeServer : IDisposable
     private readonly string _pipeName;
     private CancellationTokenSource? _cts;
     private Task? _listenerTask;
+    // 5.7: Fila global de broadcasts. A limitação (não preemptar por client ID)
+    // é aceita e intencional — o pipe usa CurrentUserOnly, o que garante apenas
+    // uma instância Electron conectada. Dois clientes exigiriam token/canal
+    // por sessão — overhead não justificado para um app desktop single-user.
     private readonly ConcurrentQueue<string> _rawBroadcastQueue = new();
     private const int MaxBroadcastQueueSize = 1000;
 

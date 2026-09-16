@@ -62,11 +62,11 @@ public sealed partial class ClipExporter
         else { WriteEbmlVint(bw, 8); var b = BitConverter.GetBytes(value); Array.Reverse(b); bw.Write(b); }
     }
 
-    private static void WriteEbmlFloat(BinaryWriter bw, uint id, double value)
+    private static void WriteEbmlDouble(BinaryWriter bw, uint id, double value)
     {
         WriteEbmlId(bw, id);
-        WriteEbmlVint(bw, 4); // Matroska "float" = 32-bit IEEE 754 (4 bytes)
-        var b = BitConverter.GetBytes((float)value);
+        WriteEbmlVint(bw, 8); // Matroska "float" 64-bit IEEE 754 — Duration em precisão total
+        var b = BitConverter.GetBytes(value);
         Array.Reverse(b);
         bw.Write(b);
     }
@@ -84,6 +84,20 @@ public sealed partial class ClipExporter
         WriteEbmlId(bw, id);
         WriteEbmlVint(bw, (ulong)data.Length);
         bw.Write(data);
+    }
+
+    /// <summary>
+    /// Termina o arquivo com um elemento EBML Void alinhado a 4 bytes (3.12).
+    /// Um EOF truncado no meio de bytes não-EBML é tratado como lixo por parsers
+    /// estritos; o Void absorve a sobra de alinhamento como elemento válido.
+    /// </summary>
+    private static void WriteEbmlVoidAlign(BinaryWriter bw, long currentPos)
+    {
+        int dataLen = (int)(4 - (currentPos + 2) % 4) % 4;
+        if (dataLen == 0) return;
+        WriteEbmlId(bw, 0xEC); // Void
+        WriteEbmlVint(bw, (ulong)dataLen);
+        bw.Write(new byte[dataLen]);
     }
 
     private static void WriteSimpleBlock(BinaryWriter bw, int trackNumber, int timecode, bool keyframe, byte[] data, int dataLength, int dataOffset = 0)
@@ -153,7 +167,8 @@ public sealed partial class ClipExporter
             if (packets.Count >= 2)
                 totalSec = (packets[^1].Pts - minPts).TotalSeconds + packets[^1].Duration.TotalSeconds;
             if (totalSec > 0)
-                WriteEbmlFloat(w, 0x4489, totalSec * 1000.0); // Duration em ticks de TimecodeScale (1 tick = 1ms)
+                // Duration em ticks de TimecodeScale (1 tick = 1ms) — precisão total (double)
+                WriteEbmlDouble(w, 0x4489, totalSec * 1000.0);
             WriteEbmlString(w, 0x4D80, "DiNho Capture"); // MuxingApp
             WriteEbmlString(w, 0x5741, "DiNho Capture"); // WritingApp
         });
@@ -252,8 +267,7 @@ public sealed partial class ClipExporter
 
             bool startNew = clusterSize == 0 ||
                             clusterSize >= maxClusterFrames ||
-                            ptsMs - clusterBaseTimecode > 30000 ||
-                            ptsMs - clusterBaseTimecode > short.MaxValue;
+                            ptsMs - clusterBaseTimecode > 30000;
 
             if (startNew)
             {
@@ -276,5 +290,6 @@ public sealed partial class ClipExporter
         // o MKV temporário fica com bytes zero no final (tolerado pelo ffmpeg mas não por
         // players/MediaInfo). SetLength ao tamanho escrito real — Opera NTFS ignora.
         fs.SetLength(fs.Position);
+        WriteEbmlVoidAlign(bw, fs.Position);
     }
 }

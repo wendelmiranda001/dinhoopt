@@ -42,6 +42,12 @@ public sealed class HybridCaptureSource : ICaptureSource
     // Transition: keep last frame from previous mode to avoid black frames
     private CaptureMode _lastActiveMode = CaptureMode.Dxgi;
     private ID3D11Texture2D? _transitionFrame;
+    private long _transitionFrameTicks;
+
+    // Staleness threshold: beyond this age the frozen transition frame is no
+    // longer "good" — returning it forever hides a dead capture path (1.5).
+    private static readonly long TransitionFrameMaxAgeTicks =
+        TimeSpan.FromSeconds(5).Ticks * Stopwatch.Frequency / TimeSpan.TicksPerSecond;
 
     // Window rect cache (relative to monitor, used for PrintWindow compositing)
     private int _winX, _winY, _winW, _winH;
@@ -140,7 +146,9 @@ public sealed class HybridCaptureSource : ICaptureSource
             return frame;
 
         // Fallback: return transition frame (last good frame from previous mode)
-        if (_transitionFrame != null)
+        // Only while it is fresh — a stale frozen frame hides a dead capture path.
+        if (_transitionFrame != null &&
+            Stopwatch.GetTimestamp() - _transitionFrameTicks <= TransitionFrameMaxAgeTicks)
         {
             var desc = _transitionFrame.Description;
             var clone = _sharedDevice!.CreateTexture2D(desc);
@@ -324,6 +332,7 @@ public sealed class HybridCaptureSource : ICaptureSource
                 var desc = frame.Texture.Description;
                 _transitionFrame = _sharedDevice!.CreateTexture2D(desc);
                 _context!.CopyResource(_transitionFrame, frame.Texture);
+                _transitionFrameTicks = Stopwatch.GetTimestamp();
             }
             frame.Dispose();
         }

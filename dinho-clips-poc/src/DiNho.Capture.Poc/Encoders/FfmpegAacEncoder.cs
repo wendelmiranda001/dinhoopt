@@ -28,6 +28,7 @@ public sealed class FfmpegAacEncoder : IDisposable
     private long _pcmBytesWritten;
     private long _pcmBatchesWritten;
     private int _pcmWriteErrors;
+    private int _consecutiveSuccesses;
     private int _totalAacFrames;
     private volatile int _droppedFrameCount;
     private volatile bool _flushing;
@@ -38,6 +39,13 @@ public sealed class FfmpegAacEncoder : IDisposable
     // de proteção contra travas — espelha o padrão do FfmpegEncoder (vídeo).
     internal const int StdinWriteWarmupTimeoutMs = 5000;
     internal const int StdinWriteTimeoutMs = 250;
+
+    /// <summary>
+    /// Após este número de escritas Ok consecutivas o encoder é rearmado
+    /// (2.4): _pcmWriteErrors zera e _isHealthy volta a true. Sem isso, uma
+    /// falha transitória (timeout momentâneo) matava o áudio para sempre.
+    /// </summary>
+    internal const int RecoverAfterConsecutiveSuccesses = 100;
 
     /// <summary>0 = auto (warmup/steady); &gt;0 = fixo (usado pelos testes).</summary>
     private int _writeTimeoutMs;
@@ -181,14 +189,24 @@ public sealed class FfmpegAacEncoder : IDisposable
                 case FfmpegEncoder.StdinWriteResult.Ok:
                     _stdin!.Flush();
                     _pcmBytesWritten += byteLen;
+                    // Re-arm (2.4): falha transitória não pode matar o encoder para sempre.
+                    if (++_consecutiveSuccesses >= RecoverAfterConsecutiveSuccesses)
+                    {
+                        _consecutiveSuccesses = 0;
+                        _isHealthy = true;
+                        Log.D("FfmpegAacEncoder",
+                            $"After {RecoverAfterConsecutiveSuccesses} consecutive Ok writes — re-armed (healthy=true)");
+                    }
                     break;
                 case FfmpegEncoder.StdinWriteResult.Timeout:
+                    _consecutiveSuccesses = 0;
                     _pcmWriteErrors++;
                     _isHealthy = false;
                     Log.E("FfmpegAacEncoder",
                         $"PCM write TIMEOUT after {timeoutMs}ms (batch #{batch}, {byteLen} bytes, totalWrote={_pcmBytesWritten}) — encoder UNHEALTHY (ffmpeg pipe preso)");
                     break;
                 default:
+                    _consecutiveSuccesses = 0;
                     _pcmWriteErrors++;
                     if (_pcmWriteErrors <= 3 || _pcmWriteErrors % 500 == 0)
                         Log.E("FfmpegAacEncoder", $"PCM write #{_pcmWriteErrors} failed ({byteLen} bytes, totalWrote={_pcmBytesWritten}): {fault?.GetType().Name}: {fault?.Message}");

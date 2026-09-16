@@ -25,6 +25,12 @@ public static class MachineCapabilities
     /// <c>EncoderManager.PickBestAdapter</c> — NVIDIA > AMD por VRAM, senão qualquer
     /// suportada (iGPU). Evita divergência com <c>DetectEncodingVendorId</c>.
     /// </summary>
+    // 6.4: ranking NVIDIA-first é intencional. Em desktops com NVIDIA + iGPU, o
+    // encoder NVENC é sempre superior (dedicado, sem custo GPU). A ordenação
+    // por VRAM dentro do mesmo fabricante estabiliza qual adapter é escolhido
+    // em sistemas multi-adapter. Limitação aceita: AMD exclusivos ficam bem,
+    // mas GPU dedicada AMD não recebe bônus de ranking — o padrão funciona
+    // corretamente para o caso de uso DiNho (NVENC é o alvo principal).
     public static EncoderManager.GpuAdapterInfo? PickEncodingAdapter(IReadOnlyList<EncoderManager.GpuAdapterInfo> adapters)
         => EncoderManager.PickBestAdapter(adapters);
 
