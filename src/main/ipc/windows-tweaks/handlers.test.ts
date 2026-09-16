@@ -2,11 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockExecFileAsync = vi.fn()
 const mockPsUtf8 = vi.fn((s: string) => s)
+const mockLoggerInfo = vi.fn()
+const mockLoggerWarning = vi.fn()
+const mockLoggerError = vi.fn()
+const mockLoggerSuccess = vi.fn()
 const mockGetLogger = vi.fn(() => ({
-  info: vi.fn(),
-  warning: vi.fn(),
-  error: vi.fn(),
-  success: vi.fn(),
+  info: mockLoggerInfo,
+  warning: mockLoggerWarning,
+  error: mockLoggerError,
+  success: mockLoggerSuccess,
 }))
 const mockIsAdmin = vi.fn()
 const mockIpcMainHandle = vi.fn()
@@ -695,6 +699,56 @@ describe('handlers.ts', () => {
       for (const item of result) {
         expect(item.applied).toBe(false)
       }
+    })
+
+    it('returns false silently when reg.exe exits with code 1 (value not found)', async () => {
+      mockExecFileAsync.mockRejectedValue(Object.assign(new Error('reg query exited 1'), { code: 1 }))
+
+      const { registerWindowsTweaksIpc } = await import('./handlers')
+      registerWindowsTweaksIpc(vi.fn())
+
+      const listHandler = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'windows-tweaks:list')![1]
+      const result = await listHandler()
+      for (const item of result) {
+        expect(item.applied).toBe(false)
+      }
+      expect(mockLoggerWarning).not.toHaveBeenCalled()
+      expect(mockLoggerError).not.toHaveBeenCalled()
+    })
+
+    it('returns false silently when stderr reports registry key not found', async () => {
+      const err = new Error('Command failed: reg.exe query ...')
+      Object.assign(err, {
+        code: 1,
+        stderr: 'ERROR: The system was unable to find the specified registry key or value.',
+      })
+      mockExecFileAsync.mockRejectedValue(err)
+
+      const { registerWindowsTweaksIpc } = await import('./handlers')
+      registerWindowsTweaksIpc(vi.fn())
+
+      const listHandler = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'windows-tweaks:list')![1]
+      const result = await listHandler()
+      for (const item of result) {
+        expect(item.applied).toBe(false)
+      }
+      expect(mockLoggerWarning).not.toHaveBeenCalled()
+    })
+
+    it('logs a warning on real command failures (no exit-code-1)', async () => {
+      const err = new Error('Command failed: reg.exe query ...')
+      Object.assign(err, { code: 5, stderr: 'ERROR: Access is denied.' })
+      mockExecFileAsync.mockRejectedValue(err)
+
+      const { registerWindowsTweaksIpc } = await import('./handlers')
+      registerWindowsTweaksIpc(vi.fn())
+
+      const listHandler = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'windows-tweaks:list')![1]
+      const result = await listHandler()
+      for (const item of result) {
+        expect(item.applied).toBe(false)
+      }
+      expect(mockLoggerWarning).toHaveBeenCalled()
     })
   })
 

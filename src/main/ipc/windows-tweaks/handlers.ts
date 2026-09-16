@@ -326,6 +326,10 @@ async function checkTweakApplied(tweak: WindowsTweakDef): Promise<boolean> {
     }
     return trimmedValue === String(tweak.optimizedValue)
   } catch (err) {
+    const code = (err as { code?: unknown })?.code
+    const stderr = (err as { stderr?: string })?.stderr ?? ''
+    const keyNotFound = code === 1 || /unable to find the specified registry/i.test(stderr)
+    if (keyNotFound) return false
     getLogger().warning('windows-tweaks', `Check failed: ${tweak.id} — ${err}`)
     return false
   }
