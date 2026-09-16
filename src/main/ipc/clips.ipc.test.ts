@@ -23,19 +23,29 @@ vi.mock('node:net', () => ({
 }))
 
 vi.mock('node:fs', () => ({
+  copyFileSync: vi.fn(),
   existsSync: vi.fn(),
+  mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
+  readFileSync: vi.fn(),
+  renameSync: vi.fn(),
   statSync: vi.fn(),
   unlinkSync: vi.fn(),
-  renameSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
 }))
 
+function enoentError(): Error {
+  return Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
+}
+
 vi.mock('node:fs/promises', () => ({
+  access: vi.fn().mockRejectedValue(enoentError()),
+  mkdir: vi.fn(),
   readdir: vi.fn(),
+  rename: vi.fn(),
   stat: vi.fn(),
+  unlink: vi.fn(),
+  writeFile: vi.fn(),
 }))
 
 vi.mock('electron', () => ({
@@ -118,8 +128,8 @@ function resetEngineMocks(): void {
 }
 
 import { execFile, spawn } from 'node:child_process'
-import { existsSync, mkdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
-import { readdir, stat } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { access, stat as fsStat, mkdir, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { IPC } from '@shared/channels'
 import type { AudioSessionInfo, ClipInfo, ClipMergeResult, ClipTrimResult, MicDeviceInfo } from '@shared/types'
 import { ipcMain, shell } from 'electron'
@@ -389,12 +399,13 @@ describe('CLIPS_DELETE_CLIP', () => {
 
   it('deletes a clip with a valid name', async () => {
     vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(unlinkSync).mockReturnValue(undefined)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(unlink).mockResolvedValue(undefined)
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_DELETE_CLIP)
     const result = (await handler({}, 'myclip.mp4')) as { success: boolean }
     expect(result.success).toBe(true)
-    expect(unlinkSync).toHaveBeenCalled()
+    expect(unlink).toHaveBeenCalled()
   })
 
   it('rejects non-string clipName', async () => {
@@ -404,14 +415,12 @@ describe('CLIPS_DELETE_CLIP', () => {
     const result = (await handler({}, 123)) as { success: boolean; error?: string }
     expect(result.success).toBe(false)
     expect(result.error).toBe('Invalid clip name')
-    expect(unlinkSync).not.toHaveBeenCalled()
+    expect(unlink).not.toHaveBeenCalled()
   })
 
   it('catches unlink errors', async () => {
     vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(unlinkSync).mockImplementation(() => {
-      throw new Error('Access denied')
-    })
+    vi.mocked(unlink).mockRejectedValue(new Error('Access denied'))
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_DELETE_CLIP)
     const result = (await handler({}, 'myclip.mp4')) as { success: boolean; error?: string }
@@ -427,11 +436,9 @@ describe('CLIPS_DELETE_CLIP', () => {
     expect(result.error).toBe('Invalid path')
   })
 
-  it('handles non-Error exception from unlinkSync', async () => {
+  it('handles non-Error exception from unlink', async () => {
     vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(unlinkSync).mockImplementation(() => {
-      throw 'disk-error'
-    })
+    vi.mocked(unlink).mockRejectedValue('disk-error')
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_DELETE_CLIP)
     const result = (await handler({}, 'myclip.mp4')) as { success: boolean; error?: string }
@@ -649,7 +656,7 @@ describe('CLIPS_SET_CONFIG', () => {
   })
 
   it('updates outputDirectory when set via config', async () => {
-    vi.mocked(statSync).mockReturnValue({ isDirectory: () => true } as ReturnType<typeof statSync>)
+    vi.mocked(fsStat).mockResolvedValue({ isDirectory: () => true } as Awaited<ReturnType<typeof fsStat>>)
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_SET_CONFIG)
     await handler({}, { outputDirectory: 'D:\\MeusClipes' })
@@ -1359,6 +1366,7 @@ describe('CLIPS_GET_ENHANCE_SUPPORT', () => {
 describe('CLIPS_SET_FAVORITE', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    vi.mocked(access).mockRejectedValue(enoentError())
     resetEngineMocks()
     clipsConfig.outputDirectory = ''
   })
@@ -1402,31 +1410,29 @@ describe('CLIPS_SET_FAVORITE', () => {
     const handler = getAsyncHandler(handlers, IPC.CLIPS_SET_FAVORITE)
     const result = (await handler({}, 'clip.mp4', true)) as { success: boolean; error?: string }
     expect(result.success).toBe(true)
-    expect(writeFileSync).toHaveBeenCalled()
+    expect(writeFile).toHaveBeenCalled()
   })
 
   it('removes favorite marker when favorite is false and file exists', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(access).mockResolvedValue(undefined)
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_SET_FAVORITE)
     const result = (await handler({}, 'clip.mp4', false)) as { success: boolean; error?: string }
     expect(result.success).toBe(true)
-    expect(unlinkSync).toHaveBeenCalled()
+    expect(unlink).toHaveBeenCalled()
   })
 
   it('does nothing when favorite is false and marker file does not exist', async () => {
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_SET_FAVORITE)
-    // No existsSync mock → default vi.fn() returns undefined (falsy)
+    // No access mock → default rejects (ENOENT) → fileExists false
     const result = (await handler({}, 'clip.mp4', false)) as { success: boolean; error?: string }
     expect(result.success).toBe(true)
-    expect(unlinkSync).not.toHaveBeenCalled()
+    expect(unlink).not.toHaveBeenCalled()
   })
 
-  it('returns error when writeFileSync fails', async () => {
-    vi.mocked(writeFileSync).mockImplementation(() => {
-      throw new Error('disk full')
-    })
+  it('returns error when writeFile fails', async () => {
+    vi.mocked(writeFile).mockRejectedValue(new Error('disk full'))
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_SET_FAVORITE)
     const result = (await handler({}, 'clip.mp4', true)) as { success: boolean; error?: string }
@@ -1434,10 +1440,8 @@ describe('CLIPS_SET_FAVORITE', () => {
     expect(result.error).toBe('disk full')
   })
 
-  it('handles non-Error exception from writeFileSync', async () => {
-    vi.mocked(writeFileSync).mockImplementation(() => {
-      throw 'unknown-error'
-    })
+  it('handles non-Error exception from writeFile', async () => {
+    vi.mocked(writeFile).mockRejectedValue('unknown-error')
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_SET_FAVORITE)
     const result = (await handler({}, 'clip.mp4', true)) as { success: boolean; error?: string }
@@ -1451,6 +1455,8 @@ describe('CLIPS_TRIM_CLIP', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
+    vi.mocked(access).mockRejectedValue(enoentError())
+    vi.mocked(unlink).mockResolvedValue(undefined)
     resetEngineMocks()
     mockFFProc.on.mockReset()
     clipsConfig.outputDirectory = ''
@@ -1474,7 +1480,7 @@ describe('CLIPS_TRIM_CLIP', () => {
   })
 
   it('rejects invalid trim range when endSeconds <= startSeconds', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(access).mockResolvedValue(undefined)
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_TRIM_CLIP)
     const result = (await handler({}, 'clip.mp4', 20, 10)) as ClipTrimResult
@@ -1483,7 +1489,7 @@ describe('CLIPS_TRIM_CLIP', () => {
   })
 
   it('rejects startSeconds < 0', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(access).mockResolvedValue(undefined)
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_TRIM_CLIP)
     const result = (await handler({}, 'clip.mp4', -1, 10)) as ClipTrimResult
@@ -1492,8 +1498,8 @@ describe('CLIPS_TRIM_CLIP', () => {
   })
 
   it('returns success when ffmpeg trim succeeds', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -1514,8 +1520,8 @@ describe('CLIPS_TRIM_CLIP', () => {
   })
 
   it('registers the ffmpeg trim process in the app-exit sweep', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -1536,9 +1542,9 @@ describe('CLIPS_TRIM_CLIP', () => {
   })
 
   it('creates output directory when trimmed dir does not exist', async () => {
-    vi.mocked(existsSync).mockReturnValueOnce(true) // safePath exists
-    // second existsSync(outDir) → undefined → falsy → triggers mkdirSync
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValueOnce(undefined) // safePath exists
+    // mkdir is unconditional now; outDir existence no longer checked
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -1554,12 +1560,12 @@ describe('CLIPS_TRIM_CLIP', () => {
     const handler = getAsyncHandler(handlers, IPC.CLIPS_TRIM_CLIP)
     const result = (await handler({}, 'clip.mp4', 10, 20)) as ClipTrimResult
     expect(result.success).toBe(true)
-    expect(mkdirSync).toHaveBeenCalled()
+    expect(mkdir).toHaveBeenCalled()
   })
 
   it('uses -c copy args when reEncode is not set', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -1582,8 +1588,8 @@ describe('CLIPS_TRIM_CLIP', () => {
   })
 
   it('uses libx264 re-encode args when reEncode is true', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -1607,7 +1613,7 @@ describe('CLIPS_TRIM_CLIP', () => {
   })
 
   it('returns error when ffmpeg trim fails', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(access).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -1627,7 +1633,7 @@ describe('CLIPS_TRIM_CLIP', () => {
   })
 
   it('handles process spawn error', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(access).mockResolvedValue(undefined)
     vi.mocked(execFile).mockReturnValue(mockFFProc as never)
     mockFFProc.on.mockImplementation((_event: string, cb: (e: Error) => void) => {
       if (_event === 'error') {
@@ -1655,8 +1661,8 @@ describe('CLIPS_TRIM_CLIP', () => {
   }
 
   function mockProbeThenTrim() {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -1724,8 +1730,8 @@ describe('CLIPS_TRIM_CLIP', () => {
 
   it('ignores enhance when source resolution cannot be probed', async () => {
     await setAmdDetected(true)
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -1746,8 +1752,8 @@ describe('CLIPS_TRIM_CLIP', () => {
   })
 
   it('appends cas=strength to the vf chain when sharpness is set with re-encode', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -1769,8 +1775,8 @@ describe('CLIPS_TRIM_CLIP', () => {
   })
 
   it('clamps sharpness above 1 to cas=strength=1', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -1791,8 +1797,8 @@ describe('CLIPS_TRIM_CLIP', () => {
   })
 
   it('ignores sharpness when re-encode is not enabled', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -1818,6 +1824,8 @@ describe('CLIPS_MERGE_CLIPS', () => {
 
   beforeEach(() => {
     vi.resetAllMocks()
+    vi.mocked(access).mockRejectedValue(enoentError())
+    vi.mocked(unlink).mockResolvedValue(undefined)
     resetEngineMocks()
     mockFFProc.on.mockReset()
     clipsConfig.outputDirectory = ''
@@ -1849,8 +1857,8 @@ describe('CLIPS_MERGE_CLIPS', () => {
   })
 
   it('returns success when ffmpeg merge succeeds', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -1868,11 +1876,11 @@ describe('CLIPS_MERGE_CLIPS', () => {
     expect(result.success).toBe(true)
     expect(result.path).toBeDefined()
     expect(typeof result.path).toBe('string')
-    expect(writeFileSync).toHaveBeenCalled() // concat file written
+    expect(writeFile).toHaveBeenCalled() // concat file written
   })
 
   it('returns error when ffmpeg merge fails', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(access).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -1892,7 +1900,7 @@ describe('CLIPS_MERGE_CLIPS', () => {
   })
 
   it('handles process spawn error during merge', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(access).mockResolvedValue(undefined)
     vi.mocked(execFile).mockReturnValue(mockFFProc as never)
     mockFFProc.on.mockImplementation((_event: string, cb: (e: Error) => void) => {
       if (_event === 'error') {
@@ -1907,13 +1915,9 @@ describe('CLIPS_MERGE_CLIPS', () => {
     expect(result.error).toBe('spawn error')
   })
 
-  it('handles writeFileSync failure for concat file', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(writeFileSync)
-      .mockReset()
-      .mockImplementation(() => {
-        throw new Error('permission denied')
-      })
+  it('handles writeFile failure for concat file', async () => {
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(writeFile).mockReset().mockRejectedValue(new Error('permission denied'))
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_MERGE_CLIPS)
     const result = (await handler({}, ['clip1.mp4', 'clip2.mp4'])) as ClipMergeResult
@@ -1922,10 +1926,8 @@ describe('CLIPS_MERGE_CLIPS', () => {
   })
 
   it('creates output directory when merged dir does not exist', async () => {
-    vi.mocked(existsSync).mockReturnValueOnce(true) // clip1.mp4 exists
-    vi.mocked(existsSync).mockReturnValueOnce(true) // clip2.mp4 exists
-    // third existsSync(outDir) → undefined → falsy → triggers mkdirSync
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined) // clip files exist
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -1941,16 +1943,12 @@ describe('CLIPS_MERGE_CLIPS', () => {
     const handler = getAsyncHandler(handlers, IPC.CLIPS_MERGE_CLIPS)
     const result = (await handler({}, ['clip1.mp4', 'clip2.mp4'])) as ClipMergeResult
     expect(result.success).toBe(true)
-    expect(mkdirSync).toHaveBeenCalled()
+    expect(mkdir).toHaveBeenCalled()
   })
 
   it('handles non-Error exception during merge', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(writeFileSync)
-      .mockReset()
-      .mockImplementation(() => {
-        throw 'write-error'
-      })
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(writeFile).mockReset().mockRejectedValue('write-error')
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_MERGE_CLIPS)
     const result = (await handler({}, ['clip1.mp4', 'clip2.mp4'])) as ClipMergeResult
@@ -1959,8 +1957,8 @@ describe('CLIPS_MERGE_CLIPS', () => {
   })
 
   it('uses -c copy stream args when enhance is not set', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -1983,8 +1981,8 @@ describe('CLIPS_MERGE_CLIPS', () => {
   })
 
   it('registers the ffmpeg merge process in the app-exit sweep', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -2012,8 +2010,8 @@ describe('CLIPS_MERGE_CLIPS', () => {
     })
     let handlers = captureHandlers()
     await getAsyncHandler(handlers, IPC.CLIPS_GET_GPUS)()
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -2048,8 +2046,8 @@ describe('CLIPS_MERGE_CLIPS', () => {
     })
     let handlers = captureHandlers()
     await getAsyncHandler(handlers, IPC.CLIPS_GET_GPUS)()
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -2072,8 +2070,8 @@ describe('CLIPS_MERGE_CLIPS', () => {
   })
 
   it('re-encodes with cas vf when sharpness is set', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -2096,8 +2094,8 @@ describe('CLIPS_MERGE_CLIPS', () => {
   })
 
   it('keeps -c copy when sharpness is zero', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(mkdirSync).mockReturnValue(undefined as never)
+    vi.mocked(access).mockResolvedValue(undefined)
+    vi.mocked(mkdir).mockResolvedValue(undefined)
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
@@ -2123,6 +2121,7 @@ describe('CLIPS_MERGE_CLIPS', () => {
 describe('CLIPS_RENAME_CLIP', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    vi.mocked(access).mockRejectedValue(enoentError())
     resetEngineMocks()
   })
 
@@ -2132,7 +2131,7 @@ describe('CLIPS_RENAME_CLIP', () => {
     const result = (await handler({}, 123, 'newclip')) as { success: boolean; error?: string }
     expect(result.success).toBe(false)
     expect(result.error).toBe('Invalid clip name')
-    expect(renameSync).not.toHaveBeenCalled()
+    expect(rename).not.toHaveBeenCalled()
   })
 
   it('rejects non-string newName', async () => {
@@ -2141,7 +2140,7 @@ describe('CLIPS_RENAME_CLIP', () => {
     const result = (await handler({}, 'oldclip.mp4', 456)) as { success: boolean; error?: string }
     expect(result.success).toBe(false)
     expect(result.error).toBe('Invalid new name')
-    expect(renameSync).not.toHaveBeenCalled()
+    expect(rename).not.toHaveBeenCalled()
   })
 
   it('rejects newName that is just .mp4 extension', async () => {
@@ -2150,7 +2149,7 @@ describe('CLIPS_RENAME_CLIP', () => {
     const result = (await handler({}, 'oldclip.mp4', '.mp4')) as { success: boolean; error?: string }
     expect(result.success).toBe(false)
     expect(result.error).toBe('Invalid new name')
-    expect(renameSync).not.toHaveBeenCalled()
+    expect(rename).not.toHaveBeenCalled()
   })
 
   it('rejects old name that escapes output directory', async () => {
@@ -2176,45 +2175,41 @@ describe('CLIPS_RENAME_CLIP', () => {
   })
 
   it('returns error when old clip does not exist', async () => {
-    vi.mocked(existsSync).mockReturnValue(false)
+    vi.mocked(access).mockRejectedValue(enoentError())
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_RENAME_CLIP)
     const result = (await handler({}, 'oldclip.mp4', 'newclip')) as { success: boolean; error?: string }
     expect(result.success).toBe(false)
     expect(result.error).toBe('Clip not found')
-    expect(renameSync).not.toHaveBeenCalled()
+    expect(rename).not.toHaveBeenCalled()
   })
 
   it('returns error when new clip already exists', async () => {
-    vi.mocked(existsSync)
-      .mockReturnValueOnce(true) // old clip exists
-      .mockReturnValueOnce(true) // new clip exists
+    vi.mocked(access).mockResolvedValue(undefined) // old + new both exist
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_RENAME_CLIP)
     const result = (await handler({}, 'oldclip.mp4', 'newclip')) as { success: boolean; error?: string }
     expect(result.success).toBe(false)
     expect(result.error).toBe('A clip with that name already exists')
-    expect(renameSync).not.toHaveBeenCalled()
+    expect(rename).not.toHaveBeenCalled()
   })
 
   it('renames the .mp4 file successfully', async () => {
-    vi.mocked(existsSync)
-      .mockReturnValueOnce(true) // old clip exists
-      .mockReturnValueOnce(false) // new clip doesn't exist
+    vi.mocked(access)
+      .mockResolvedValueOnce(undefined) // old clip exists
+      .mockRejectedValueOnce(enoentError()) // new clip doesn't exist
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_RENAME_CLIP)
     const result = (await handler({}, 'oldclip.mp4', 'newclip')) as { success: boolean; error?: string }
     expect(result.success).toBe(true)
-    expect(renameSync).toHaveBeenCalledTimes(1)
+    expect(rename).toHaveBeenCalledTimes(1)
   })
 
-  it('returns error when renameSync fails (e.g. cross-volume)', async () => {
-    vi.mocked(existsSync)
-      .mockReturnValueOnce(true) // old clip exists
-      .mockReturnValueOnce(false) // new clip doesn't exist
-    vi.mocked(renameSync).mockImplementationOnce(() => {
-      throw new Error('EXDEV: cross-device link not permitted')
-    })
+  it('returns error when rename fails (e.g. cross-volume)', async () => {
+    vi.mocked(access)
+      .mockResolvedValueOnce(undefined) // old clip exists
+      .mockRejectedValueOnce(enoentError()) // new clip doesn't exist
+    vi.mocked(rename).mockRejectedValueOnce(new Error('EXDEV: cross-device link not permitted'))
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_RENAME_CLIP)
     const result = (await handler({}, 'oldclip.mp4', 'newclip')) as { success: boolean; error?: string }
@@ -2223,52 +2218,55 @@ describe('CLIPS_RENAME_CLIP', () => {
   })
 
   it('renames the cached thumbnail when present', async () => {
-    vi.mocked(existsSync).mockImplementation((p) => {
-      if (typeof p !== 'string') return false
-      if (p.endsWith('oldclip.mp4')) return true // old clip exists
-      if (p.endsWith('newclip.mp4')) return false // new clip doesn't exist
-      if (p.includes('.thumbnails') && p.includes('oldclip.jpg')) return true // cached thumbnail
-      return false
+    vi.mocked(existsSync).mockImplementation(
+      (p) => typeof p === 'string' && p.includes('.thumbnails') && p.includes('oldclip.jpg'),
+    )
+    vi.mocked(access).mockImplementation((p) => {
+      if (typeof p !== 'string') return Promise.reject(enoentError())
+      if (p.endsWith('oldclip.mp4')) return Promise.resolve() // old clip exists
+      if (p.endsWith('newclip.mp4')) return Promise.reject(enoentError()) // new clip doesn't exist
+      if (p.includes('.thumbnails') && p.includes('oldclip.jpg')) return Promise.resolve() // cached thumbnail
+      return Promise.reject(enoentError())
     })
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_RENAME_CLIP)
     const result = (await handler({}, 'oldclip.mp4', 'newclip')) as { success: boolean; error?: string }
     expect(result.success).toBe(true)
-    // renameSync called twice: once for .mp4, once for thumbnail
-    expect(renameSync).toHaveBeenCalledTimes(2)
+    // rename called twice: once for .mp4, once for thumbnail
+    expect(rename).toHaveBeenCalledTimes(2)
   })
 
   it('renames the .favorite marker when present', async () => {
-    vi.mocked(existsSync).mockImplementation((p) => {
-      if (typeof p !== 'string') return false
-      if (p.endsWith('oldclip.mp4')) return true // old clip exists
-      if (p.endsWith('newclip.mp4')) return false // new clip doesn't exist
-      if (p.includes('.oldclip.mp4.favorite')) return true // favorite marker
-      return false
+    vi.mocked(access).mockImplementation((p) => {
+      if (typeof p !== 'string') return Promise.reject(enoentError())
+      if (p.endsWith('oldclip.mp4')) return Promise.resolve() // old clip exists
+      if (p.endsWith('newclip.mp4')) return Promise.reject(enoentError()) // new clip doesn't exist
+      if (p.includes('.oldclip.mp4.favorite')) return Promise.resolve() // favorite marker
+      return Promise.reject(enoentError())
     })
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_RENAME_CLIP)
     const result = (await handler({}, 'oldclip.mp4', 'newclip')) as { success: boolean; error?: string }
     expect(result.success).toBe(true)
-    // renameSync called twice: once for .mp4, once for .favorite
-    expect(renameSync).toHaveBeenCalledTimes(2)
+    // rename called twice: once for .mp4, once for .favorite
+    expect(rename).toHaveBeenCalledTimes(2)
   })
 
   it('strips .mp4 suffix from newName if user included it', async () => {
-    vi.mocked(existsSync)
-      .mockReturnValueOnce(true) // old clip exists
-      .mockReturnValueOnce(false) // new clip doesn't exist (after .mp4 stripped and re-added)
+    vi.mocked(access)
+      .mockResolvedValueOnce(undefined) // old clip exists
+      .mockRejectedValueOnce(enoentError()) // new clip doesn't exist (after .mp4 stripped and re-added)
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_RENAME_CLIP)
     const result = (await handler({}, 'oldclip.mp4', 'newclip.mp4')) as { success: boolean; error?: string }
     expect(result.success).toBe(true)
-    expect(renameSync).toHaveBeenCalledTimes(1)
+    expect(rename).toHaveBeenCalledTimes(1)
   })
 
   it('invalidates duration cache for old path after successful rename', async () => {
-    vi.mocked(existsSync)
-      .mockReturnValueOnce(true) // old clip exists
-      .mockReturnValueOnce(false) // new clip doesn't exist
+    vi.mocked(access)
+      .mockResolvedValueOnce(undefined) // old clip exists
+      .mockRejectedValueOnce(enoentError()) // new clip doesn't exist
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_RENAME_CLIP)
     await handler({}, 'oldclip.mp4', 'newclip')
@@ -2422,7 +2420,7 @@ describe('CLIPS_PUBLISH', () => {
   })
 
   it('rejects nonexistent clip file', async () => {
-    vi.mocked(existsSync).mockReturnValue(false)
+    vi.mocked(access).mockRejectedValue(enoentError())
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_PUBLISH)
     const result = (await handler({}, 'C:\\clips\\missing.mp4')) as { success: boolean; error: string }
@@ -2431,7 +2429,7 @@ describe('CLIPS_PUBLISH', () => {
   })
 
   it('returns link on successful upload', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(access).mockResolvedValue(undefined)
     mockUploadClipToGofile.mockResolvedValue({ success: true, link: 'https://gofile.io/d/abc' })
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_PUBLISH)
@@ -2445,7 +2443,7 @@ describe('CLIPS_PUBLISH', () => {
   })
 
   it('returns error when upload fails', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(access).mockResolvedValue(undefined)
     mockUploadClipToGofile.mockResolvedValue({ success: false, error: 'Connection lost during upload' })
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_PUBLISH)
@@ -2454,7 +2452,7 @@ describe('CLIPS_PUBLISH', () => {
   })
 
   it('blocks concurrent upload of the same clip', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(access).mockResolvedValue(undefined)
     let resolveUpload: (v: { success: boolean }) => void = () => {}
     mockUploadClipToGofile.mockImplementation(
       () =>
@@ -2472,7 +2470,7 @@ describe('CLIPS_PUBLISH', () => {
   })
 
   it('returns ABORTED code when upload is cancelled', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(access).mockResolvedValue(undefined)
     mockUploadClipToGofile.mockResolvedValue({ success: false, cancelled: true, error: 'Upload cancelled' })
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_PUBLISH)
@@ -2506,7 +2504,7 @@ describe('CLIPS_PUBLISH_CANCEL', () => {
   })
 
   it('aborts an in-flight upload for the clip path', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(access).mockResolvedValue(undefined)
     let signal: AbortSignal | undefined
     mockUploadClipToGofile.mockImplementation(
       (_path: string, _onProgress?: unknown, sig?: AbortSignal) =>
@@ -2520,6 +2518,7 @@ describe('CLIPS_PUBLISH_CANCEL', () => {
     const handlers = captureHandlers()
     const publish = getAsyncHandler(handlers, IPC.CLIPS_PUBLISH)
     const inFlight = publish({}, 'C:\\clips\\clip.mp4')
+    await vi.waitFor(() => expect(signal).toBeDefined())
     expect(signal?.aborted).toBe(false)
     const cancel = handlers.get(IPC.CLIPS_PUBLISH_CANCEL)! as (_e: unknown, p: string) => { success: boolean }
     expect(cancel({}, 'C:\\clips\\clip.mp4')).toEqual({ success: true })

@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process'
-import { existsSync, mkdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
-import { stat as fsStat } from 'node:fs/promises'
+import { access, stat as fsStat, mkdir, rename, unlink, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { IPC } from '@shared/channels'
 import type {
@@ -52,6 +51,15 @@ import {
   stopEngineProcess,
 } from './clips-engine-connection'
 
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
 let _micDevicesCache: MicDeviceInfo[] | null = null
 let _micDevicesCacheTs = 0
 
@@ -88,7 +96,7 @@ function enumerateMicDevicesLocal(): Promise<MicDeviceInfo[]> {
   return new Promise((resolve) => {
     execFile('powershell', ['-NoProfile', '-Command', ps], { timeout: 15000 }, (_err, stdout) => {
       if (_err || !stdout) {
-        getLogger().warning('clips-mic', `local enumerate failed: ${_err?.message ?? 'empty output'}`)
+        getLogger().info('clips-mic', `local enumerate failed: ${_err?.message ?? 'empty output'}`)
         resolve([])
         return
       }
@@ -214,19 +222,19 @@ export function registerClipsIpc(): void {
     }
     try {
       const outputDir = getDefaultOutputDir()
-      unlinkSync(clipPath)
+      await unlink(clipPath)
       const thumbPath = getCachedThumbnailPath(outputDir, clipName)
       if (thumbPath) {
         try {
-          unlinkSync(thumbPath)
+          await unlink(thumbPath)
         } catch {
           /* ignore thumbnail cleanup failure */
         }
       }
       const engineThumb = join(outputDir, `${clipName.replace(/\.mp4$/, '')}.thumb.jpg`)
-      if (existsSync(engineThumb)) {
+      if (await fileExists(engineThumb)) {
         try {
-          unlinkSync(engineThumb)
+          await unlink(engineThumb)
         } catch {
           /* ignore engine thumbnail cleanup failure */
         }
@@ -269,39 +277,39 @@ export function registerClipsIpc(): void {
       return { success: false, error: 'Invalid new clip name' }
     }
     try {
-      if (!existsSync(oldPath)) {
+      if (!(await fileExists(oldPath))) {
         getLogger().warning('clips', `RenameClip failed: Clip '${clipName}' not found`)
         return { success: false, error: 'Clip not found' }
       }
-      if (existsSync(newPath)) {
+      if (await fileExists(newPath)) {
         getLogger().warning('clips', `RenameClip failed: A clip named '${newName}' already exists`)
         return { success: false, error: 'A clip with that name already exists' }
       }
-      renameSync(oldPath, newPath)
+      await rename(oldPath, newPath)
       const outputDir = getDefaultOutputDir()
       const oldThumbPath = getCachedThumbnailPath(outputDir, clipName)
-      if (oldThumbPath && existsSync(oldThumbPath)) {
+      if (oldThumbPath && (await fileExists(oldThumbPath))) {
         const newThumbPath = join(outputDir, '.thumbnails', `${newName.replace(/\.mp4$/, '')}.jpg`)
         try {
-          renameSync(oldThumbPath, newThumbPath)
+          await rename(oldThumbPath, newThumbPath)
         } catch {
           /* ignore thumbnail rename failure */
         }
       }
       const oldEngineThumb = join(outputDir, `${clipName.replace(/\.mp4$/, '')}.thumb.jpg`)
-      if (existsSync(oldEngineThumb)) {
+      if (await fileExists(oldEngineThumb)) {
         const newEngineThumb = join(outputDir, `${newName.replace(/\.mp4$/, '')}.thumb.jpg`)
         try {
-          renameSync(oldEngineThumb, newEngineThumb)
+          await rename(oldEngineThumb, newEngineThumb)
         } catch {
           /* ignore engine thumbnail rename failure */
         }
       }
       const oldFavPath = join(outputDir, `.${clipName}.favorite`)
-      if (existsSync(oldFavPath)) {
+      if (await fileExists(oldFavPath)) {
         const newFavPath = join(outputDir, `.${newName}.favorite`)
         try {
-          renameSync(oldFavPath, newFavPath)
+          await rename(oldFavPath, newFavPath)
         } catch {
           /* ignore favorite rename failure */
         }
@@ -409,8 +417,8 @@ export function registerClipsIpc(): void {
       }
       if (typeof c.outputDirectory === 'string' && c.outputDirectory.length > 0 && c.outputDirectory.length < 1024) {
         try {
-          const stat = statSync(c.outputDirectory, { throwIfNoEntry: false })
-          if (stat?.isDirectory()) {
+          const stat = await fsStat(c.outputDirectory)
+          if (stat.isDirectory()) {
             C.outputDirectory = c.outputDirectory
           }
         } catch {
@@ -601,10 +609,10 @@ export function registerClipsIpc(): void {
     }
     try {
       if (favorite) {
-        writeFileSync(resolvedName, '', 'utf-8')
+        await writeFile(resolvedName, '', 'utf-8')
       } else {
-        if (existsSync(resolvedName)) {
-          unlinkSync(resolvedName)
+        if (await fileExists(resolvedName)) {
+          await unlink(resolvedName)
         }
       }
       return { success: true }
@@ -631,7 +639,7 @@ export function registerClipsIpc(): void {
         return { success: false, error: 'Invalid clip path' }
       }
       const safePath = clipPathInOutputDir(clipPath)
-      if (!safePath || !existsSync(safePath)) {
+      if (!safePath || !(await fileExists(safePath))) {
         getLogger().warning('clips', `TrimClip failed: Clip file not found '${clipPath}'`)
         return { success: false, error: 'Clip file not found' }
       }
@@ -645,7 +653,7 @@ export function registerClipsIpc(): void {
         return { success: false, error: 'Invalid trim range' }
       }
       const outDir = getDefaultOutputDir()
-      if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true })
+      await mkdir(outDir, { recursive: true })
       const baseName = basename(safePath, '.mp4')
       const outPath = join(outDir, `${baseName} DiNho Clipe ${Date.now()}.mp4`)
       const copyArgs = ['-c', 'copy']
@@ -700,11 +708,9 @@ export function registerClipsIpc(): void {
         const args = ['-y', '-loglevel', 'error', ...seekArgs, outPath]
         const proc = execFile(getFfmpegPath(), args, { timeout: 120_000 }, (err) => {
           if (err) {
-            try {
-              unlinkSync(outPath)
-            } catch {
+            void unlink(outPath).catch(() => {
               /* ignore cleanup error */
-            }
+            })
             getLogger().warning('clips', `TrimClip ffmpeg failed: ${err.message}`)
             resolve({ success: false, error: err.message })
           } else {
@@ -714,11 +720,9 @@ export function registerClipsIpc(): void {
         })
         trackChildProcess(proc)
         proc.on('error', (e) => {
-          try {
-            unlinkSync(outPath)
-          } catch {
+          void unlink(outPath).catch(() => {
             /* ignore cleanup error */
-          }
+          })
           getLogger().warning('clips', `TrimClip process error: ${e.message}`)
           resolve({ success: false, error: e.message })
         })
@@ -743,14 +747,14 @@ export function registerClipsIpc(): void {
           return { success: false, error: 'Invalid clip path' }
         }
         const safe = clipPathInOutputDir(p)
-        if (!safe || !existsSync(safe)) {
+        if (!safe || !(await fileExists(safe))) {
           getLogger().warning('clips', `MergeClips failed: Clip not found '${p}'`)
           return { success: false, error: `Clip not found: ${p}` }
         }
         safePaths.push(safe)
       }
       const outDir = getDefaultOutputDir()
-      if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true })
+      await mkdir(outDir, { recursive: true })
       const now = new Date()
       const pad = (n: number) => String(n).padStart(2, '0')
       const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`
@@ -793,7 +797,7 @@ export function registerClipsIpc(): void {
           : ['-c', 'copy']
       try {
         const lines = safePaths.map((p) => `file '${p.replace(/'/g, "'\\''")}'`)
-        writeFileSync(concatFile, lines.join('\n'), 'utf-8')
+        await writeFile(concatFile, lines.join('\n'), 'utf-8')
         return await new Promise((resolve) => {
           const args = [
             '-y',
@@ -809,15 +813,11 @@ export function registerClipsIpc(): void {
             outPath,
           ]
           const proc = execFile(getFfmpegPath(), args, { timeout: 120_000 }, (err) => {
-            try {
-              unlinkSync(concatFile)
-            } catch {}
+            void unlink(concatFile).catch(() => {})
             if (err) {
-              try {
-                unlinkSync(outPath)
-              } catch {
+              void unlink(outPath).catch(() => {
                 /* ignore cleanup error */
-              }
+              })
               getLogger().warning('clips', `MergeClips ffmpeg failed: ${err.message}`)
               resolve({ success: false, error: err.message })
             } else {
@@ -827,22 +827,16 @@ export function registerClipsIpc(): void {
           })
           trackChildProcess(proc)
           proc.on('error', (e) => {
-            try {
-              unlinkSync(concatFile)
-            } catch {}
-            try {
-              unlinkSync(outPath)
-            } catch {
+            void unlink(concatFile).catch(() => {})
+            void unlink(outPath).catch(() => {
               /* ignore cleanup error */
-            }
+            })
             getLogger().warning('clips', `MergeClips process error: ${e.message}`)
             resolve({ success: false, error: e.message })
           })
         })
       } catch (err) {
-        try {
-          unlinkSync(concatFile)
-        } catch {}
+        await unlink(concatFile).catch(() => {})
         getLogger().warning('clips', `MergeClips failed: ${err instanceof Error ? err.message : String(err)}`)
         return { success: false, error: err instanceof Error ? err.message : String(err) }
       }
@@ -873,7 +867,7 @@ export function registerClipsIpc(): void {
       return { success: false, error: 'Invalid clip path' }
     }
     const safe = clipPathInOutputDir(clipPath)
-    if (!safe || !existsSync(safe)) {
+    if (!safe || !(await fileExists(safe))) {
       getLogger().warning('clips', `Publish failed: Clip file not found '${clipPath}'`)
       return { success: false, error: 'Clip file not found' }
     }
