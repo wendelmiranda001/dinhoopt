@@ -98,6 +98,32 @@ window.dinho = {
 
 import { ClipsPage } from './ClipsPage'
 
+const baseConfig = {
+  replayTimeSeconds: 120,
+  micEnabled: true,
+  audioLoopback: false,
+  fps: 30,
+  width: 1920,
+  height: 1080,
+  bitrateKbps: 50000,
+  cq: 22,
+  maxrateKbps: 30000,
+  bufsizeKbps: 60000,
+  bframes: 2,
+  lookahead: 16,
+  encoderPreset: 'p4',
+  outputDirectory: 'C:\\Users\\Test\\Desktop\\DiNhoClips',
+  forceSoftware: false,
+  pushToTalk: 'off',
+  pushToTalkKeys: [0x7a],
+  gameDetection: false,
+  hotkeys: [
+    { id: 'hk-save', vk: 0x77, modifiers: [], action: 'saveClip', replayDurationSeconds: 60, enabled: true },
+    { id: 'hk-capture', vk: 0x78, modifiers: [], action: 'toggleCapture', enabled: true },
+    { id: 'hk-mic', vk: 0x79, modifiers: [], action: 'toggleMic', enabled: true },
+  ],
+}
+
 describe('ClipsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -108,31 +134,7 @@ describe('ClipsPage', () => {
       fps: 30,
       replayTimeSeconds: 120,
     })
-    mockGetConfig.mockResolvedValue({
-      replayTimeSeconds: 120,
-      micEnabled: true,
-      audioLoopback: false,
-      fps: 30,
-      width: 1920,
-      height: 1080,
-      bitrateKbps: 50000,
-      cq: 22,
-      maxrateKbps: 30000,
-      bufsizeKbps: 60000,
-      bframes: 2,
-      lookahead: 16,
-      encoderPreset: 'p4',
-      outputDirectory: 'C:\\Users\\Test\\Desktop\\DiNhoClips',
-      forceSoftware: false,
-      pushToTalk: 'off',
-      pushToTalkKeys: [0x7a],
-      gameDetection: false,
-      hotkeys: [
-        { id: 'hk-save', vk: 0x77, modifiers: [], action: 'saveClip', replayDurationSeconds: 60, enabled: true },
-        { id: 'hk-capture', vk: 0x78, modifiers: [], action: 'toggleCapture', enabled: true },
-        { id: 'hk-mic', vk: 0x79, modifiers: [], action: 'toggleMic', enabled: true },
-      ],
-    })
+    mockGetConfig.mockResolvedValue({ ...baseConfig })
     mockList.mockResolvedValue([])
     mockGetAudioSessions.mockResolvedValue([])
   })
@@ -389,8 +391,54 @@ describe('ClipsPage', () => {
     await screen.findByText('recordingQuality')
     screen.getByText('audioSessions').click()
     expect(await screen.findByText('Spotify')).toBeTruthy()
-    screen.getByText('sessionInclude').click()
+    screen.getByTestId('audio-session-2233').click()
     expect(mockSetConfig).toHaveBeenLastCalledWith({ selectedAudioSessions: [2233] })
+  })
+
+  it('audio sessions picker does not show the always-included badge nor pre-selects engine sessions', async () => {
+    mockGetConfig.mockResolvedValue({ ...baseConfig, selectedAudioSessions: [] })
+    mockGetAudioSessions.mockResolvedValue([
+      { processId: 4421, processName: 'FiveM_b2944.exe', displayName: 'Grand Theft Auto V', isSelected: true },
+      { processId: 2233, processName: 'Spotify.exe', displayName: 'Spotify', isSelected: true },
+    ])
+    render(<ClipsPage />)
+    showSettings()
+    await screen.findByText('recordingQuality')
+    screen.getByText('audioSessions').click()
+    expect(await screen.findByText('Spotify')).toBeTruthy()
+    expect(screen.getByText('audioSessionsHint')).toBeTruthy()
+    expect(screen.queryByText('requiredSession')).toBeNull()
+    expect(screen.getAllByText('sessionInclude')).toHaveLength(2)
+  })
+
+  it('audio sessions picker is single-select: including a new app replaces the previous selection', async () => {
+    mockGetConfig.mockResolvedValue({ ...baseConfig, selectedAudioSessions: [2233] })
+    mockGetAudioSessions.mockResolvedValue([
+      { processId: 2233, processName: 'Spotify.exe', displayName: 'Spotify', isSelected: true },
+      { processId: 7788, processName: 'Discord.exe', displayName: 'Discord', isSelected: true },
+    ])
+    render(<ClipsPage />)
+    showSettings()
+    await screen.findByText('recordingQuality')
+    screen.getByText('audioSessions').click()
+    expect(await screen.findByText('Discord')).toBeTruthy()
+    expect(screen.getByText('sessionRemove')).toBeTruthy()
+    screen.getByTestId('audio-session-7788').click()
+    expect(mockSetConfig).toHaveBeenLastCalledWith({ selectedAudioSessions: [7788] })
+  })
+
+  it('removing the selected app restores full system capture', async () => {
+    mockGetConfig.mockResolvedValue({ ...baseConfig, selectedAudioSessions: [2233] })
+    mockGetAudioSessions.mockResolvedValue([
+      { processId: 2233, processName: 'Spotify.exe', displayName: 'Spotify', isSelected: true },
+    ])
+    render(<ClipsPage />)
+    showSettings()
+    await screen.findByText('recordingQuality')
+    screen.getByText('audioSessions').click()
+    expect(await screen.findByText('Spotify')).toBeTruthy()
+    screen.getByTestId('audio-session-2233').click()
+    expect(mockSetConfig).toHaveBeenLastCalledWith({ selectedAudioSessions: [] })
   })
 
   it('renders game detection toggle', async () => {

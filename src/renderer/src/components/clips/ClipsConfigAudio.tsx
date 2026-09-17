@@ -45,10 +45,9 @@ export function AudioSection({
   const toggleSession = useCallback(
     (pid: number) => {
       if (!config) return
-      const current = new Set(config.selectedAudioSessions ?? [])
-      if (current.has(pid)) current.delete(pid)
-      else current.add(pid)
-      void handleConfigUpdate({ selectedAudioSessions: [...current] })
+      const current = config.selectedAudioSessions ?? []
+      const isSelected = current.includes(pid)
+      void handleConfigUpdate({ selectedAudioSessions: isSelected ? [] : [pid] })
     },
     [config, handleConfigUpdate],
   )
@@ -315,9 +314,12 @@ export function AudioSection({
               <RefreshCw className="h-3 w-3" />
             </button>
           </div>
+          <p className="px-1 text-[9px] leading-relaxed" style={{ color: 'var(--text-dim)' }}>
+            {t('audioSessionsHint')}
+          </p>
           <div className="max-h-44 space-y-1 overflow-y-auto pr-0.5">
             {audioSessions.map((s) => {
-              const selected = (config.selectedAudioSessions ?? []).includes(s.processId) || s.isSelected
+              const selected = (config.selectedAudioSessions ?? []).includes(s.processId)
               return (
                 <div
                   key={s.processId}
@@ -332,26 +334,18 @@ export function AudioSection({
                       {s.processName} &middot; PID {s.processId}
                     </div>
                   </div>
-                  {s.isSelected ? (
-                    <span
-                      className="shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-medium"
-                      style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6' }}
-                    >
-                      {t('requiredSession')}
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => toggleSession(s.processId)}
-                      className="shrink-0 rounded-md px-2 py-0.5 text-[9px] font-semibold transition-all"
-                      style={{
-                        background: selected ? 'var(--accent)' : 'rgba(113,113,122,0.1)',
-                        color: selected ? '#fff' : 'var(--text-dim)',
-                      }}
-                    >
-                      {selected ? t('sessionRemove') : t('sessionInclude')}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    data-testid={`audio-session-${s.processId}`}
+                    onClick={() => toggleSession(s.processId)}
+                    className="shrink-0 rounded-md px-2 py-0.5 text-[9px] font-semibold transition-all"
+                    style={{
+                      background: selected ? 'rgba(113,113,122,0.1)' : 'var(--accent)',
+                      color: selected ? 'var(--text-dim)' : '#fff',
+                    }}
+                  >
+                    {selected ? t('sessionRemove') : t('sessionInclude')}
+                  </button>
                 </div>
               )
             })}

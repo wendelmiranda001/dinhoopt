@@ -152,6 +152,7 @@ export function useClipsState(): ClipsState {
       'sample-rate': t('tooltipSampleRate'),
       'game-audio': t('tooltipGameAudio'),
       'noise-suppression': t('tooltipNoiseSuppression'),
+      'audio-sessions': t('audioSessionsTooltip'),
       'adaptive-quality': t('tooltipAdaptiveQuality'),
     }),
     [t],
