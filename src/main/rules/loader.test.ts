@@ -110,16 +110,16 @@ describe('buildCleanerPaths', () => {
     const cleaners = buildCleanerPaths(mockRules, 'win32')
     const targets = cleaners.systemCleanTargets()
     expect(targets).toHaveLength(2)
-    expect(targets[0].path).toContain('cache')
-    expect(targets[0].needsAdmin).toBe(true)
-    expect(targets[1].needsAdmin).toBeUndefined()
+    expect(targets[0]!.path).toContain('cache')
+    expect(targets[0]!.needsAdmin).toBe(true)
+    expect(targets[1]!.needsAdmin).toBeUndefined()
   })
 
   it('singleFileCleanTargets returns resolved paths', () => {
     const cleaners = buildCleanerPaths(mockRules, 'win32')
     const targets = cleaners.singleFileCleanTargets()
     expect(targets).toHaveLength(1)
-    expect(targets[0].path).toContain('Prefetch')
+    expect(targets[0]!.path).toContain('Prefetch')
   })
 
   it('protectedEventLogs returns event logs list', () => {
@@ -155,14 +155,14 @@ describe('buildCleanerPaths', () => {
     const cleaners = buildCleanerPaths(mockRules, 'win32')
     const games = cleaners.gamingPaths()
     expect(games).toHaveLength(1)
-    expect(games[0].id).toBe('steam')
+    expect(games[0]!.id).toBe('steam')
   })
 
   it('gpuCachePaths returns resolved paths', () => {
     const cleaners = buildCleanerPaths(mockRules, 'win32')
     const caches = cleaners.gpuCachePaths()
     expect(caches).toHaveLength(1)
-    expect(caches[0].id).toBe('nvidia')
+    expect(caches[0]!.id).toBe('nvidia')
   })
 
   it('steamLibraries returns resolved libraries', () => {
@@ -187,14 +187,14 @@ describe('buildCleanerPaths', () => {
     const cleaners = buildCleanerPaths(mockRules, 'win32')
     const targets = cleaners.databaseOptimizeTargets()
     expect(targets).toHaveLength(3)
-    expect(targets[0].label).toBe('Chrome History')
-    expect(targets[0].dbFiles).toEqual(['History', 'Favicons', 'Cookies'])
-    expect(targets[0].multiProfile).toBe(true)
-    expect(targets[0].profilePattern).toEqual(['Default', 'Profile *'])
-    expect(targets[1].label).toBe('Firefox Places')
-    expect(targets[1].dbFiles).toEqual(['places.sqlite', 'cookies.sqlite'])
-    expect(targets[2].label).toBe('Custom DB')
-    expect(targets[2].dbFiles).toEqual(['custom.db'])
+    expect(targets[0]!.label).toBe('Chrome History')
+    expect(targets[0]!.dbFiles).toEqual(['History', 'Favicons', 'Cookies'])
+    expect(targets[0]!.multiProfile).toBe(true)
+    expect(targets[0]!.profilePattern).toEqual(['Default', 'Profile *'])
+    expect(targets[1]!.label).toBe('Firefox Places')
+    expect(targets[1]!.dbFiles).toEqual(['places.sqlite', 'cookies.sqlite'])
+    expect(targets[2]!.label).toBe('Custom DB')
+    expect(targets[2]!.dbFiles).toEqual(['custom.db'])
   })
 
   it('databaseOptimizeTargets resolves array dbFiles', () => {
@@ -239,7 +239,7 @@ describe('getWinVars fallbacks', () => {
     const cleaners = buildCleanerPaths(mockRules, 'win32')
     const targets = cleaners.systemCleanTargets()
     expect(targets).toHaveLength(2)
-    expect(targets[0].path).toBeDefined()
+    expect(targets[0]!.path).toBeDefined()
   })
 })
 
@@ -254,8 +254,8 @@ describe('resolveVars', () => {
     }
     const cleaners = buildCleanerPaths(rulesWithUnknownVar, 'win32')
     const targets = cleaners.systemCleanTargets()
-    expect(targets[0].path).not.toContain('UNKNOWN_VAR')
-    expect(targets[0].path).toContain('cache')
+    expect(targets[0]!.path).not.toContain('UNKNOWN_VAR')
+    expect(targets[0]!.path).toContain('cache')
   })
 
   it('logs a warning when a variable cannot be resolved', () => {

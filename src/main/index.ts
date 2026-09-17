@@ -394,7 +394,6 @@ function initGui(): void {
         preload: join(__dirname, '../preload/index.js'),
         contextIsolation: true,
         nodeIntegration: false,
-        allowFileAccessFromFiles: true,
       },
     })
     // abre em tela cheia
@@ -602,8 +601,8 @@ function initGui(): void {
     // Handle multi-schedule run completion
     ipcMain.on(IPC.SCHEDULE_RUN_COMPLETE, (_event, scheduleId: unknown, status: unknown) => {
       if (typeof scheduleId !== 'string' || typeof status !== 'string') return
-      const VALID_STATUSES: ScheduleRunStatus[] = ['completed', 'failed', 'cancelled']
-      if (!(VALID_STATUSES as readonly string[]).includes(status)) return
+      const VALID_STATUSES: readonly string[] = ['completed', 'failed', 'cancelled']
+      if (!VALID_STATUSES.includes(status)) return
       completeScheduleRun(scheduleId, status as ScheduleRunStatus)
     })
 
