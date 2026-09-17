@@ -551,13 +551,13 @@ describe('preload API bridge', () => {
 
     it('winSxSScan returns empty array when invoke returns falsy', async () => {
       mockIpc.invoke.mockResolvedValueOnce(null)
-      const result = await api.winSxSScan()
+      const result = (await (api.winSxSScan as () => Promise<unknown>)()) as Array<{ id: string }>
       expect(result).toEqual([])
     })
 
     it('winSxSScan wraps truthy result in array', async () => {
       mockIpc.invoke.mockResolvedValueOnce({ id: 'test', category: 'winsxs', path: 'C:\\test', size: 1024 })
-      const result = await api.winSxSScan()
+      const result = (await (api.winSxSScan as () => Promise<unknown>)()) as Array<{ id: string }>
       expect(result).toHaveLength(1)
       expect(result[0]!.id).toBe('test')
     })
@@ -752,7 +752,7 @@ describe('preload API bridge', () => {
 
     it('clipsOnEngineStatus registers listener and returns unsubscribe', () => {
       const cb = vi.fn()
-      const unsub = api.clipsOnEngineStatus(cb)
+      const unsub = (api.clipsOnEngineStatus as (cb: (...args: unknown[]) => unknown) => () => void)(cb)
       expect(mockIpc.on).toHaveBeenCalledWith(IPC.CLIPS_ENGINE_STATUS, expect.any(Function))
       unsub()
       expect(mockIpc.removeListener).toHaveBeenCalledWith(IPC.CLIPS_ENGINE_STATUS, expect.any(Function))
@@ -760,17 +760,17 @@ describe('preload API bridge', () => {
 
     it('clipsGetVideoUrl returns clip-video:// URL for Windows path', () => {
       const expected = `clip-video://file?path=${encodeURIComponent('C:\\Users\\test\\clip.mp4')}`
-      expect(api.clipsGetVideoUrl('C:\\Users\\test\\clip.mp4')).toBe(expected)
+      expect((api.clipsGetVideoUrl as (path: string) => string)('C:\\Users\\test\\clip.mp4')).toBe(expected)
     })
 
     it('clipsGetVideoUrl handles already normalized path', () => {
       const expected = `clip-video://file?path=${encodeURIComponent('D:/games/clip.mp4')}`
-      expect(api.clipsGetVideoUrl('D:/games/clip.mp4')).toBe(expected)
+      expect((api.clipsGetVideoUrl as (path: string) => string)('D:/games/clip.mp4')).toBe(expected)
     })
 
     it('clipsGetVideoUrl handles spaces in path', () => {
       const expected = `clip-video://file?path=${encodeURIComponent('C:\\Users\\test\\my clip.mp4')}`
-      expect(api.clipsGetVideoUrl('C:\\Users\\test\\my clip.mp4')).toBe(expected)
+      expect((api.clipsGetVideoUrl as (path: string) => string)('C:\\Users\\test\\my clip.mp4')).toBe(expected)
     })
   })
 })

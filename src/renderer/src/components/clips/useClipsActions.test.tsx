@@ -13,7 +13,21 @@ vi.mock('./clips-utils', () => ({
   MODIFIER_KEYS: new Set([0x11, 0x10, 0x12]),
 }))
 
-type Dinho = Record<string, ReturnType<typeof vi.fn>>
+type Dinho = {
+  clipsSetConfig: ReturnType<typeof vi.fn>
+  clipsStartEngine: ReturnType<typeof vi.fn>
+  clipsStartCapture: ReturnType<typeof vi.fn>
+  clipsStopCapture: ReturnType<typeof vi.fn>
+  clipsStopEngine: ReturnType<typeof vi.fn>
+  clipsSaveClip: ReturnType<typeof vi.fn>
+  clipsDelete: ReturnType<typeof vi.fn>
+  clipsRename: ReturnType<typeof vi.fn>
+  clipsOpen: ReturnType<typeof vi.fn>
+  clipsSelectOutputDir: ReturnType<typeof vi.fn>
+  clipsSetFavorite: ReturnType<typeof vi.fn>
+  clipsPublish: ReturnType<typeof vi.fn>
+  clipsPublishCancel: ReturnType<typeof vi.fn>
+}
 
 function mockDinho(): Dinho {
   const base: Dinho = {
@@ -51,6 +65,9 @@ function makeDeps(overrides: Record<string, unknown> = {}) {
     setConfig: vi.fn(),
     setFavorites: vi.fn(),
     setRebindingId: vi.fn(),
+    setPublishingPath: vi.fn(),
+    setPublishProgress: vi.fn(),
+    setPublishResult: vi.fn(),
     setPublishedLink: vi.fn(),
     refreshClips: vi.fn().mockResolvedValue(undefined),
     refreshConfig: vi.fn().mockResolvedValue(undefined),
@@ -58,7 +75,7 @@ function makeDeps(overrides: Record<string, unknown> = {}) {
     setSelectedClips: vi.fn(),
     t: vi.fn((key: string) => key),
     ...overrides,
-  } as never
+  }
 }
 
 function getDeps(deps: unknown) {
@@ -82,7 +99,7 @@ describe('useClipsActions', () => {
         await result.current.handleConfigUpdate({ replayTimeSeconds: 300 })
       })
 
-      const updater = deps.setConfig.mock.calls[0][0]
+      const updater = deps.setConfig.mock.calls[0]![0]
       expect(updater({ replayTimeSeconds: 60 })).toEqual({ replayTimeSeconds: 300 })
       expect(dinho.clipsSetConfig).toHaveBeenCalledWith({ replayTimeSeconds: 300 })
       expect(deps.refreshConfig).toHaveBeenCalled()
@@ -97,7 +114,7 @@ describe('useClipsActions', () => {
         await result.current.handleConfigUpdate({ replayTimeSeconds: 300 })
       })
 
-      const updater = deps.setConfig.mock.calls[0][0]
+      const updater = deps.setConfig.mock.calls[0]![0]
       expect(updater(null)).toBeNull()
     })
   })
@@ -668,7 +685,7 @@ describe('useClipsActions', () => {
       })
 
       expect(dinho.clipsSetFavorite).toHaveBeenCalledWith('clip1.mp4', true)
-      const updater = deps.setFavorites.mock.calls[0][0]
+      const updater = deps.setFavorites.mock.calls[0]![0]
       expect(updater(new Set(['other.mp4']))).toEqual(new Set(['other.mp4', 'clip1.mp4']))
     })
 
@@ -683,7 +700,7 @@ describe('useClipsActions', () => {
       })
 
       expect(dinho.clipsSetFavorite).toHaveBeenCalledWith('clip1.mp4', false)
-      const updater = deps.setFavorites.mock.calls[0][0]
+      const updater = deps.setFavorites.mock.calls[0]![0]
       expect(updater(new Set(['clip1.mp4']))).toEqual(new Set())
     })
   })
@@ -707,12 +724,12 @@ describe('useClipsActions', () => {
         result.current.addHotkey()
       })
 
-      const [patch] = dinho.clipsSetConfig.mock.calls[0]
+      const [patch] = dinho.clipsSetConfig.mock.calls[0]!
       const hotkeys = (patch as { hotkeys: HotkeyBinding[] }).hotkeys
       expect(hotkeys).toHaveLength(2)
-      expect(hotkeys[1].vk).toBe(0x7d)
-      expect(hotkeys[1].action).toBe('saveClip')
-      expect(hotkeys[1].enabled).toBe(true)
+      expect(hotkeys[1]!.vk).toBe(0x7d)
+      expect(hotkeys[1]!.action).toBe('saveClip')
+      expect(hotkeys[1]!.enabled).toBe(true)
     })
 
     it('does nothing when there is no config', async () => {
@@ -747,7 +764,7 @@ describe('useClipsActions', () => {
         result.current.removeHotkey('hk-1')
       })
 
-      const [patch] = dinho.clipsSetConfig.mock.calls[0]
+      const [patch] = dinho.clipsSetConfig.mock.calls[0]!
       expect((patch as { hotkeys: HotkeyBinding[] }).hotkeys).toEqual([])
     })
 
@@ -769,10 +786,10 @@ describe('useClipsActions', () => {
         result.current.updateHotkey('hk-1', { vk: 0x51 })
       })
 
-      const [patch] = dinho.clipsSetConfig.mock.calls[0]
+      const [patch] = dinho.clipsSetConfig.mock.calls[0]!
       const hotkeys = (patch as { hotkeys: HotkeyBinding[] }).hotkeys
-      expect(hotkeys[0].vk).toBe(0x51)
-      expect(hotkeys[0].id).toBe('hk-1')
+      expect(hotkeys[0]!.vk).toBe(0x51)
+      expect(hotkeys[0]!.id).toBe('hk-1')
     })
   })
 
@@ -829,10 +846,10 @@ describe('useClipsActions', () => {
 
       dispatchKey({ keyCode: 0x41, ctrlKey: true, shiftKey: false, altKey: true })
 
-      const [patch] = dinho.clipsSetConfig.mock.calls[0]
+      const [patch] = dinho.clipsSetConfig.mock.calls[0]!
       const hotkeys = (patch as { hotkeys: HotkeyBinding[] }).hotkeys
-      expect(hotkeys[0].vk).toBe(0x41)
-      expect(hotkeys[0].modifiers).toEqual(['Ctrl', 'Alt'])
+      expect(hotkeys[0]!.vk).toBe(0x41)
+      expect(hotkeys[0]!.modifiers).toEqual(['Ctrl', 'Alt'])
       expect(deps.setRebindingId).toHaveBeenCalledWith(null)
       cleanup()
     })
@@ -848,7 +865,7 @@ describe('useClipsActions', () => {
       expect(dinho.clipsSetConfig).not.toHaveBeenCalled()
 
       dispatchKey({ keyCode: 0x15 })
-      const [patch] = dinho.clipsSetConfig.mock.calls[0]
+      const [patch] = dinho.clipsSetConfig.mock.calls[0]!
       expect((patch as { pushToTalkKeys: number[] }).pushToTalkKeys).toEqual([0x14, 0x15])
       expect(deps.setRebindingId).toHaveBeenCalledWith(null)
       cleanup()
@@ -870,12 +887,12 @@ describe('useClipsActions', () => {
       const cleanup = result.current.setupRebindingListeners('hk-1')
 
       dispatchMouse(3)
-      let [patch] = dinho.clipsSetConfig.mock.calls[0]
-      expect((patch as { hotkeys: HotkeyBinding[] }).hotkeys[0].vk).toBe(0x05)
+      let [patch] = dinho.clipsSetConfig.mock.calls[0]!
+      expect((patch as { hotkeys: HotkeyBinding[] }).hotkeys[0]!.vk).toBe(0x05)
 
       dispatchMouse(4)
-      patch = dinho.clipsSetConfig.mock.calls[1][0]
-      expect((patch as { hotkeys: HotkeyBinding[] }).hotkeys[0].vk).toBe(0x06)
+      patch = dinho.clipsSetConfig.mock.calls[1]![0]
+      expect((patch as { hotkeys: HotkeyBinding[] }).hotkeys[0]!.vk).toBe(0x06)
       cleanup()
     })
 
