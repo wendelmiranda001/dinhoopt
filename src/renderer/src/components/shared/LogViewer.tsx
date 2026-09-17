@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { useLoggerStore } from '@/stores/logger-store'
 
 const LEVEL_COLORS: Record<LogLevel, string> = {
+  debug: '#6b7280',
   info: '#3b82f6',
   success: '#22c55e',
   warning: '#eab308',

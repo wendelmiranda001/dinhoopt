@@ -111,6 +111,7 @@ export function PrivacyShieldPage({ embedded }: { embedded?: boolean }) {
       usePrivacyStore.getState().setApplyResult({
         succeeded: 0,
         failed: unprotectedIds.length,
+        skipped: 0,
         errors: [{ id: '', label: t('privacy.allSettingsLabel'), reason: t('privacy.ipcCallFailed') }],
       })
       usePrivacyStore.getState().setStatus('done')
@@ -164,6 +165,7 @@ export function PrivacyShieldPage({ embedded }: { embedded?: boolean }) {
         usePrivacyStore.getState().setApplyResult({
           succeeded: 0,
           failed: ids.length,
+          skipped: 0,
           errors: [{ id: '', label: categoryId, reason: t('privacy.ipcCallFailed') }],
         })
         usePrivacyStore.getState().setStatus('done')

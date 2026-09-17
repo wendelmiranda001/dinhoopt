@@ -7,7 +7,7 @@ const mockStore = {
   searchQuery: '',
   sortField: 'name',
   sortDirection: 'asc' as const,
-  severityFilter: 'all' as const,
+  severityFilter: 'all' as 'all' | 'major' | 'minor' | 'patch' | 'uptodate',
   loading: false,
   updating: false,
 }

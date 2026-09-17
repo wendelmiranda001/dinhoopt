@@ -1,4 +1,4 @@
-import type { GameModeAuditReport, GameModeConfig } from '@shared/types'
+import type { GameModeAuditReport, GameModeConfig, GameProfile } from '@shared/types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { initGameModeStore, useGameModeStore } from './game-mode-store'
 
@@ -351,13 +351,9 @@ describe('game-mode-store - initGameModeStore', () => {
 
 describe('game-mode-store - setGameProfile', () => {
   it('sets a game profile and persists', () => {
-    const profile = {
+    const profile: GameProfile = {
+      gameName: 'Minecraft.exe',
       enabledOptimizations: ['svc-wsearch'],
-      customProcessKillList: [],
-      autoDetect: false,
-      autoDeactivate: true,
-      customGameProcesses: [],
-      gameProfiles: {},
     }
     useGameModeStore.getState().setGameProfile('Minecraft.exe', profile)
     const state = useGameModeStore.getState()
@@ -379,12 +375,8 @@ describe('game-mode-store - setGameProfile', () => {
         customGameProcesses: [],
         gameProfiles: {
           'Minecraft.exe': {
+            gameName: 'Minecraft.exe',
             enabledOptimizations: [],
-            customProcessKillList: [],
-            autoDetect: false,
-            autoDeactivate: true,
-            customGameProcesses: [],
-            gameProfiles: {},
           },
         },
       },

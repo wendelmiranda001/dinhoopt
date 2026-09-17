@@ -18,6 +18,8 @@ describe('settings-store', () => {
         autoUpdate: true,
         autoRestart: true,
         updateCheckIntervalHours: 4,
+        autoInstallUpdates: false,
+        autoInstallSchedule: null,
         cleaner: {
           skipRecentMinutes: 60,
           secureDelete: false,

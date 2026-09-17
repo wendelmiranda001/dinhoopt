@@ -43,6 +43,10 @@ export function FirewallAuditPage() {
   const showBuiltin = useFirewallStore((s) => s.showBuiltin)
 
   const { t } = useTranslation('firewall')
+  const tRule = useCallback(
+    (key: string, options?: Record<string, unknown>): string => (options ? t(key, options) : t(key)),
+    [t],
+  )
   const [pendingAction, setPendingAction] = useState<FirewallAction | null>(null)
   const isBusy = scanning || applying
 
@@ -443,7 +447,7 @@ export function FirewallAuditPage() {
                   </div>
                   <div className="space-y-1.5">
                     {group.rules.map((r) => (
-                      <RuleRow key={r.name} rule={r} t={t} />
+                      <RuleRow key={r.name} rule={r} t={tRule} />
                     ))}
                   </div>
                 </div>

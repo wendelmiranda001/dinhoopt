@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next'
 import { Gamepad2, Plus, Search, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { CollapsibleMini, formatKey, GamePickerBtn, REPLAY_DURATIONS, TogglePill } from './clips-utils'
@@ -198,7 +199,7 @@ export function ProcessPicker({
   processes: Array<{ name: string; pid: number }>
   onSelect: (name: string) => void
   onClose: () => void
-  t: (key: string) => string
+  t: TFunction<'clips'>
 }) {
   return (
     <div

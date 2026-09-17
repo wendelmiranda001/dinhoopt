@@ -18,6 +18,8 @@ const defaultSettings: DiNhoSettings = {
   autoUpdate: true,
   autoRestart: true,
   updateCheckIntervalHours: 4,
+  autoInstallUpdates: false,
+  autoInstallSchedule: null,
   cleaner: {
     skipRecentMinutes: 60,
     secureDelete: false,

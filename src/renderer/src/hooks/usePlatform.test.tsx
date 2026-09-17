@@ -45,7 +45,7 @@ describe('usePlatformLoader', () => {
   beforeEach(() => {
     window.dinho = {
       platformInfo: vi.fn<() => Promise<PlatformInfo>>().mockResolvedValue(defaultInfo),
-    }
+    } as unknown as Window['dinho']
   })
 
   it('returns default info initially before promise resolves', () => {

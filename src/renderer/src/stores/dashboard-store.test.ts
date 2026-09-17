@@ -71,7 +71,7 @@ describe('useDashboardStore', () => {
       const entry = fns.find((f) => f.type === cleaner.type)
       expect(entry).toBeDefined()
       const expected = [{ id: `${cleaner.type}-result` }]
-      dinho[cleaner.scan].mockResolvedValue(expected)
+      dinho[cleaner.scan]!.mockResolvedValue(expected)
       await expect(entry!.scan()).resolves.toEqual(expected)
       expect(dinho[cleaner.scan]).toHaveBeenCalledWith()
     }
@@ -85,7 +85,7 @@ describe('useDashboardStore', () => {
       const entry = fns.find((f) => f.type === cleaner.type)
       expect(entry).toBeDefined()
       const expected = { cleaned: 1, failed: 0, skipped: 0 }
-      dinho[cleaner.clean].mockResolvedValue(expected)
+      dinho[cleaner.clean]!.mockResolvedValue(expected)
       if (cleaner.cleanNoArgs) {
         await expect(entry!.clean([])).resolves.toEqual(expected)
         expect(dinho[cleaner.clean]).toHaveBeenCalledWith()

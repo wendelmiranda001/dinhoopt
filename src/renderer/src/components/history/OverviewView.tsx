@@ -2,7 +2,19 @@ import type { HistoryEntryType, ScanHistoryEntry } from '@shared/types'
 import { BarChart3, Clock, HardDrive, TrendingUp } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  type TooltipValueType,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import { StaggerContainer, StaggerItem } from '@/components/shared/StaggerContainer'
 import { formatBytes } from '@/lib/utils'
 import { PIE_COLORS, typeConfigBase } from './constants'
@@ -124,9 +136,9 @@ export function OverviewView({
                       fontSize: 12,
                     }}
                     labelStyle={{ color: 'var(--text-secondary)' }}
-                    formatter={(value: number, name: string) => {
-                      const label = t(`typeLabels.${name}`, { defaultValue: name })
-                      return [formatBytes(value), label]
+                    formatter={(value: TooltipValueType | undefined, name: number | string | undefined) => {
+                      const label = t(`typeLabels.${name}`, { defaultValue: String(name) })
+                      return [formatBytes(typeof value === 'number' ? value : 0), label]
                     }}
                   />
                   {activeTypes.map((tp) => (

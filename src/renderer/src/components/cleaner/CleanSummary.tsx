@@ -180,7 +180,9 @@ export function CleanSummary({ summary, onRelaunchAsAdmin, platform }: CleanSumm
             className="rounded-full px-3 py-1 text-[11px] font-medium"
             style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)' }}
           >
-            {t('summaryDuration', { duration: formatDuration(summary.duration, t) })}
+            {t('summaryDuration', {
+              duration: formatDuration(summary.duration, t as (key: string, opts?: Record<string, unknown>) => string),
+            })}
           </motion.span>
         </div>
 
@@ -206,7 +208,10 @@ export function CleanSummary({ summary, onRelaunchAsAdmin, platform }: CleanSumm
           <MetricCard
             icon={Clock}
             value={0}
-            displayValue={formatDuration(summary.duration, t)}
+            displayValue={formatDuration(
+              summary.duration,
+              t as (key: string, opts?: Record<string, unknown>) => string,
+            )}
             label={t('summaryDurationLabel')}
             color="var(--text-muted)"
             iconBg="var(--bg-hover)"

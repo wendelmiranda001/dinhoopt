@@ -87,7 +87,7 @@ export function UpdateHeader({
             }}
           >
             <Filter className="h-3.5 w-3.5" strokeWidth={1.8} />
-            {t(FILTER_LABEL_KEYS[severityFilter])}
+            {t(FILTER_LABEL_KEYS[severityFilter] ?? 'softwareUpdater.filterAll')}
             <ChevronDown className="h-3 w-3" strokeWidth={2} />
           </button>
           {showFilterMenu && (
@@ -132,7 +132,7 @@ export function UpdateHeader({
             }}
           >
             <ArrowUpDown className="h-3.5 w-3.5" strokeWidth={1.8} />
-            {t(SORT_LABEL_KEYS[sortField])}
+            {t(SORT_LABEL_KEYS[sortField] ?? 'softwareUpdater.sortName')}
             <ChevronDown className="h-3 w-3" strokeWidth={2} />
           </button>
           {showSortMenu && (

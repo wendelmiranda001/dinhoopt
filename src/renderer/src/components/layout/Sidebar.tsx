@@ -293,10 +293,14 @@ export const Sidebar = memo(function Sidebar({ collapsed, onToggle }: { collapse
     for (const group of navGroups) {
       const section = group.headingKey ? t(group.headingKey) : t('sectionQuick')
       for (const item of group.items) {
-        if (item.path) pages.push({ icon: item.icon, labelKey: item.labelKey, path: item.path, section })
+        if (item.path && item.labelKey) {
+          pages.push({ icon: item.icon, labelKey: item.labelKey, path: item.path, section })
+        }
         if (item.children) {
           for (const child of item.children) {
-            pages.push({ icon: child.icon, labelKey: child.labelKey, path: child.path, section })
+            if (child.labelKey) {
+              pages.push({ icon: child.icon, labelKey: child.labelKey, path: child.path, section })
+            }
           }
         }
       }
@@ -401,11 +405,11 @@ export const Sidebar = memo(function Sidebar({ collapsed, onToggle }: { collapse
       .filter((r) => (q ? r.score > 0 : true))
 
     // Recent pages (only shown when query is empty)
-    const recentResults: SearchResult[] = (!q ? getRecentPages() : [])
-      .map((path) => {
-        const page = allPages.find((p) => p.path === path)
-        if (!page) return null
-        return {
+    const recentResults: SearchResult[] = (!q ? getRecentPages() : []).flatMap((path) => {
+      const page = allPages.find((p) => p.path === path)
+      if (!page) return []
+      return [
+        {
           kind: 'recent' as const,
           key: `recent-${path}`,
           icon: Clock,
@@ -413,9 +417,9 @@ export const Sidebar = memo(function Sidebar({ collapsed, onToggle }: { collapse
           path: page.path,
           section: t('searchGroupRecent'),
           score: 700,
-        }
-      })
-      .filter((r): r is SearchResult => r !== null)
+        },
+      ]
+    })
 
     return [...recentResults, ...pageResults, ...actionResults].sort((a, b) => b.score - a.score)
   }, [searchQuery, allPages, paletteActions, t])
@@ -669,7 +673,7 @@ export const Sidebar = memo(function Sidebar({ collapsed, onToggle }: { collapse
                   item={item}
                   badgeCount={effectiveBadgeCounts[item.path] ?? 0}
                   badgeCounts={effectiveBadgeCounts}
-                  badgeLabel={item.badgeLabel}
+                  {...(item.badgeLabel ? { badgeLabel: item.badgeLabel } : {})}
                   isActive={isPathActive(item)}
                   submenuOpen={openSubmenu === item.path}
                   collapsed={collapsed}
@@ -725,7 +729,7 @@ export const Sidebar = memo(function Sidebar({ collapsed, onToggle }: { collapse
                   item={item}
                   badgeCount={effectiveBadgeCounts[item.path] ?? 0}
                   badgeCounts={effectiveBadgeCounts}
-                  badgeLabel={item.badgeLabel}
+                  {...(item.badgeLabel ? { badgeLabel: item.badgeLabel } : {})}
                   isActive={isPathActive(item)}
                   submenuOpen={openSubmenu === item.path}
                   collapsed={collapsed}

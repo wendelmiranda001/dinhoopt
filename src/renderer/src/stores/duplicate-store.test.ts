@@ -258,7 +258,14 @@ describe('duplicate-store', () => {
   })
 
   it('setProgress stores progress', () => {
-    const progress = { current: 5, total: 100, currentFile: 'test.txt' }
+    const progress = {
+      phase: 'walking' as const,
+      currentPath: 'test.txt',
+      filesScanned: 5,
+      duplicatesFound: 0,
+      reclaimableSpace: 0,
+      progress: 5,
+    }
     useDuplicateStore.getState().setProgress(progress)
     expect(useDuplicateStore.getState().progress).toEqual(progress)
     useDuplicateStore.getState().setProgress(null)
@@ -266,7 +273,7 @@ describe('duplicate-store', () => {
   })
 
   it('setDeleteResult stores delete result', () => {
-    const result = { deleted: 3, failed: 0, errors: [] }
+    const result = { deleted: 3, failed: 0, spaceRecovered: 0, errors: [] }
     useDuplicateStore.getState().setDeleteResult(result)
     expect(useDuplicateStore.getState().deleteResult).toEqual(result)
     useDuplicateStore.getState().setDeleteResult(null)

@@ -1,8 +1,9 @@
 import type { ServiceCategory, ServiceSafety } from '@shared/types'
 import { Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { CATEGORY_LABEL_KEYS } from '@/pages/service-manager/ServiceManagerComponents'
 import { useServiceStore } from '@/stores/service-store'
-import { CATEGORY_LABEL_KEYS, FilterDropdown } from './ServiceManagerRows'
+import { FilterDropdown } from './ServiceManagerRows'
 
 interface ServiceFilterBarProps {
   searchQuery: string

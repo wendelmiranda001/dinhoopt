@@ -319,7 +319,7 @@ export function SoftwareUpdaterPage({ embedded }: { embedded?: boolean }) {
               }}
             >
               <Filter className="h-3.5 w-3.5" strokeWidth={1.8} />
-              {t(FILTER_LABEL_KEYS[severityFilter])}
+              {t(FILTER_LABEL_KEYS[severityFilter] ?? '')}
               <ChevronDown className="h-3 w-3" strokeWidth={2} />
             </button>
             {showFilterMenu && (
@@ -365,7 +365,7 @@ export function SoftwareUpdaterPage({ embedded }: { embedded?: boolean }) {
               }}
             >
               <ArrowUpDown className="h-3.5 w-3.5" strokeWidth={1.8} />
-              {t(SORT_LABEL_KEYS[sortField])}
+              {t(SORT_LABEL_KEYS[sortField] ?? '')}
               <ChevronDown className="h-3 w-3" strokeWidth={2} />
             </button>
             {showSortMenu && (

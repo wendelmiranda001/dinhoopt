@@ -1,5 +1,5 @@
 import { CleanerType, ScanStatus } from '@shared/enums'
-import type { ScanResult } from '@shared/types'
+import type { CleanResult, ScanResult } from '@shared/types'
 import { FileText, Loader2, Search, ShieldAlert, Sparkles, TriangleAlert, Wifi } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -125,7 +125,7 @@ export function CleanerPage() {
     cleanStartRef.current = Date.now()
     try {
       const selectedIds = store.getSelectedIds()
-      const cleanFns: Partial<Record<CleanerType, (ids: string[]) => Promise<unknown>>> = {
+      const cleanFns: Partial<Record<CleanerType, (ids: string[]) => Promise<CleanResult>>> = {
         [CleanerType.System]: (ids) => window.dinho.systemClean(ids),
         [CleanerType.WinSxS]: () => window.dinho.winSxSClean(),
         [CleanerType.Browser]: (ids) => window.dinho.browserClean(ids),

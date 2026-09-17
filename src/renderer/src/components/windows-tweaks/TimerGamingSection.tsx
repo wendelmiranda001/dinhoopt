@@ -1,11 +1,11 @@
-import type { GamingTimer } from '@shared/types'
+import type { GamingTimerStatus } from '@shared/types'
 import { Timer } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useWindowsTweaksStore } from '@/stores/windows-tweaks-store'
 
 interface TimerGamingSectionProps {
-  gamingTimer: GamingTimer | null
+  gamingTimer: GamingTimerStatus | null
   loading: boolean
 }
 
@@ -13,7 +13,9 @@ export function TimerGamingSection({ gamingTimer, loading }: TimerGamingSectionP
   const { t } = useTranslation('windowsTweaks')
   const store = useWindowsTweaksStore
 
-  const handleSetTimer = async (patch: Partial<GamingTimer>) => {
+  const handleSetTimer = async (
+    patch: Partial<Pick<GamingTimerStatus, 'hpetOff' | 'tscSyncPolicy' | 'dynamicTickDisabled'>>,
+  ) => {
     const r = await store.getState().setGamingTimer(patch)
     if (r.success) toast.success(t('timerApplied', 'Timer setting applied!'))
     else toast.error(r.errors[0] ?? t('failed', 'Failed'))

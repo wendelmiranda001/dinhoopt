@@ -322,6 +322,9 @@ export function DashboardPage() {
       privacyIssues: 0,
       startupHighImpact: 0,
       updatesAvailable: 0,
+      networkCleaned: 0,
+      vulnerabilitiesFound: 0,
+      memoryFreed: 0,
     }
 
     const totalItems = files + regFixed

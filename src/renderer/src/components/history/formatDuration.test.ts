@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next'
 import { describe, expect, it, vi } from 'vitest'
 
 import { formatDuration } from './formatDuration'
@@ -10,7 +11,7 @@ describe('formatDuration', () => {
   })
 
   it('formats sub-second durations via the t function', () => {
-    const t = vi.fn()
+    const t = vi.fn<TFunction>()
     expect(formatDuration(250, t)).toBe(t('duration.lessThanOneSecond'))
     expect(t).toHaveBeenCalledWith('duration.lessThanOneSecond')
   })
@@ -22,7 +23,7 @@ describe('formatDuration', () => {
   })
 
   it('formats seconds below a minute via the t function with a count', () => {
-    const t = vi.fn()
+    const t = vi.fn<TFunction>()
     expect(formatDuration(45_000, t)).toBe(t('duration.seconds', { count: 45 }))
     expect(t).toHaveBeenCalledWith('duration.seconds', { count: 45 })
   })
@@ -34,7 +35,7 @@ describe('formatDuration', () => {
   })
 
   it('formats minutes and seconds via the t function', () => {
-    const t = vi.fn()
+    const t = vi.fn<TFunction>()
     expect(formatDuration(125_000, t)).toBe(t('duration.minutesAndSeconds', { minutes: 2, seconds: 5 }))
     expect(t).toHaveBeenCalledWith('duration.minutesAndSeconds', { minutes: 2, seconds: 5 })
   })

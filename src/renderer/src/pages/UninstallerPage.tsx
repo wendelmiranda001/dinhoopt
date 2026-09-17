@@ -24,6 +24,8 @@ import {
 
 export function UninstallerPage() {
   const { t } = useTranslation('uninstaller')
+  const translate: (key: string, options?: Record<string, unknown>) => string = (key, options) =>
+    options ? t(key, options) : t(key)
   const programs = useUninstallerStore((s) => s.programs)
   const loading = useUninstallerStore((s) => s.loading)
   const uninstalling = useUninstallerStore((s) => s.uninstalling)
@@ -324,7 +326,7 @@ export function UninstallerPage() {
           totalSize={unusedTotalSize}
           days={UNUSED_THRESHOLD_DAYS}
           onView={() => useUninstallerStore.getState().setFilterMode('unused')}
-          t={t}
+          t={translate}
         />
       )}
 
@@ -334,7 +336,7 @@ export function UninstallerPage() {
         <ErrorAlert message={error} onDismiss={() => useUninstallerStore.getState().setError(null)} className="mb-5" />
       )}
 
-      {uninstalling && progress && <UninstallProgressBanner progress={progress} t={t} />}
+      {uninstalling && progress && <UninstallProgressBanner progress={progress} t={translate} />}
 
       {uninstallResult && (
         <UninstallResultBanner
@@ -342,7 +344,7 @@ export function UninstallerPage() {
           lastFailedProgram={lastFailedProgramRef.current}
           onForceRemove={(p) => setConfirmForceRemove(p)}
           uninstalling={uninstalling}
-          t={t}
+          t={translate}
         />
       )}
 

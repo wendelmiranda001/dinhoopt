@@ -33,6 +33,8 @@ export function RegistryPage() {
 
 function RegistryPageContent() {
   const { t } = useTranslation('registry')
+  const translate: (key: string, params?: Record<string, unknown>) => string = (key, params) =>
+    params ? t(key, params) : t(key)
   const entries = useRegistryStore((s) => s.entries)
   const scanning = useRegistryStore((s) => s.scanning)
   const scanned = useRegistryStore((s) => s.scanned)
@@ -331,7 +333,7 @@ function RegistryPageContent() {
           onToggleCardAll={(types) => useRegistryStore.getState().toggleCardAll(types)}
           onToggleCardExpand={(i) => useRegistryStore.getState().toggleCardExpand(i)}
           onToggleEntry={(id) => useRegistryStore.getState().toggleEntry(id)}
-          t={t}
+          t={translate}
         />
       )}
 

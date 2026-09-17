@@ -1,7 +1,11 @@
-import type { DnsPreset, WindowsTweakApplyProgress, WindowsTweakResult, WindowsTweakState } from '@shared/types'
+import type {
+  DnsPreset,
+  GamingTimerStatus,
+  WindowsTweakApplyProgress,
+  WindowsTweakResult,
+  WindowsTweakState,
+} from '@shared/types'
 import { create } from 'zustand'
-
-type GamingTimerStatus = import('../../main/ipc/windows-tweaks/tweaks/gaming').GamingTimerStatus
 
 interface WindowsTweaksStoreState {
   tweaks: WindowsTweakState[]

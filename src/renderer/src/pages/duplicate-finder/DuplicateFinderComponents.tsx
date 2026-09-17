@@ -78,6 +78,7 @@ export function SettingsPanel({
   excludeInput,
   setMinFileSize,
   setMaxFileSize,
+  setExtensionFilter,
   setMaxDepth,
   setExcludeInput,
   onAddExclude,

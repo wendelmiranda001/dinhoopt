@@ -1,4 +1,4 @@
-import type { WindowsTweakCategory, WindowsTweakWithState } from '@shared/types'
+import type { WindowsTweakCategory, WindowsTweakState } from '@shared/types'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
 import { ChevronDown } from 'lucide-react'
@@ -15,7 +15,7 @@ export interface CategoryDef {
 
 interface TweakCategoryCardProps {
   category: CategoryDef
-  tweaks: WindowsTweakWithState[]
+  tweaks: WindowsTweakState[]
   selectedIds: Set<string>
   catColors: Record<string, { color: string; glow: string }>
   isExpanded: boolean

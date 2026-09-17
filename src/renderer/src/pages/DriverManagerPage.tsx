@@ -569,7 +569,12 @@ export function DriverManagerPage({ embedded }: { embedded?: boolean }) {
 
           <div className="grid grid-cols-1 gap-2">
             {updates.map((upd) => (
-              <UpdateItemRow key={upd.id} upd={upd} t={t} onToggle={handleToggleUpdateItem} />
+              <UpdateItemRow
+                key={upd.id}
+                upd={upd}
+                t={t as (key: string, options?: Record<string, unknown>) => string}
+                onToggle={handleToggleUpdateItem}
+              />
             ))}
           </div>
         </div>
@@ -633,7 +638,11 @@ export function DriverManagerPage({ embedded }: { embedded?: boolean }) {
           {showUpToDateDrivers && (
             <div className="grid grid-cols-1 gap-1.5">
               {allDrivers.map((drv) => (
-                <InstalledDriverRow key={drv.id} drv={drv} t={t} />
+                <InstalledDriverRow
+                  key={drv.id}
+                  drv={drv}
+                  t={t as (key: string, options?: Record<string, unknown>) => string}
+                />
               ))}
             </div>
           )}

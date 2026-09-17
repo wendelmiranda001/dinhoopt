@@ -36,14 +36,6 @@ export function NetworkMonitor() {
     fetchConnections()
   }, [fetchConnections])
 
-  const _uniqueProcesses = useMemo(() => {
-    const names = new Set<string>()
-    for (const c of connections) {
-      if (c.processName && c.processName !== 'Unknown') names.add(c.processName)
-    }
-    return [...names].sort()
-  }, [connections])
-
   const uniqueStates = useMemo(() => {
     const states = new Set<string>()
     for (const c of connections) states.add(c.state)

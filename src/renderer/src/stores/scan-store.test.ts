@@ -1,5 +1,5 @@
-import { type CleanerType, ScanStatus } from '@shared/enums'
-import type { ScanResult } from '@shared/types'
+import { CleanerType, ScanStatus } from '@shared/enums'
+import type { CleanSummaryData, ProgressData, ScanResult } from '@shared/types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useScanStore } from './scan-store'
 
@@ -171,7 +171,14 @@ describe('scan-store', () => {
   })
 
   it('setProgress stores progress data', () => {
-    const progress = { current: 50, total: 100, phase: 'scanning', currentItem: 'test.log' }
+    const progress: ProgressData = {
+      phase: 'scanning',
+      category: 'system',
+      currentPath: 'test.log',
+      progress: 50,
+      itemsFound: 10,
+      sizeFound: 1024,
+    }
     useScanStore.getState().setProgress(progress)
     expect(useScanStore.getState().progress).toEqual(progress)
 
@@ -180,7 +187,16 @@ describe('scan-store', () => {
   })
 
   it('setCleanSummary stores clean summary data', () => {
-    const summary = { totalCleaned: 1024, itemsCleaned: 10, duration: 500 }
+    const summary: CleanSummaryData = {
+      totalCleaned: 1024,
+      filesDeleted: 10,
+      filesSkipped: 0,
+      errors: [],
+      needsElevation: false,
+      categories: [],
+      duration: 500,
+      totalSizeBefore: 2048,
+    }
     useScanStore.getState().setCleanSummary(summary)
     expect(useScanStore.getState().cleanSummary).toEqual(summary)
 
@@ -189,8 +205,8 @@ describe('scan-store', () => {
   })
 
   it('setActiveCategory stores active category', () => {
-    useScanStore.getState().setActiveCategory('system')
-    expect(useScanStore.getState().activeCategory).toBe('system')
+    useScanStore.getState().setActiveCategory(CleanerType.System)
+    expect(useScanStore.getState().activeCategory).toBe(CleanerType.System)
 
     useScanStore.getState().setActiveCategory(null)
     expect(useScanStore.getState().activeCategory).toBeNull()

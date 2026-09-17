@@ -11,7 +11,7 @@ interface PublishModalProps {
 export default function PublishModal({ link, onClose }: PublishModalProps) {
   const { t } = useTranslation('clips')
   const [copied, setCopied] = useState(false)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const timerRef = useRef<number | null>(null)
 
   useEffect(() => {
     return () => {

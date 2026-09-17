@@ -20,7 +20,7 @@ const CLEANER_TASKS: Record<
   {
     label: string
     scan: () => Promise<ScanResult[]>
-    clean: (ids: string[]) => Promise<unknown>
+    clean: (ids: string[]) => Promise<{ filesDeleted?: number; totalCleaned?: number }>
   }
 > = {
   'cleaner:system': {

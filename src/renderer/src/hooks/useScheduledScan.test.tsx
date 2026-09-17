@@ -720,7 +720,7 @@ describe('useScheduledScan', () => {
     await vi.advanceTimersByTimeAsync(10_000)
 
     expect(mockHistoryStore.addEntry).toHaveBeenCalledTimes(1)
-    const entry = mockHistoryStore.addEntry.mock.calls[0][0]
+    const entry = mockHistoryStore.addEntry.mock.calls[0]![0]
     expect(entry.type).toBe('cleaner')
     expect(entry.scheduleName).toBe('History Test')
     expect(entry.totalItemsFound).toBe(2)
