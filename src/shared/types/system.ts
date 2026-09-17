@@ -52,6 +52,16 @@ export interface ScanItem {
   selected: boolean
 }
 
+export interface NetworkConnection {
+  localAddress: string
+  localPort: number
+  remoteAddress: string
+  remotePort: number
+  state: string
+  pid: number
+  processName: string
+}
+
 export interface ScanResult {
   category: CleanerType
   subcategory: string

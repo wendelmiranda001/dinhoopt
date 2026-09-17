@@ -129,7 +129,7 @@ export interface LicenseResult {
 
 // ─── Logs ───────────────────────────────────────────────────
 
-export type LogLevel = 'info' | 'success' | 'warning' | 'error'
+export type LogLevel = 'debug' | 'info' | 'success' | 'warning' | 'error'
 
 export interface LogEntry {
   timestamp: string
