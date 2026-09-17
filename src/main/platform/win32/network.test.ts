@@ -356,7 +356,7 @@ describe('win32 network', () => {
       expect(result).toBe(true)
       const netshEither = execFileMock.mock.calls.filter((c) => c[0] === 'netsh' || c[0] === 'powershell.exe')
       expect(netshEither).toHaveLength(1)
-      expect(String(netshEither[0][1])).toContain('Wi-Fi')
+      expect(String(netshEither[0]![1])).toContain('Wi-Fi')
     })
 
     it('returns false when netsh fails', async () => {

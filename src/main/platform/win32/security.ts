@@ -294,8 +294,16 @@ function unsupportedOnWindows(name: string): () => Promise<never> {
   }
 }
 
-export function createWin32Security(): PlatformSecurity {
-  return {
+type Win32PlatformSecurity = PlatformSecurity & {
+  collectSshHardening(): Promise<never>
+  collectFail2ban(): Promise<never>
+  collectAuditd(): Promise<never>
+  collectSuidSgidBinaries(): Promise<never>
+  collectLinuxFirewallStatus(): Promise<never>
+}
+
+export function createWin32Security(): Win32PlatformSecurity {
+  const base: PlatformSecurity = {
     async isServer() {
       try {
         const server = await detectServerRole()
@@ -320,9 +328,12 @@ export function createWin32Security(): PlatformSecurity {
     collectUpdateStatus,
     collectScreenLockStatus,
     collectPasswordPolicy,
+    collectListeningPorts: unsupportedOnWindows('collectListeningPorts'),
+  }
+  return {
+    ...base,
     collectSshHardening: unsupportedOnWindows('collectSshHardening'),
     collectFail2ban: unsupportedOnWindows('collectFail2ban'),
-    collectListeningPorts: unsupportedOnWindows('collectListeningPorts'),
     collectAuditd: unsupportedOnWindows('collectAuditd'),
     collectSuidSgidBinaries: unsupportedOnWindows('collectSuidSgidBinaries'),
     collectLinuxFirewallStatus: unsupportedOnWindows('collectLinuxFirewallStatus'),
