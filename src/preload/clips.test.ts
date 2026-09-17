@@ -96,7 +96,14 @@ describe('clipsMethods listener wrappers', () => {
     expect(mockIpc.on).toHaveBeenCalledWith(IPC.CLIPS_ENGINE_STATUS, expect.any(Function))
     const handler = mockIpc.on.mock.calls[0]?.[1] as (_event: unknown, status: ClipsEngineStatus) => void
 
-    const status = { currentGame: 'cs2.exe', recording: true } as ClipsEngineStatus
+    const status = {
+      currentGame: 'cs2.exe',
+      running: false,
+      capturing: false,
+      uptime: 0,
+      fps: 0,
+      replayTimeSeconds: 0,
+    } as ClipsEngineStatus
     handler({}, status)
     expect(cb).toHaveBeenCalledWith(status)
 
