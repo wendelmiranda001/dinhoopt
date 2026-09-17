@@ -608,6 +608,49 @@ describe('getCurrentStatus', () => {
     const s = getCurrentStatus()
     expect(s.calibrationTier).toBe('Medium')
   })
+
+  it('exposes watchdogOk, memoryMB and micLevel from engineStatus', async () => {
+    const child = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as never)
+    vi.mocked(existsSync).mockReturnValue(true)
+    await startEngine()
+
+    triggerPipeData(
+      `${JSON.stringify({
+        cmd: '_event',
+        payload: { type: 'engineStatus', watchdogOk: false, memoryMB: 1234, micLevel: 0.42 },
+      })}\n`,
+    )
+    const s = getCurrentStatus()
+    expect(s.watchdogOk).toBe(false)
+    expect(s.memoryMB).toBe(1234)
+    expect(s.micLevel).toBe(0.42)
+  })
+
+  it('clamps micLevel to the 0..1 range', async () => {
+    const child = makeMockChild()
+    vi.mocked(spawn).mockReturnValue(child as never)
+    vi.mocked(existsSync).mockReturnValue(true)
+    await startEngine()
+
+    triggerPipeData(
+      `${JSON.stringify({
+        cmd: '_event',
+        payload: { type: 'engineStatus', micLevel: 3.5 },
+      })}\n`,
+    )
+    let s = getCurrentStatus()
+    expect(s.micLevel).toBe(1)
+
+    triggerPipeData(
+      `${JSON.stringify({
+        cmd: '_event',
+        payload: { type: 'engineStatus', micLevel: -2 },
+      })}\n`,
+    )
+    s = getCurrentStatus()
+    expect(s.micLevel).toBe(0)
+  })
 })
 
 // ─── sendPipeCommand ───────────────────────────────────────

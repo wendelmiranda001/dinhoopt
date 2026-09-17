@@ -22,6 +22,7 @@ public sealed class EngineStatusSnapshot
     public int ReplayBufferAudioPackets { get; set; } = 0;
     public long ReplayBufferAudioBytes { get; set; } = 0;
     public bool AudioFallback { get; set; } = false;
+    public float MicLevel { get; set; } = 0;
     public string OutputDirectory { get; set; } = "";
     public long DroppedFrames { get; set; } = 0;
     public long GpuBusyDrops { get; set; } = 0;
@@ -87,6 +88,7 @@ public sealed class EngineStatus : IDisposable
                 ReplayBufferAudioPackets = _current.ReplayBufferAudioPackets,
                 ReplayBufferAudioBytes = _current.ReplayBufferAudioBytes,
                 AudioFallback = _current.AudioFallback,
+                MicLevel = _current.MicLevel,
                 OutputDirectory = _current.OutputDirectory,
                 DroppedFrames = _current.DroppedFrames,
                 CalibrationTier = _current.CalibrationTier,

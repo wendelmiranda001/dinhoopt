@@ -109,6 +109,9 @@ public sealed class EngineStatusValue
     [JsonPropertyName("audioFallback")]
     public bool AudioFallback { get; set; } = false;
 
+    [JsonPropertyName("micLevel")]
+    public float MicLevel { get; set; } = 0;
+
     [JsonPropertyName("lastFrameMs")]
     public double LastFrameMs { get; set; } = 0;
 

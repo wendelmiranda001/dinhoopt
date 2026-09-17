@@ -32,7 +32,9 @@ public sealed partial class EngineCoordinator
             Log.W("EngineCoordinator", "Nenhum dispositivo de áudio disponível — captura será SOMENTE VÍDEO");
         }
 
-        return new AudioMixer(_loopbackSource, _micSource, _clock);
+        var mixer = new AudioMixer(_loopbackSource, _micSource, _clock);
+        mixer.OnMicLevel += level => _status.Update(s => s.MicLevel = level);
+        return mixer;
     }
 
     private IAudioSource? CreateLoopbackSource(int sampleRate)
@@ -237,7 +239,7 @@ public sealed partial class EngineCoordinator
 
         var currentAnchor = LastAudioAnchor;
         if (_audioPacketCount % 1000 == 0 && _audioPacketCount > 0)
-            Log.I("AudioDiag", $"SYNC-DIAG: packets={_audioPacketCount} maxAacDrain={_maxAacDrainCount} anchorGap={(currentAnchor - TimeSpan.FromSeconds((_audioPacketCount - 1) * 1024.0 / _audioSampleRate)).TotalMilliseconds:F1}ms");
+            Log.I("AudioDiag", $"SYNC-DIAG: packets={_audioPacketCount} maxAacDrain={_maxAacDrainCount} aacDropped={_aacEncoder?.DroppedFrameCount ?? 0} anchorGap={(currentAnchor - TimeSpan.FromSeconds((_audioPacketCount - 1) * 1024.0 / _audioSampleRate)).TotalMilliseconds:F1}ms");
 
         if ((_audioPacketCount <= 5 || _audioPacketCount % 100 == 0) && aacCount > 0)
             Log.D("AudioDiag", $"packet #{_audioPacketCount}: AAC frames produced={aacCount}");

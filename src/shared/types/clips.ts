@@ -41,6 +41,7 @@ export interface ClipsEngineStatus {
   activePipelines?: number
   watchdogOk?: boolean
   memoryMB?: number
+  micLevel?: number
   replayBufferBytes?: number
   replayBufferVideoFrames?: number
   replayBufferVideoBytes?: number

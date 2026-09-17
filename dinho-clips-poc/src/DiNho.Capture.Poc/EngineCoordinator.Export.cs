@@ -3,11 +3,14 @@ using DiNho.Capture.Poc.Ipc;
 using DiNho.Capture.Poc.Logging;
 using DiNho.Capture.Poc.Memory;
 using DiNho.Capture.Poc.Status;
+using System.Diagnostics;
 
 namespace DiNho.Capture.Poc;
 
 public sealed partial class EngineCoordinator
 {
+    private const long ExportStallThresholdMs = 10_000;
+
     private async Task SaveClipAsync(int? customDurationSeconds = null)
     {
         // Anti-double-press (spec 14.1)
@@ -119,6 +122,7 @@ public sealed partial class EngineCoordinator
             var ffEncoder = _encoder as FfmpegEncoder;
             var cachedAvcc = ffEncoder?.AvccCache;
             var cachedHvcc = ffEncoder?.HvccCache;
+            var exportSw = Stopwatch.StartNew();
             await Task.Run(() =>
             {
                 var result = _exporter.ExportToMp4(
@@ -137,6 +141,9 @@ public sealed partial class EngineCoordinator
                 Log.I("EngineCoordinator", $"═══════ SAVE OK ═══════");
                 _status.Update(s => s.LastClipSize = fileInfo.Length);
             });
+            exportSw.Stop();
+            if (exportSw.ElapsedMilliseconds > ExportStallThresholdMs)
+                _watchdog.ReportExportStall();
         }
         catch (Exception ex)
         {
@@ -257,6 +264,7 @@ public sealed partial class EngineCoordinator
                 Recording = _recording,
                 UptimeSeconds = (long)_clock.Now.TotalSeconds,
                 AudioFallback = _audioFallback,
+                MicLevel = s.MicLevel,
                 LastFrameMs = s.LastFrameMs,
                 LastClipSize = s.LastClipSize,
                 ActivePipelines = s.ActivePipelines,

@@ -123,6 +123,7 @@ public sealed partial class EngineCoordinator
             var dxgi = new DxgiCaptureSource();
             dxgi.Initialize(_sharedDevice, gameHwnd);
             _capture = dxgi;
+            _watchdog.ReportApiSwitch();
             _status.Update(s => s.CaptureBackend = "DXGI");
             Log.I("EngineCoordinator", "Captura: DXGI Desktop Duplication");
             goto multiMonitor;
@@ -138,6 +139,7 @@ public sealed partial class EngineCoordinator
             var hybrid = new HybridCaptureSource();
             hybrid.Initialize(_sharedDevice, gameHwnd);
             _capture = hybrid;
+            _watchdog.ReportApiSwitch();
             _status.Update(s => s.CaptureBackend = _capture.Name);
             Log.I("EngineCoordinator", $"Captura híbrida: HWND=0x{gameHwnd:X8}");
             goto multiMonitor;
@@ -257,6 +259,7 @@ public sealed partial class EngineCoordinator
             var dxgi = new DxgiCaptureSource();
             dxgi.Initialize(_sharedDevice, gameHwnd);
             _capture = dxgi;
+            _watchdog.ReportApiSwitch();
             _status.Update(s => s.CaptureBackend = "DXGI");
             Log.I("EngineCoordinator", "Captura: DXGI Desktop Duplication");
             return;
@@ -272,6 +275,7 @@ public sealed partial class EngineCoordinator
             var hybrid = new HybridCaptureSource();
             hybrid.Initialize(_sharedDevice, gameHwnd);
             _capture = hybrid;
+            _watchdog.ReportApiSwitch();
             _status.Update(s => s.CaptureBackend = _capture.Name);
             Log.I("EngineCoordinator", $"Captura híbrida: HWND=0x{gameHwnd:X8}");
             return;

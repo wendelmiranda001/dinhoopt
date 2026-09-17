@@ -42,6 +42,9 @@ let _engineReplayBufferAudioBytes = 0
 let _engineDroppedFrames = 0
 let _engineGpuBusyDrops = 0
 let _engineCalibrationTier = ''
+let _engineMicLevel = 0
+let _engineWatchdogOk = true
+let _engineMemoryMB = 0
 
 // ─── Lazy getter for getCurrentStatus (breaks circular dep) ───
 
@@ -85,6 +88,9 @@ function statusUpdater(src: Record<string, unknown>): void {
   if (typeof src.droppedFrames === 'number') _engineDroppedFrames = src.droppedFrames
   if (typeof src.gpuBusyDrops === 'number') _engineGpuBusyDrops = src.gpuBusyDrops
   if (typeof src.calibrationTier === 'string') _engineCalibrationTier = src.calibrationTier
+  if (typeof src.micLevel === 'number') _engineMicLevel = Math.max(0, Math.min(1, src.micLevel))
+  if (typeof src.watchdogOk === 'boolean') _engineWatchdogOk = src.watchdogOk
+  if (typeof src.memoryMB === 'number') _engineMemoryMB = Math.max(0, Math.floor(src.memoryMB))
   if (typeof src.outputDirectory === 'string' && src.outputDirectory) {
     const engineDir = src.outputDirectory as string
     if (C.outputDirectory && C.outputDirectory !== engineDir) {
@@ -136,6 +142,9 @@ export function readEngineStatus(): {
   droppedFrames: number
   gpuBusyDrops: number
   calibrationTier: string
+  micLevel: number
+  watchdogOk: boolean
+  memoryMB: number
 } {
   return {
     capturing: _engineCapturing,
@@ -156,6 +165,9 @@ export function readEngineStatus(): {
     droppedFrames: _engineDroppedFrames,
     gpuBusyDrops: _engineGpuBusyDrops,
     calibrationTier: _engineCalibrationTier,
+    micLevel: _engineMicLevel,
+    watchdogOk: _engineWatchdogOk,
+    memoryMB: _engineMemoryMB,
   }
 }
 

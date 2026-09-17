@@ -11,7 +11,7 @@ public sealed class AudioMixerTests
     {
         var loopback = new float[] { 0.05f, 0.02f, 0.03f, -0.02f };
         var mic = new float[] { 0.05f, 0.03f, 0.02f, 0.01f };
-        var result = AudioMixer.Mix(loopback, 2, mic, micGain: 4.0f);
+        var result = MixWrapper(loopback, 2, mic, micGain: 4.0f);
 
         Assert.Equal(4, result.Length);
         Assert.Equal(0.2449f, result[0], 4);  // tanh(0.25)
@@ -25,7 +25,7 @@ public sealed class AudioMixerTests
     {
         var loopback = new float[] { 0.05f, 0.02f, 0.03f, -0.02f };
         var mic = new float[] { 0.05f, 0.03f };
-        var result = AudioMixer.Mix(loopback, 2, mic, micGain: 4.0f);
+        var result = MixWrapper(loopback, 2, mic, micGain: 4.0f);
 
         Assert.Equal(4, result.Length);
         Assert.Equal(0.2449f, result[0], 4);  // tanh(0.05 + 0.05*4)
@@ -39,7 +39,7 @@ public sealed class AudioMixerTests
     {
         var loopback = new float[] { 0.9f };
         var mic = new float[] { 0.8f };
-        var result = AudioMixer.Mix(loopback, 1, mic);
+        var result = MixWrapper(loopback, 1, mic);
 
         Assert.Single(result);
         Assert.Equal(0.9354f, result[0], 4); // tanh(1.7)
@@ -50,7 +50,7 @@ public sealed class AudioMixerTests
     {
         var loopback = new float[] { 0.05f, 0.1f, 0.15f };
         var mic = new float[] { 0.04f };
-        var result = AudioMixer.Mix(loopback, 1, mic, micGain: 4.0f);
+        var result = MixWrapper(loopback, 1, mic, micGain: 4.0f);
 
         Assert.Equal(3, result.Length);
         Assert.Equal(0.2070f, result[0], 3); // tanh(0.05 + 0.04*4)
@@ -65,7 +65,7 @@ public sealed class AudioMixerTests
     {
         var loopback = new float[] { 0.1f, float.NaN, 0.3f };
         var mic = new float[] { 0.05f, 0.05f, 0.05f };
-        var result = AudioMixer.Mix(loopback, 1, mic, micGain: 1.0f);
+        var result = MixWrapper(loopback, 1, mic, micGain: 1.0f);
 
         Assert.Equal(3, result.Length);
         Assert.Equal(0.1489f, result[0], 3); // tanh(0.15)
@@ -78,7 +78,7 @@ public sealed class AudioMixerTests
     {
         var loopback = new float[] { 0.1f, 0.2f };
         var mic = new float[] { 0.05f, float.NaN };
-        var result = AudioMixer.Mix(loopback, 1, mic, micGain: 1.0f);
+        var result = MixWrapper(loopback, 1, mic, micGain: 1.0f);
 
         Assert.Equal(2, result.Length);
         Assert.Equal(0.1489f, result[0], 3); // tanh(0.15)
@@ -91,8 +91,8 @@ public sealed class AudioMixerTests
         var loopback = new float[] { 0.1f, 0.1f };
         var mic = new float[] { 0.1f, 0.1f };
 
-        var resultLow = AudioMixer.Mix(loopback, 1, mic, micGain: 0.5f);
-        var resultHigh = AudioMixer.Mix(loopback, 1, mic, micGain: 2.0f);
+        var resultLow = MixWrapper(loopback, 1, mic, micGain: 0.5f);
+        var resultHigh = MixWrapper(loopback, 1, mic, micGain: 2.0f);
 
         Assert.Equal(0.1489f, resultLow[0], 3);  // tanh(0.15)
         Assert.Equal(0.2913f, resultHigh[0], 3); // tanh(0.3)
@@ -103,7 +103,7 @@ public sealed class AudioMixerTests
     {
         var loopback = new float[] { 0.2f, 0.3f };
         var mic = new float[] { 0.9f, 0.9f };
-        var result = AudioMixer.Mix(loopback, 1, mic, micGain: 0.0f);
+        var result = MixWrapper(loopback, 1, mic, micGain: 0.0f);
 
         Assert.Equal(2, result.Length);
         Assert.Equal(0.1974f, result[0], 3); // tanh(0.2)
@@ -113,7 +113,7 @@ public sealed class AudioMixerTests
     [Fact]
     public void Mix_EmptyLoopback_ReturnsEmpty()
     {
-        var result = AudioMixer.Mix([], 2, [0.1f, 0.2f], micGain: 1.0f);
+        var result = MixWrapper([], 2, [0.1f, 0.2f], micGain: 1.0f);
         Assert.Empty(result);
     }
 
@@ -122,7 +122,7 @@ public sealed class AudioMixerTests
     {
         var loopback = new float[] { float.NaN, float.NaN };
         var mic = new float[] { float.NaN, float.NaN };
-        var result = AudioMixer.Mix(loopback, 1, mic, micGain: 1.0f);
+        var result = MixWrapper(loopback, 1, mic, micGain: 1.0f);
 
         Assert.Equal(2, result.Length);
         Assert.Equal(0.0f, result[0], 3);
@@ -335,6 +335,21 @@ public sealed class AudioMixerTests
         Assert.Equal(TimeSpan.FromMilliseconds(20), captured.Duration);
     }
 
+    [Fact]
+    public void OnMicLevel_IsRaisedWithPeak_OnMicData()
+    {
+        using var loop = new RaisingSource(48000, 2);
+        using var micSource = new RaisingSource(48000, 1);
+        float? captured = null;
+        using var mixer = new AudioMixer(loop, micSource, new MasterClock());
+        mixer.OnMicLevel += lvl => captured = lvl;
+
+        micSource.Raise(new AudioBuffer(new float[] { 0.1f, -0.4f, 0.7f, -0.2f }, 48000, 1));
+
+        Assert.NotNull(captured);
+        Assert.Equal(0.7f, captured!.Value, 3);
+    }
+
     private sealed class RaisingSource : IAudioSource
     {
         public int SampleRate { get; }
@@ -349,5 +364,18 @@ public sealed class AudioMixerTests
         public void Start() { }
         public void Stop() { }
         public void Dispose() { }
+    }
+
+    private static float[] MixWrapper(float[] loopbackSamples, int loopbackChannels,
+                                 float[] micSamples, float gameGain = 1.0f, float micGain = 1.0f)
+    {
+        int frames = loopbackSamples.Length / loopbackChannels;
+        var upmixed = new float[loopbackSamples.Length];
+        for (int i = 0; i < upmixed.Length; i++)
+        {
+            int frame = i / loopbackChannels;
+            upmixed[i] = frame < micSamples.Length ? micSamples[frame] : 0f;
+        }
+        return AudioMixer.MixSamples(loopbackSamples, upmixed, loopbackSamples.Length, gameGain, micGain);
     }
 }

@@ -120,6 +120,20 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
         return coord;
     }
 
+    [Fact]
+    public void GetStatusMessage_IncludesMicLevel()
+    {
+        var coord = CreateWithMinimalDeps();
+        var status = (EngineStatus)GetField(coord, "_status")!;
+        status.Update(s => s.MicLevel = 0.62f);
+
+        var msg = CoordinatorType.GetMethod("GetStatusMessage", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(coord, null) as EngineStatusMessage;
+
+        Assert.NotNull(msg);
+        Assert.Equal(0.62f, msg!.Value.MicLevel, 3);
+    }
+
     private static ReplayBuffer CreateTestBuffer()
     {
         return new ReplayBuffer(TimeSpan.FromSeconds(30));
