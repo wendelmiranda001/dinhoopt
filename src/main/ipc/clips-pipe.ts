@@ -16,10 +16,6 @@ export const PROTO_VERSION = 1
 // While set, all commands except a re-handshake are rejected. Cleared on (re)connect.
 let _handshakeError: string | null = null
 
-export function getHandshakeError(): string | null {
-  return _handshakeError
-}
-
 // ─── Pipe types ──────────────────────────────────────────────
 
 export interface PipeEnvelope {
@@ -54,18 +50,6 @@ export function getPipeSocket(): Socket | null {
 
 export function isPipeConnected(): boolean {
   return _pipeConnected
-}
-
-export function setPipeConnected(v: boolean): void {
-  _pipeConnected = v
-}
-
-export function getPipeBuffer(): string {
-  return _pipeBuffer
-}
-
-export function setPipeBuffer(v: string): void {
-  _pipeBuffer = v
 }
 
 // ─── Request maps ────────────────────────────────────────────

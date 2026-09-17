@@ -11,8 +11,6 @@ public sealed class AudioBuffer
     /// Used for A/V sync — both audio and video PTS derive from the same MasterClock which
     /// is also Stopwatch-based, eliminating DateTime/Stopwatch drift.</summary>
     public long CaptureTicks { get; init; } = Stopwatch.GetTimestamp();
-    /// <summary>Wall-clock timestamp (legacy). Kept for diagnostics but no longer used for PTS.</summary>
-    public DateTime CaptureTimestamp { get; init; } = DateTime.UtcNow;
 
     public AudioBuffer(float[] samples, int sampleRate, int channels)
     {

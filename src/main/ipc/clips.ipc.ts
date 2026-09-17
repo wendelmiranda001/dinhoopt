@@ -35,7 +35,6 @@ import { getLogger } from '../services/logger.service'
 import { getCachedThumbnailPath, getThumbnailDataUrl } from '../services/thumbnail-generator'
 import {
   getCurrentStatus,
-  getDurationsForClips,
   invalidateClipsCache,
   invalidateDurationCache,
   isEngineRunning,
@@ -182,32 +181,6 @@ export function registerClipsIpc(): void {
   ipcMain.handle(IPC.CLIPS_LIST_CLIPS, async (): Promise<ClipInfo[]> => {
     invalidateClipsCache()
     return readClipsFromDisk()
-  })
-
-  ipcMain.handle(IPC.CLIPS_GET_DURATIONS, async (_event, paths: unknown): Promise<Record<string, number>> => {
-    if (!Array.isArray(paths)) return {}
-    const clips = (
-      await Promise.all(
-        paths
-          .filter((p): p is string => typeof p === 'string')
-          .map(async (p) => {
-            const safe = clipPathInOutputDir(p)
-            if (!safe) return null
-            try {
-              const s = await fsStat(safe)
-              return { path: safe, mtimeMs: s.mtime.getTime() }
-            } catch {
-              return { path: safe, mtimeMs: 0 }
-            }
-          }),
-      )
-    ).filter((x): x is { path: string; mtimeMs: number } => x !== null)
-    const durations = await getDurationsForClips(clips)
-    const result: Record<string, number> = {}
-    for (const [k, v] of durations) {
-      result[k] = v
-    }
-    return result
   })
 
   ipcMain.handle(IPC.CLIPS_DELETE_CLIP, async (_event, clipName: unknown): Promise<IpcResult> => {
@@ -545,25 +518,6 @@ export function registerClipsIpc(): void {
       }
     }
     return enumerateMicDevicesLocal()
-  })
-
-  ipcMain.handle(IPC.CLIPS_SET_MIC_DEVICE, async (_event, deviceId: unknown): Promise<IpcResult> => {
-    if (typeof deviceId !== 'string') {
-      getLogger().warning('clips', 'SetMicDevice failed: deviceId must be a string')
-      return { success: false, error: 'deviceId must be a string' }
-    }
-    C.micDeviceId = deviceId
-    persistClipsConfig()
-    if (!isPipeConnected()) {
-      return { success: true }
-    }
-    try {
-      await sendPipeCommand('setMicDevice', { deviceId })
-      return { success: true }
-    } catch (err) {
-      getLogger().warning('clips', `SetMicDevice failed: ${err instanceof Error ? err.message : String(err)}`)
-      return { success: false, error: err instanceof Error ? err.message : String(err) }
-    }
   })
 
   interface GpuInfo {

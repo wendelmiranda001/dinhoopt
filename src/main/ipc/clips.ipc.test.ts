@@ -183,13 +183,11 @@ describe('registerClipsIpc', () => {
       IPC.CLIPS_GET_THUMBNAIL,
       IPC.CLIPS_GET_RUNNING_PROCESSES,
       IPC.CLIPS_GET_MIC_DEVICES,
-      IPC.CLIPS_SET_MIC_DEVICE,
       IPC.CLIPS_SET_FAVORITE,
       IPC.CLIPS_GET_GPUS,
       IPC.CLIPS_GET_ENHANCE_SUPPORT,
       IPC.CLIPS_TRIM_CLIP,
       IPC.CLIPS_MERGE_CLIPS,
-      IPC.CLIPS_GET_DURATIONS,
       IPC.CLIPS_RENAME_CLIP,
       IPC.CLIPS_PUBLISH,
       IPC.CLIPS_PUBLISH_CANCEL,
@@ -198,7 +196,7 @@ describe('registerClipsIpc', () => {
     for (const ch of expectedChannels) {
       expect(handlers.has(ch)).toBe(true)
     }
-    expect(handlers.size).toBe(28)
+    expect(handlers.size).toBe(26)
   })
 })
 
@@ -1245,50 +1243,6 @@ describe('CLIPS_GET_MIC_DEVICES', () => {
     const handler = getAsyncHandler(handlers, IPC.CLIPS_GET_MIC_DEVICES)
     const result = (await handler()) as MicDeviceInfo[]
     expect(result).toEqual([])
-  })
-})
-
-describe('CLIPS_SET_MIC_DEVICE', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    resetEngineMocks()
-  })
-
-  it('rejects non-string deviceId', async () => {
-    const handlers = captureHandlers()
-    const handler = getAsyncHandler(handlers, IPC.CLIPS_SET_MIC_DEVICE)
-    const result = (await handler({}, 123)) as { success: boolean; error?: string }
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('deviceId must be a string')
-  })
-
-  it('returns success when pipe is not connected', async () => {
-    mockIsPipeConnected.mockReturnValue(false)
-    const handlers = captureHandlers()
-    const handler = getAsyncHandler(handlers, IPC.CLIPS_SET_MIC_DEVICE)
-    const result = (await handler({}, 'mic-device-1')) as { success: boolean; error?: string }
-    expect(result.success).toBe(true)
-    expect(mockSendPipeCommand).not.toHaveBeenCalled()
-  })
-
-  it('updates mic device and syncs to engine when pipe is connected', async () => {
-    mockIsPipeConnected.mockReturnValue(true)
-    mockSendPipeCommand.mockResolvedValue({ cmd: 'setMicDevice', payload: {} })
-    const handlers = captureHandlers()
-    const handler = getAsyncHandler(handlers, IPC.CLIPS_SET_MIC_DEVICE)
-    const result = (await handler({}, 'mic-device-1')) as { success: boolean; error?: string }
-    expect(result.success).toBe(true)
-    expect(mockSendPipeCommand).toHaveBeenCalledWith('setMicDevice', { deviceId: 'mic-device-1' })
-  })
-
-  it('returns error when sendPipeCommand throws', async () => {
-    mockIsPipeConnected.mockReturnValue(true)
-    mockSendPipeCommand.mockRejectedValue(new Error('pipe disconnected'))
-    const handlers = captureHandlers()
-    const handler = getAsyncHandler(handlers, IPC.CLIPS_SET_MIC_DEVICE)
-    const result = (await handler({}, 'mic-device-1')) as { success: boolean; error?: string }
-    expect(result.success).toBe(false)
-    expect(result.error).toContain('pipe disconnected')
   })
 })
 
@@ -2427,96 +2381,6 @@ describe('CLIPS_RENAME_CLIP', () => {
     const handler = getAsyncHandler(handlers, IPC.CLIPS_RENAME_CLIP)
     await handler({}, 'oldclip.mp4', 'newclip')
     expect(mockInvalidateDurationCache).toHaveBeenCalled()
-  })
-})
-
-describe('CLIPS_GET_DURATIONS', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    resetEngineMocks()
-    mockInvalidateDurationCache.mockReset()
-    realInvalidateDurationCache.call()
-  })
-
-  function mockDuration(stderr: string) {
-    vi.mocked(execFile).mockImplementation(
-      (
-        _cmd: string,
-        _args: readonly string[] | null | undefined,
-        _opts: ExecFileOptions | null | undefined,
-        cb?:
-          | ((
-              error: ExecFileException | null,
-              stdout: string | NonSharedBuffer,
-              stderr: string | NonSharedBuffer,
-            ) => void)
-          | null,
-      ) => {
-        if (cb) cb(null, '', stderr)
-        return undefined as never
-      },
-    )
-  }
-
-  it('returns duration for valid clip names', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(stat).mockResolvedValue({
-      size: 1000,
-      birthtime: new Date(),
-      mtime: new Date(),
-    } as Awaited<ReturnType<typeof stat>>)
-    mockDuration('Duration: 00:01:30.50, start: 0.000000, bitrate: 1000 kb/s\n')
-
-    const handlers = captureHandlers()
-    const handler = getAsyncHandler(handlers, IPC.CLIPS_GET_DURATIONS)
-    const result = (await handler({}, ['clip.mp4'])) as Record<string, number>
-    const keys = Object.keys(result)
-    expect(keys).toHaveLength(1)
-    expect(result[keys[0]!]).toBeGreaterThan(0)
-  })
-
-  it('returns empty object for empty input', async () => {
-    const handlers = captureHandlers()
-    const handler = getAsyncHandler(handlers, IPC.CLIPS_GET_DURATIONS)
-    const result = (await handler({}, [])) as Record<string, number>
-    expect(result).toEqual({})
-  })
-
-  it('returns empty object for non-array input', async () => {
-    const handlers = captureHandlers()
-    const handler = getAsyncHandler(handlers, IPC.CLIPS_GET_DURATIONS)
-    const result = (await handler({}, 'not-an-array')) as Record<string, number>
-    expect(result).toEqual({})
-  })
-
-  it('filters out non-string paths and returns durations for valid ones', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(stat).mockResolvedValue({
-      size: 1000,
-      birthtime: new Date(),
-      mtime: new Date(),
-    } as Awaited<ReturnType<typeof stat>>)
-    mockDuration('Duration: 00:00:30.00, start: 0.000000, bitrate: 1000 kb/s\n')
-
-    const handlers = captureHandlers()
-    const handler = getAsyncHandler(handlers, IPC.CLIPS_GET_DURATIONS)
-    const result = (await handler({}, [123, null, 'clip.mp4'])) as Record<string, number>
-    const keys = Object.keys(result)
-    expect(keys).toHaveLength(1)
-    expect(result[keys[0]!]).toBeGreaterThan(0)
-  })
-
-  it('returns 0 duration for files that fail to stat', async () => {
-    vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(stat).mockRejectedValue(new Error('no such file'))
-    mockDuration('')
-
-    const handlers = captureHandlers()
-    const handler = getAsyncHandler(handlers, IPC.CLIPS_GET_DURATIONS)
-    const result = (await handler({}, ['missing.mp4'])) as Record<string, number>
-    const keys = Object.keys(result)
-    expect(keys).toHaveLength(1)
-    expect(result[keys[0]!]).toBe(0)
   })
 })
 

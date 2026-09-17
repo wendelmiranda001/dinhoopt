@@ -20,8 +20,6 @@ export const clipsMethods = {
   clipsStopCapture: (): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke(IPC.CLIPS_STOP_CAPTURE),
   clipsSaveClip: (): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke(IPC.CLIPS_SAVE_CLIP),
   clipsList: (): Promise<ClipInfo[]> => ipcRenderer.invoke(IPC.CLIPS_LIST_CLIPS),
-  clipsGetDurations: (paths: string[]): Promise<Record<string, number>> =>
-    ipcRenderer.invoke(IPC.CLIPS_GET_DURATIONS, paths),
   clipsDelete: (name: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC.CLIPS_DELETE_CLIP, name),
   clipsRename: (oldName: string, newName: string): Promise<{ success: boolean; error?: string }> =>
@@ -37,8 +35,6 @@ export const clipsMethods = {
   clipsSetAudioSessions: (sessionPids: number[]): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC.CLIPS_SET_AUDIO_SESSIONS, sessionPids),
   clipsGetMicDevices: (): Promise<MicDeviceInfo[]> => ipcRenderer.invoke(IPC.CLIPS_GET_MIC_DEVICES),
-  clipsSetMicDevice: (deviceId: string): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke(IPC.CLIPS_SET_MIC_DEVICE, deviceId),
   clipsGetGpus: (): Promise<Array<{ index: number; name: string; vendorId: number }>> =>
     ipcRenderer.invoke(IPC.CLIPS_GET_GPUS),
   clipsGetEnhanceSupport: (): Promise<{ amd: boolean }> => ipcRenderer.invoke(IPC.CLIPS_GET_ENHANCE_SUPPORT),

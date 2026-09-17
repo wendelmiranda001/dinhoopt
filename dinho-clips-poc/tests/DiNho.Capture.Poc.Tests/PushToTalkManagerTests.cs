@@ -75,17 +75,4 @@ public sealed class PushToTalkManagerTests
         hm.SimulateRawKey((int)VirtualKey.VK_F5, true);
         Assert.True(last);
     }
-
-    [Fact]
-    public void RemoveKey_ThenKeyDown_NoEffect()
-    {
-        using var hm = new HotkeyManager();
-        using var ptt = new PushToTalkManager(hm);
-        ptt.Mode = PttMode.Hold;
-        ptt.AddPttKey(VirtualKey.VK_F5);
-        ptt.RemovePttKey(VirtualKey.VK_F5);
-
-        hm.SimulateRawKey((int)VirtualKey.VK_F5, true);
-        Assert.False(ptt.MicActive);
-    }
 }

@@ -36,22 +36,6 @@ public sealed class PushToTalkManager : IDisposable
             }
         }
 
-        public void RemovePttKey(VirtualKey key)
-        {
-            lock (_pttLock)
-            {
-                _pttKeys.Remove((int)key);
-            }
-        }
-
-        public void ClearKeys()
-        {
-            lock (_pttLock)
-            {
-                _pttKeys.Clear();
-            }
-        }
-
         public void ReplaceKeys(IEnumerable<int> vkCodes)
         {
             lock (_pttLock)

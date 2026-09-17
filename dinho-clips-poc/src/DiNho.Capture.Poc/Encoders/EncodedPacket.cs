@@ -15,7 +15,6 @@ public sealed class EncodedPacket
     public bool IsKeyFrame { get; }
     public int Width { get; }
     public int Height { get; }
-    public bool IsFavorite { get; set; }
     public bool IsPooled { get; }
     public int DataLength { get; private set; }
     public bool IsPooledPcm { get; }

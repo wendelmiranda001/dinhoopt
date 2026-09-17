@@ -36,16 +36,6 @@ public sealed class ConfigManagerTests
         Assert.Equal("p5", cfg.Config.EncoderPreset);
     }
 
-    // Item 2 (Step 3 RED): texture mode sempre ligado — sem fallback silencioso pra Hybrid.
-    // AllowHybridFallback=false por padrão: se nenhum backend de textura for viável a captura
-    // FALHA com erro claro (nunca "fundo branco e manchas" do caminho Hybrid).
-    [Fact]
-    public void AllowHybridFallback_DefaultsFalse()
-    {
-        var cfg = CreateClean();
-        Assert.False(cfg.Config.AllowHybridFallback);
-    }
-
     [Fact]
     public void OverrideBitrate_Persists()
     {

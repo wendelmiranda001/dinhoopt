@@ -736,7 +736,6 @@ describe('preload API bridge', () => {
       'clipsSetAudioSessions',
       'clipsSetFavorite',
       'clipsGetMicDevices',
-      'clipsSetMicDevice',
       'clipsGetGpus',
       'clipsGetRunningProcesses',
       'clipsTrimClip',

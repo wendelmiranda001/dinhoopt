@@ -164,8 +164,6 @@ internal sealed class GpuVideoConverter : IDisposable
         return _cachedOutput ?? throw new InvalidOperationException("GpuVideoConverter output texture not allocated");
     }
 
-    public ID3D11Texture2D? OutputTexture => _cachedOutput;
-
     public int OutputWidth => _outW;
 
     public int OutputHeight => _outH;

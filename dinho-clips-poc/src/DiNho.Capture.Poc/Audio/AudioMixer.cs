@@ -344,27 +344,6 @@ public sealed class AudioMixer : IDisposable
             micOut != null ? AudioStreamKind.Mixed : AudioStreamKind.Game, pooled, loopback.Buffer.Channels);
     }
 
-    /// <summary>
-    /// Mistura loopback + mic com ganhos independentes.
-    /// Usa SoftClip (tanh) — curva C∞ suave sem aliasing.
-    /// </summary>
-    /// <summary>
-    /// Wrapper preservado para compatibilidade com testes existentes.
-    /// Converte mic per-frame para upmix stereo e delega a MixSamples.
-    /// </summary>
-    internal static float[] Mix(float[] loopbackSamples, int loopbackChannels,
-                                 float[] micSamples, float gameGain = 1.0f, float micGain = 1.0f)
-    {
-        int frames = loopbackSamples.Length / loopbackChannels;
-        var upmixed = new float[loopbackSamples.Length];
-        for (int i = 0; i < upmixed.Length; i++)
-        {
-            int frame = i / loopbackChannels;
-            upmixed[i] = frame < micSamples.Length ? micSamples[frame] : 0f;
-        }
-        return MixSamples(loopbackSamples, upmixed, loopbackSamples.Length, gameGain, micGain);
-    }
-
     internal static float[] MixSamples(float[] game, float[] mic, int length,
                                         float gameGain, float micGain)
     {
