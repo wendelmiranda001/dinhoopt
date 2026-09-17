@@ -209,9 +209,10 @@ export class PerfMonitorService {
       const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', psUtf8(script)], {
         timeout: 10000,
         windowsHide: true,
+        encoding: 'utf-8',
       })
 
-      const parsed = JSON.parse(stdout.trim())
+      const parsed = JSON.parse(String(stdout).trim())
       const entries = Array.isArray(parsed) ? parsed : [parsed]
 
       for (const entry of entries) {
@@ -249,8 +250,11 @@ export class PerfMonitorService {
     let totalDelta = 0
 
     for (let i = 0; i < now.length; i++) {
-      const idleDelta = now[i].idle - this.prevCpuTimes[i].idle
-      const totalDeltaCore = now[i].total - this.prevCpuTimes[i].total
+      const cur = now[i]
+      const prev = this.prevCpuTimes[i]
+      if (!cur || !prev) continue
+      const idleDelta = cur.idle - prev.idle
+      const totalDeltaCore = cur.total - prev.total
       totalIdleDelta += idleDelta
       totalDelta += totalDeltaCore
       perCore.push(totalDeltaCore > 0 ? Math.min(100, Math.max(0, (1 - idleDelta / totalDeltaCore) * 100)) : 0)

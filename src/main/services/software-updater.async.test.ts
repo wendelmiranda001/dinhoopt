@@ -36,13 +36,10 @@ describe('checkForUpdates (win32)', () => {
       '2 upgrades available.',
     ].join('\n')
 
-    vi.mocked(execFileAsync).mockImplementation(async (cmd, args) => {
-      if (cmd === 'winget') {
-        if (args?.[0] === '--version') return { stdout: 'v1.4', stderr: '' }
-        if (args?.[0] === 'upgrade') return { stdout: upgradeOutput, stderr: '' }
-      }
-      throw new Error('not found')
-    })
+    vi.mocked(execFileAsync)
+      .mockResolvedValueOnce({ stdout: 'v1.4', stderr: '' })
+      .mockResolvedValueOnce({ stdout: 'v1.4', stderr: '' })
+      .mockResolvedValueOnce({ stdout: upgradeOutput, stderr: '' })
 
     const result = await mod.checkForUpdates()
     expect(result.packageManagerName).toBe('winget')
@@ -71,13 +68,10 @@ describe('checkForUpdates (win32)', () => {
       'App     Some.App    1.0.0       2.0.0       winget',
     ].join('\n')
 
-    vi.mocked(execFileAsync).mockImplementation(async (cmd, args) => {
-      if (cmd === 'winget') {
-        if (args?.[0] === '--version') return { stdout: 'v1.4', stderr: '' }
-        if (args?.[0] === 'upgrade') throw { stdout: upgradeOutput, message: 'exit code 1' }
-      }
-      throw new Error('not found')
-    })
+    vi.mocked(execFileAsync)
+      .mockResolvedValueOnce({ stdout: 'v1.4', stderr: '' })
+      .mockResolvedValueOnce({ stdout: 'v1.4', stderr: '' })
+      .mockRejectedValueOnce({ stdout: upgradeOutput, message: 'exit code 1' })
 
     const result = await mod.checkForUpdates()
     expect(result.packageManagerAvailable).toBe(true)
@@ -87,13 +81,10 @@ describe('checkForUpdates (win32)', () => {
   it('returns empty apps when winget has no stdout on error', async () => {
     const mod = await freshMod()
     const { execFileAsync } = await import('./exec-utf8')
-    vi.mocked(execFileAsync).mockImplementation(async (cmd, args) => {
-      if (cmd === 'winget') {
-        if (args?.[0] === '--version') return { stdout: 'v1.4', stderr: '' }
-        throw new Error('no output')
-      }
-      throw new Error('not found')
-    })
+    vi.mocked(execFileAsync)
+      .mockResolvedValueOnce({ stdout: 'v1.4', stderr: '' })
+      .mockResolvedValueOnce({ stdout: 'v1.4', stderr: '' })
+      .mockRejectedValueOnce(new Error('no output'))
 
     const result = await mod.checkForUpdates()
     expect(result.packageManagerAvailable).toBe(true)

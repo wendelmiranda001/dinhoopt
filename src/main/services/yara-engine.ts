@@ -98,7 +98,7 @@ export class YaraEngine {
       this._scanner = yarax.create()
       this._ready = true
     } catch (err) {
-      getLogger().warning('yara', '@litko/yara-x initialization failed:', err)
+      getLogger().warning('yara', '@litko/yara-x initialization failed:', String(err))
       this._ready = false
       throw err
     }
@@ -237,7 +237,7 @@ export class YaraEngine {
       const results = this._scanner.scan(buffer)
       return results.map((r) => this._convertMatch(r))
     } catch (err) {
-      getLogger().warning('yara', 'Scan error:', err)
+      getLogger().warning('yara', 'Scan error:', String(err))
       return []
     }
   }
@@ -252,7 +252,7 @@ export class YaraEngine {
       const results = this._scanner.scanFile(filePath)
       return results.map((r) => this._convertMatch(r))
     } catch (err) {
-      getLogger().warning('yara', 'File scan error:', err)
+      getLogger().warning('yara', 'File scan error:', String(err))
       return []
     }
   }

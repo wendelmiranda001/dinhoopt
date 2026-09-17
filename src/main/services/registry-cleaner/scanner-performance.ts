@@ -22,7 +22,7 @@ export async function scanPerformance(signal?: AbortSignal): Promise<RegistryEnt
           ['-NoProfile', '-Command', psUtf8(diskScript)],
           { timeout: 10000, windowsHide: true },
         )
-        isSSD = driveInfo.trim().toUpperCase() === 'SSD'
+        isSSD = String(driveInfo).trim().toUpperCase() === 'SSD'
       } catch {
         /* Assume HDD if detection fails */
       }

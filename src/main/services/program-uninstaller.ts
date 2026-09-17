@@ -421,7 +421,7 @@ async function hasRunningProcesses(folderPaths: string[]): Promise<Set<string>> 
       windowsHide: true,
     })
 
-    const processPaths = stdout
+    const processPaths = String(stdout)
       .split(/\r?\n/)
       .map((p) => p.trim().toLowerCase())
       .filter(Boolean)

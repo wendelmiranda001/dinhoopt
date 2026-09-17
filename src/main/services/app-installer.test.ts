@@ -40,7 +40,7 @@ vi.mock('./software-updater/utils', () => ({
   cleanOutput: (s: string) => s,
 }))
 
-const resolveWebAppIconMock = vi.hoisted(() => vi.fn(async () => null))
+const resolveWebAppIconMock = vi.hoisted(() => vi.fn(async (_appId: string): Promise<string | null> => null))
 vi.mock('./app-installer-icons', () => ({
   resolveWebAppIcon: resolveWebAppIconMock,
 }))

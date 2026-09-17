@@ -99,7 +99,7 @@ export async function fixRegistryEntries(
           ? 'Key or value no longer exists'
           : stderr.includes('network')
             ? 'Network error'
-            : stderr.split(/\r?\n/)[0].substring(0, 120) || 'Unknown error'
+            : stderr.split(/\r?\n/)[0]!.substring(0, 120) || 'Unknown error'
       failed++
       failures.push({ issue: entry.issue, reason })
     }

@@ -44,7 +44,7 @@ function findFfmpeg(): string | null {
 
   try {
     const result = execFileSync('where.exe', ['ffmpeg'], { encoding: 'utf-8', timeout: 3000 }).trim()
-    if (result) return result.split('\n')[0].trim()
+    if (result) return result.split('\n')[0]!.trim()
   } catch {
     /* ffmpeg not in PATH */
   }

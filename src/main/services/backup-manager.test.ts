@@ -59,7 +59,7 @@ describe('backup-manager', () => {
     mocks.join.mockImplementation(((...parts: string[]) => parts.join('\\')) as typeof join)
     mocks.basename.mockImplementation(((p: string) => p.split(/[\\/]/).pop() ?? '') as typeof basename)
     mocks.statSync.mockReturnValue({ isFile: () => true, size: 100 } as any)
-    vi.mocked(getSettings).mockReturnValue({ backupPath: '' })
+    vi.mocked(getSettings).mockReturnValue({ backupPath: '' } as ReturnType<typeof getSettings>)
   })
 
   describe('initBackupManager', () => {
@@ -71,10 +71,10 @@ describe('backup-manager', () => {
     })
 
     it('honors a user-configured backup path via getBackupDir', () => {
-      vi.mocked(getSettings).mockReturnValue({ backupPath: 'D:\\MyBackups' })
+      vi.mocked(getSettings).mockReturnValue({ backupPath: 'D:\\MyBackups' } as ReturnType<typeof getSettings>)
       initBackupManager()
       expect(mocks.mkdirSync).toHaveBeenCalledWith('D:\\MyBackups', { recursive: true })
-      vi.mocked(getSettings).mockReturnValue({ backupPath: '' })
+      vi.mocked(getSettings).mockReturnValue({ backupPath: '' } as ReturnType<typeof getSettings>)
       initBackupManager()
     })
   })

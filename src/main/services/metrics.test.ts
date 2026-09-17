@@ -1,3 +1,4 @@
+import type { ScanHistoryEntry } from '@shared/types'
 import { describe, expect, it, vi } from 'vitest'
 
 // Mock electron app
@@ -11,7 +12,7 @@ vi.mock('systeminformation', () => ({
   mem: vi.fn().mockResolvedValue({ total: 17179869184, used: 8589934592 }),
 }))
 
-const mockGetHistory = vi.hoisted(() => vi.fn(() => []))
+const mockGetHistory = vi.hoisted(() => vi.fn<() => ScanHistoryEntry[]>(() => []))
 vi.mock('./history-store', () => ({
   getHistory: mockGetHistory,
 }))

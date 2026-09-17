@@ -175,7 +175,7 @@ describe('probeVideoResolution', () => {
   it('returns null on timeout', async () => {
     execFileMock.mockImplementation(
       (_bin: unknown, _args: unknown, _opts: unknown, cb: (err: { code: string | null; killed: boolean }) => void) => {
-        cb({ code: null, killed: true }, '', '')
+        cb({ code: null, killed: true })
       },
     )
     await expect(probeVideoResolution('ffmpeg', 'clip.mp4')).resolves.toBeNull()

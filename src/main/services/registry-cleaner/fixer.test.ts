@@ -53,6 +53,8 @@ describe('fixRegistryEntries', () => {
   it('counts a set-value entry without regType/data as a failure instead of silent success', async () => {
     const result = await fixRegistryEntries([
       {
+        id: 'missing-fields',
+        type: 'obsolete',
         issue: 'missing fields',
         keyPath: 'K',
         valueName: 'V',
@@ -71,6 +73,8 @@ describe('fixRegistryEntries', () => {
     mocks.execReg.mockResolvedValue({ stdout: '', stderr: '' })
     const result = await fixRegistryEntries([
       {
+        id: 'valid-set-value',
+        type: 'obsolete',
         issue: 'y',
         keyPath: 'K',
         valueName: 'V',
@@ -91,6 +95,8 @@ describe('fixRegistryEntries', () => {
     mocks.execReg.mockRejectedValue({ stderr: 'Access is denied' })
     const result = await fixRegistryEntries([
       {
+        id: 'delete-value',
+        type: 'obsolete',
         issue: 'z',
         keyPath: 'K',
         valueName: 'V',

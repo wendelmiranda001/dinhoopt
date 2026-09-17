@@ -24,7 +24,9 @@ vi.mock('./ffmpeg-path', () => ({
   resolveFfmpegOrNull: vi.fn(),
 }))
 
+import type { ChildProcess } from 'node:child_process'
 import { execFile } from 'node:child_process'
+import type { Stats } from 'node:fs'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { resolveFfmpegOrNull } from './ffmpeg-path'
 import {
@@ -65,6 +67,7 @@ function successExecFile(duration?: string, onGen?: () => void): () => void {
       onGen?.()
       callback(null, '', '')
     }
+    return {} as ChildProcess
   })
   return () => undefined
 }
@@ -76,6 +79,7 @@ describe('thumbnail-generator', () => {
     execFileMock.mockImplementation((_cmd, _args, _options, cb) => {
       const callback = cb as (err: Error, stdout: string, stderr: string) => void
       if (callback) callback(new Error('not found'), '', '')
+      return {} as ChildProcess
     })
     existsSyncMock.mockReset()
     existsSyncMock.mockReturnValue(false)
@@ -151,7 +155,7 @@ describe('thumbnail-generator', () => {
   describe('generateThumbnail full flow', () => {
     beforeEach(() => {
       resolveFfmpegMock.mockReturnValue(FFMPEG_EXE)
-      statSyncMock.mockReturnValue({ size: 100 })
+      statSyncMock.mockReturnValue({ size: 100 } as Stats)
     })
 
     it('generates a thumbnail when ffmpeg and video exist', async () => {
@@ -253,7 +257,7 @@ describe('thumbnail-generator', () => {
   describe('getThumbnailDataUrl full flow', () => {
     beforeEach(() => {
       resolveFfmpegMock.mockReturnValue(FFMPEG_EXE)
-      statSyncMock.mockReturnValue({ size: 100 })
+      statSyncMock.mockReturnValue({ size: 100 } as Stats)
     })
 
     it('generates the thumbnail then returns its data url', async () => {
@@ -277,7 +281,7 @@ describe('thumbnail-generator', () => {
   describe('engine thumbnail fallback', () => {
     beforeEach(() => {
       resolveFfmpegMock.mockReturnValue(FFMPEG_EXE)
-      statSyncMock.mockReturnValue({ size: 100 })
+      statSyncMock.mockReturnValue({ size: 100 } as Stats)
     })
 
     it('returns the cached thumbnail without running ffmpeg', async () => {

@@ -29,6 +29,7 @@ vi.mock('./exec-utf8', () => ({
 }))
 
 import { IPC } from '@shared/channels'
+import type { Systeminformation } from 'systeminformation'
 import * as si from 'systeminformation'
 import { execFileAsync } from './exec-utf8'
 import { PerfMonitorService } from './perf-monitor'
@@ -119,7 +120,10 @@ describe('PerfMonitorService', () => {
     it('collects initial snapshot immediately', async () => {
       const cpuData = [{ times: { user: 200, nice: 0, sys: 100, idle: 700, irq: 0 } }]
       mockCpus.mockReturnValue(cpuData as any)
-      mockedDisksIO.mockResolvedValue({ rIO_sec: 1024, wIO_sec: 2048 } as any)
+      mockedDisksIO.mockResolvedValue({
+        rIO_sec: 1024,
+        wIO_sec: 2048,
+      } as Systeminformation.DisksIoData)
 
       await service.startMonitoring(mockSender)
 
@@ -262,8 +266,8 @@ describe('PerfMonitorService', () => {
     it('stops process polling when stopProcessPolling is called', async () => {
       vi.useFakeTimers()
       mockCpus.mockReturnValue([{ times: { user: 0, nice: 0, sys: 0, idle: 1000, irq: 0 } }] as any)
-      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 })
-      mockedProcesses.mockResolvedValue({ all: 1, running: 1, blocked: 0, sleeping: 0, list: [] })
+      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 } as Systeminformation.DisksIoData)
+      mockedProcesses.mockResolvedValue({ all: 1, running: 1, blocked: 0, sleeping: 0, unknown: 0, list: [] })
 
       await service.startMonitoring(mockSender)
       service.startProcessPolling()
@@ -532,7 +536,7 @@ describe('PerfMonitorService', () => {
           size: 512110190592,
           smartStatus: 'Ok',
           temperature: 35,
-        },
+        } as Systeminformation.DiskLayoutData,
       ])
       mockedExecFileAsync.mockResolvedValue({
         stdout: JSON.stringify({
@@ -543,6 +547,7 @@ describe('PerfMonitorService', () => {
           WriteErrorsTotal: 0,
           Wear: 5,
         }),
+        stderr: '',
       })
 
       const result = await service.getDiskHealth()
@@ -568,9 +573,9 @@ describe('PerfMonitorService', () => {
           size: 512110190592,
           smartStatus: 'Ok',
           temperature: 35,
-        },
+        } as Systeminformation.DiskLayoutData,
       ])
-      mockedExecFileAsync.mockResolvedValue({ stdout: '[]' })
+      mockedExecFileAsync.mockResolvedValue({ stdout: '[]', stderr: '' })
 
       const result = await service.getDiskHealth()
 
@@ -608,8 +613,8 @@ describe('PerfMonitorService', () => {
         blocked: 0,
         sleeping: 0,
         list: [{ pid: 100, name: 'rundll32.exe', cpu: 2, memRss: 5000000, user: 'user', started: '09:00' }],
-      })
-      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 })
+      } as Systeminformation.ProcessesData)
+      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 } as Systeminformation.DisksIoData)
 
       await service.startMonitoring(mockSender, getStartupItems)
       service.startProcessPolling()
@@ -649,8 +654,8 @@ describe('PerfMonitorService', () => {
         blocked: 0,
         sleeping: 0,
         list: [{ pid: 50, name: 'python.exe', cpu: 5, memRss: 10000000, user: 'user', started: '09:00' }],
-      })
-      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 })
+      } as Systeminformation.ProcessesData)
+      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 } as Systeminformation.DisksIoData)
 
       await service.startMonitoring(mockSender, getStartupItems)
       service.startProcessPolling()
@@ -675,7 +680,7 @@ describe('PerfMonitorService', () => {
       vi.useFakeTimers()
 
       mockCpus.mockReturnValue([{ times: { user: 0, nice: 0, sys: 0, idle: 1000, irq: 0 } }] as any)
-      mockedDisksIO.mockResolvedValue({ rIO_sec: 512, wIO_sec: 1024 })
+      mockedDisksIO.mockResolvedValue({ rIO_sec: 512, wIO_sec: 1024 } as Systeminformation.DisksIoData)
 
       await service.startMonitoring(mockSender)
       await vi.advanceTimersByTimeAsync(1)
@@ -684,7 +689,7 @@ describe('PerfMonitorService', () => {
       mockedDisksIO.mockClear()
 
       // Make getDiskIO slow to trigger re-entrant scenario
-      let resolveDisksIO: (v: unknown) => void
+      let resolveDisksIO: (v: Systeminformation.DisksIoData | PromiseLike<Systeminformation.DisksIoData>) => void
       mockedDisksIO.mockImplementation(
         () =>
           new Promise((resolve) => {
@@ -706,7 +711,7 @@ describe('PerfMonitorService', () => {
       expect(mockedDisksIO).toHaveBeenCalledTimes(1)
 
       // Resolve the hanging promise
-      resolveDisksIO!({ rIO_sec: 0, wIO_sec: 0 })
+      resolveDisksIO!({ rIO_sec: 0, wIO_sec: 0 } as Systeminformation.DisksIoData)
 
       await vi.advanceTimersByTimeAsync(100)
 
@@ -736,7 +741,7 @@ describe('PerfMonitorService', () => {
       mockSender.isDestroyed.mockReturnValue(true)
 
       mockCpus.mockReturnValue([{ times: { user: 0, nice: 0, sys: 0, idle: 1000, irq: 0 } }] as any)
-      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 })
+      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 } as Systeminformation.DisksIoData)
 
       // startMonitoring will call collectSnapshot immediately
       // Since sender.isDestroyed() returns true, the first check stops monitoring
@@ -753,9 +758,9 @@ describe('PerfMonitorService', () => {
       vi.useFakeTimers()
 
       mockCpus.mockReturnValue([{ times: { user: 0, nice: 0, sys: 0, idle: 1000, irq: 0 } }] as any)
-      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 })
+      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 } as Systeminformation.DisksIoData)
 
-      let resolveProcesses: (v: unknown) => void
+      let resolveProcesses: (v: Systeminformation.ProcessesData | PromiseLike<Systeminformation.ProcessesData>) => void
       mockedProcesses.mockImplementation(
         () =>
           new Promise((resolve) => {
@@ -781,7 +786,7 @@ describe('PerfMonitorService', () => {
         blocked: 0,
         sleeping: 0,
         list: [{ pid: 100, name: 'test.exe', cpu: 10, memRss: 10000000, user: 'user', started: '' }],
-      })
+      } as Systeminformation.ProcessesData)
       await vi.advanceTimersByTimeAsync(100)
 
       vi.useRealTimers()
@@ -789,7 +794,7 @@ describe('PerfMonitorService', () => {
 
     it('handles si.processes throwing an error', async () => {
       mockCpus.mockReturnValue([{ times: { user: 0, nice: 0, sys: 0, idle: 1000, irq: 0 } }] as any)
-      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 })
+      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 } as Systeminformation.DisksIoData)
       mockedProcesses.mockRejectedValue(new Error('Process list failed'))
 
       await expect(service.startMonitoring(mockSender)).resolves.toBeUndefined()
@@ -803,14 +808,14 @@ describe('PerfMonitorService', () => {
       mockSender.isDestroyed.mockReturnValue(true)
 
       mockCpus.mockReturnValue([{ times: { user: 0, nice: 0, sys: 0, idle: 1000, irq: 0 } }] as any)
-      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 })
+      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 } as Systeminformation.DisksIoData)
       mockedProcesses.mockResolvedValue({
         all: 2,
         running: 2,
         blocked: 0,
         sleeping: 0,
         list: [{ pid: 100, name: 'test.exe', cpu: 10, memRss: 10000000, user: 'user', started: '' }],
-      })
+      } as Systeminformation.ProcessesData)
 
       await service.startMonitoring(mockSender)
 
@@ -825,7 +830,7 @@ describe('PerfMonitorService', () => {
       vi.useFakeTimers()
 
       mockCpus.mockReturnValue([{ times: { user: 0, nice: 0, sys: 0, idle: 1000, irq: 0 } }] as any)
-      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 })
+      mockedDisksIO.mockResolvedValue({ rIO_sec: 0, wIO_sec: 0 } as Systeminformation.DisksIoData)
 
       await service.startMonitoring(mockSender)
       await vi.advanceTimersByTimeAsync(1)

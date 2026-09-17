@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import type { HotkeyBinding } from '@shared/types'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('./clips-config-store', () => ({
@@ -163,16 +164,16 @@ describe('clips-config-manager', () => {
       const customHk = [
         { id: 'test', vk: 0x31, modifiers: [], action: 'saveClip', replayDurationSeconds: 30, enabled: true },
       ]
-      config.hotkeys = customHk
+      config.hotkeys = customHk as HotkeyBinding[]
       const result = buildEngineConfig()
       expect(result.Hotkeys as Record<string, unknown>[]).toHaveLength(1)
-      expect((result.Hotkeys as Record<string, unknown>[])[0].vk).toBe(0x31)
+      expect((result.Hotkeys as Record<string, unknown>[])[0]!.vk).toBe(0x31)
     })
 
     it('uses default hotkeys when config.hotkeys is empty', () => {
       config.hotkeys = []
       const result = buildEngineConfig()
-      expect((result.Hotkeys as Record<string, unknown>[])[0].vk).toBe(0x77)
+      expect((result.Hotkeys as Record<string, unknown>[])[0]!.vk).toBe(0x77)
     })
 
     it('maps modifier names to VK codes', () => {
@@ -187,16 +188,25 @@ describe('clips-config-manager', () => {
         },
       ]
       const result = buildEngineConfig()
-      const hk = (result.Hotkeys as Record<string, unknown>[])[0]
+      const hk = (result.Hotkeys as Record<string, unknown>[])[0]!
       expect(hk.modifiers).toEqual([0x11, 0x10, 0x12])
     })
 
     it('returns 0 for unknown modifier', () => {
-      config.hotkeys = [
-        { id: 'test', vk: 0x31, modifiers: ['Super'], action: 'saveClip', replayDurationSeconds: 30, enabled: true },
-      ]
+      const hotkey: HotkeyBinding = {
+        id: 'test',
+        vk: 0x31,
+        modifiers: ['Ctrl'],
+        action: 'saveClip',
+        replayDurationSeconds: 30,
+        enabled: true,
+      }
+      const modifiers = hotkey.modifiers as string[]
+      modifiers.length = 0
+      modifiers.push('Super')
+      config.hotkeys = [hotkey]
       const result = buildEngineConfig()
-      const hk = (result.Hotkeys as Record<string, unknown>[])[0]
+      const hk = (result.Hotkeys as Record<string, unknown>[])[0]!
       expect(hk.modifiers).toEqual([0])
     })
 
@@ -211,7 +221,7 @@ describe('clips-config-manager', () => {
         { id: 'test', vk: 0x31, modifiers: [], action: 'toggleMic', replayDurationSeconds: 30, enabled: true },
       ]
       const result = buildEngineConfig()
-      const hk = (result.Hotkeys as Record<string, unknown>[])[0]
+      const hk = (result.Hotkeys as Record<string, unknown>[])[0]!
       expect(hk.action).toBe('ToggleMic')
     })
 
@@ -313,7 +323,7 @@ describe('clips-config-manager', () => {
     it('uses default hotkeys when config.hotkeys is empty', () => {
       config.hotkeys = []
       const result = getCurrentConfigPayload()
-      expect((result.hotkeys as Record<string, unknown>[])[0].vk).toBe(0x77)
+      expect((result.hotkeys as Record<string, unknown>[])[0]!.vk).toBe(0x77)
     })
   })
 
@@ -361,6 +371,8 @@ describe('clips-config-manager', () => {
         autoCleanupEnabled: undefined as unknown as boolean,
         autoCleanupThresholdGB: undefined as unknown as number,
         adaptiveQuality: undefined as unknown as boolean,
+        stretchToFit: false,
+        replayBufferMode: 'ram',
       })
       loadPersistedClipsConfig()
       expect(config.cq).toBe(20)
@@ -386,7 +398,7 @@ describe('clips-config-manager', () => {
     })
 
     it('syncs replayTimeSeconds and fps from store', () => {
-      const saved = {
+      const saved: ReturnType<typeof loadClipsConfig> = {
         replayTimeSeconds: 600,
         fps: 120,
         micEnabled: true,
@@ -423,6 +435,7 @@ describe('clips-config-manager', () => {
         autoCleanupThresholdGB: 100,
         adaptiveQuality: true,
         replayBufferMode: 'disk',
+        stretchToFit: false,
       }
       vi.mocked(loadClipsConfig).mockReturnValueOnce(saved)
       loadPersistedClipsConfig()
@@ -440,7 +453,7 @@ describe('clips-config-manager', () => {
       config.engineFps = 60
       persistClipsConfig()
       expect(saveClipsConfig).toHaveBeenCalledTimes(1)
-      const saved = vi.mocked(saveClipsConfig).mock.calls[0][0]
+      const saved = vi.mocked(saveClipsConfig).mock.calls[0]![0]
       expect(saved.width).toBe(2560)
       expect(saved.height).toBe(1440)
       expect(saved.bitrateKbps).toBe(40000)
@@ -451,7 +464,7 @@ describe('clips-config-manager', () => {
     it('persists stretchToFit from config', () => {
       config.stretchToFit = true
       persistClipsConfig()
-      const saved = vi.mocked(saveClipsConfig).mock.calls[0][0] as Record<string, unknown>
+      const saved = vi.mocked(saveClipsConfig).mock.calls[0]![0] as Record<string, unknown>
       expect(saved.stretchToFit).toBe(true)
       config.stretchToFit = false
     })
@@ -459,7 +472,7 @@ describe('clips-config-manager', () => {
     it('persists replayBufferMode from config', () => {
       config.replayBufferMode = 'hybrid'
       persistClipsConfig()
-      const saved = vi.mocked(saveClipsConfig).mock.calls[0][0] as Record<string, unknown>
+      const saved = vi.mocked(saveClipsConfig).mock.calls[0]![0] as Record<string, unknown>
       expect(saved.replayBufferMode).toBe('hybrid')
       config.replayBufferMode = 'hybrid'
     })
@@ -467,7 +480,7 @@ describe('clips-config-manager', () => {
     it('includes outputDirectory from getDefaultOutputDir', () => {
       config.outputDirectory = ''
       persistClipsConfig()
-      const saved = vi.mocked(saveClipsConfig).mock.calls[0][0] as Record<string, unknown>
+      const saved = vi.mocked(saveClipsConfig).mock.calls[0]![0] as Record<string, unknown>
       expect(saved.outputDirectory).toBe(join(mockUserProfile, 'Videos', 'DiNho Clips'))
     })
   })

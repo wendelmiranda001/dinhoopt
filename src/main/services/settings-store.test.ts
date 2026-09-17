@@ -189,13 +189,13 @@ describe('settings-store', () => {
       getSettings()
 
       expect(mockSave).toHaveBeenCalledTimes(1)
-      const saved = mockSave.mock.calls[0][0] as Record<string, unknown>
+      const saved = mockSave.mock.calls[0]![0] as Record<string, unknown>
       const settings = saved.settings as Record<string, unknown>
       expect((settings.schedule as Record<string, unknown>).enabled).toBe(false)
       const schedules = settings.schedules as ScheduleEntry[]
       expect(schedules).toHaveLength(1)
-      expect(schedules[0].frequency).toBe('daily')
-      expect(schedules[0].hour).toBe(10)
+      expect(schedules[0]!.frequency).toBe('daily')
+      expect(schedules[0]!.hour).toBe(10)
     })
 
     it('does not migrate when schedules already exist', () => {
@@ -257,7 +257,7 @@ describe('settings-store', () => {
       await flushSettings()
 
       expect(mockSave).toHaveBeenCalledTimes(1)
-      const saved = mockSave.mock.calls[0][0] as Record<string, unknown>
+      const saved = mockSave.mock.calls[0]![0] as Record<string, unknown>
       const settings = saved.settings as Record<string, unknown>
       expect(settings.minimizeToTray).toBe(true)
       expect((settings.cleaner as Record<string, unknown>).skipRecentMinutes).toBe(30)
@@ -273,7 +273,7 @@ describe('settings-store', () => {
       updateRegistryIgnoredTweaks(['sig1', 'sig2'], true)
       await flushSettings()
 
-      const saved = mockSave.mock.calls[0][0] as Record<string, unknown>
+      const saved = mockSave.mock.calls[0]![0] as Record<string, unknown>
       const settings = saved.settings as Record<string, unknown>
       expect(settings.registryIgnoredTweaks).toEqual(['sig1', 'sig2'])
     })
@@ -291,7 +291,7 @@ describe('settings-store', () => {
       updateRegistryIgnoredTweaks(['sig2'], false)
       await flushSettings()
 
-      const saved = mockSave.mock.calls[0][0] as Record<string, unknown>
+      const saved = mockSave.mock.calls[0]![0] as Record<string, unknown>
       const settings = saved.settings as Record<string, unknown>
       expect(settings.registryIgnoredTweaks).toEqual(['sig1', 'sig3'])
     })
@@ -303,7 +303,7 @@ describe('settings-store', () => {
       updateRegistryIgnoredTweaks(['', 'valid'], true)
       await flushSettings()
 
-      const saved = mockSave.mock.calls[0][0] as Record<string, unknown>
+      const saved = mockSave.mock.calls[0]![0] as Record<string, unknown>
       const settings = saved.settings as Record<string, unknown>
       expect(settings.registryIgnoredTweaks).toEqual(['valid'])
     })
@@ -316,7 +316,7 @@ describe('settings-store', () => {
       updateRegistryIgnoredTweaks(manySigs, true)
       await flushSettings()
 
-      const saved = mockSave.mock.calls[0][0] as Record<string, unknown>
+      const saved = mockSave.mock.calls[0]![0] as Record<string, unknown>
       const settings = saved.settings as Record<string, unknown>
       expect(settings.registryIgnoredTweaks).toHaveLength(200)
     })
@@ -352,35 +352,40 @@ describe('settings-store', () => {
         ...defaults,
         settings: {
           ...(defaults.settings as Record<string, unknown>),
-          malwareAllowlist: [{ sha256: 'abc', name: 'old' }],
+          malwareAllowlist: [{ sha256: 'abc', path: 'C:/old.exe', fileName: 'old.exe', addedAt: 1 }],
         },
       }
       mockLoad.mockReturnValue(mockData.current)
 
-      await addMalwareAllowlistEntry({ sha256: 'abc', name: 'new' } as MalwareAllowlistEntry)
+      await addMalwareAllowlistEntry({ sha256: 'abc', path: 'C:/new.exe', fileName: 'new.exe', addedAt: 2 })
       await flushSettings()
 
-      const saved = mockSave.mock.calls[0][0] as Record<string, unknown>
+      const saved = mockSave.mock.calls[0]![0] as Record<string, unknown>
       const list = (saved.settings as Record<string, unknown>).malwareAllowlist as MalwareAllowlistEntry[]
       expect(list).toHaveLength(1)
-      expect(list[0].name).toBe('new')
+      expect(list[0]!.path).toBe('C:/new.exe')
     })
 
     it('addMalwareAllowlistEntry caps at 500 entries', async () => {
-      const existing = Array.from({ length: 500 }, (_, i) => ({ sha256: `existing${i}` }))
+      const existing = Array.from({ length: 500 }, (_, i) => ({
+        sha256: `existing${i}`,
+        path: `C:/existing${i}.exe`,
+        fileName: `existing${i}.exe`,
+        addedAt: 1,
+      }))
       mockData.current = {
         ...defaults,
         settings: { ...(defaults.settings as Record<string, unknown>), malwareAllowlist: existing },
       }
       mockLoad.mockReturnValue(mockData.current)
 
-      await addMalwareAllowlistEntry({ sha256: 'new-entry' } as MalwareAllowlistEntry)
+      await addMalwareAllowlistEntry({ sha256: 'new-entry', path: 'C:/x.exe', fileName: 'x.exe', addedAt: 1 })
       await flushSettings()
 
-      const saved = mockSave.mock.calls[0][0] as Record<string, unknown>
+      const saved = mockSave.mock.calls[0]![0] as Record<string, unknown>
       const list = (saved.settings as Record<string, unknown>).malwareAllowlist as MalwareAllowlistEntry[]
       expect(list).toHaveLength(500)
-      expect(list[499].sha256).toBe('new-entry')
+      expect(list[499]!.sha256).toBe('new-entry')
     })
 
     it('removeMalwareAllowlistEntry removes by sha256', async () => {
@@ -388,7 +393,10 @@ describe('settings-store', () => {
         ...defaults,
         settings: {
           ...(defaults.settings as Record<string, unknown>),
-          malwareAllowlist: [{ sha256: 'abc' }, { sha256: 'def' }],
+          malwareAllowlist: [
+            { sha256: 'abc', path: 'C:/a.exe', fileName: 'a.exe', addedAt: 1 },
+            { sha256: 'def', path: 'C:/d.exe', fileName: 'd.exe', addedAt: 2 },
+          ],
         },
       }
       mockLoad.mockReturnValue(mockData.current)
@@ -396,10 +404,10 @@ describe('settings-store', () => {
       await removeMalwareAllowlistEntry('abc')
       await flushSettings()
 
-      const saved = mockSave.mock.calls[0][0] as Record<string, unknown>
+      const saved = mockSave.mock.calls[0]![0] as Record<string, unknown>
       const list = (saved.settings as Record<string, unknown>).malwareAllowlist as MalwareAllowlistEntry[]
       expect(list).toHaveLength(1)
-      expect(list[0].sha256).toBe('def')
+      expect(list[0]!.sha256).toBe('def')
     })
   })
 
@@ -436,7 +444,7 @@ describe('settings-store', () => {
       await setOnboardingComplete(true)
       await flushSettings()
 
-      const saved = mockSave.mock.calls[0][0] as Record<string, unknown>
+      const saved = mockSave.mock.calls[0]![0] as Record<string, unknown>
       expect(saved.onboardingComplete).toBe(true)
     })
   })
@@ -466,7 +474,7 @@ describe('settings-store', () => {
       const id = getMachineId()
       await flushSettings()
 
-      const saved = mockSave.mock.calls[0][0] as Record<string, unknown>
+      const saved = mockSave.mock.calls[0]![0] as Record<string, unknown>
       expect(saved.machineId).toBe(id)
     })
 

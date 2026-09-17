@@ -15,7 +15,7 @@ async function ps(script: string, timeout = 15000): Promise<string> {
     ['-NoProfile', '-NonInteractive', '-Command', psUtf8(script)],
     { timeout, windowsHide: true },
   )
-  return stdout.trim()
+  return String(stdout).trim()
 }
 
 export async function listPowerPlans(): Promise<PowerPlanInfo[]> {
@@ -34,7 +34,7 @@ export async function listPowerPlans(): Promise<PowerPlanInfo[]> {
   return arr.map((p: Record<string, unknown>) => ({
     guid: (p.Guid as string) ?? '',
     name: (p.Name as string) ?? 'Unknown',
-    description: p.Name ?? '',
+    description: typeof p.Name === 'string' ? p.Name : '',
     isActive: p.IsActive === true,
     isHighPerformance: p.IsHighPerformance === true,
     isBalanced: p.IsBalanced === true,

@@ -82,6 +82,10 @@ class LoggerService {
     return this.log('info', module, message, details)
   }
 
+  async debug(module: string, message: string, details?: string): Promise<void> {
+    return this.log('debug', module, message, details)
+  }
+
   async success(module: string, message: string, details?: string): Promise<void> {
     return this.log('success', module, message, details)
   }

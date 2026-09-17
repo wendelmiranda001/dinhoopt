@@ -730,8 +730,6 @@ describe('yara-rules-store integration', () => {
     it('rejects download when content-length exceeds 50 MB', async () => {
       createExistingRules()
 
-      const encoder = new TextEncoder()
-      const _data = encoder.encode('small body')
       const reader = {
         read: async () => ({ done: true as const, value: undefined as undefined }),
         cancel: vi.fn(),
@@ -872,7 +870,7 @@ describe('yara-rules-store integration', () => {
       await mod.fetchAndCacheRules('https://example.com/api/yara-rules')
 
       // If-None-Match should NOT be in headers since etag was empty
-      const callHeaders = fetchMock.mock.calls[0][1].headers
+      const callHeaders = fetchMock.mock.calls[0]![1].headers
       expect(callHeaders['If-None-Match']).toBeUndefined()
     })
 

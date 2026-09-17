@@ -8,7 +8,7 @@ import { getLogger } from './logger.service'
 function execFileAsync(
   cmd: string,
   args: readonly string[],
-  options: { timeout: number; encoding: string },
+  options: { timeout: number; encoding: BufferEncoding },
 ): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     execFile(cmd, args, options, (err: ExecFileException | null, stdout: string, stderr: string) => {
@@ -111,7 +111,7 @@ export async function generateThumbnail(outputDir: string, clipName: string): Pr
         '-y',
         thumbPath,
       ],
-      { timeout: FFMPEG_TIMEOUT },
+      { timeout: FFMPEG_TIMEOUT, encoding: 'utf-8' },
     )
 
     if (existsSync(thumbPath) && statSync(thumbPath).size > 0) return thumbPath

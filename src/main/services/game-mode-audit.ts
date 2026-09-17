@@ -22,7 +22,7 @@ async function ps(script: string, timeout = 15000): Promise<string> {
     ['-NoProfile', '-NonInteractive', '-Command', psUtf8(script)],
     { timeout, windowsHide: true },
   )
-  return stdout.trim()
+  return String(stdout).trim()
 }
 
 async function getRunningProcesses(): Promise<string[]> {
@@ -31,7 +31,7 @@ async function getRunningProcesses(): Promise<string[]> {
       timeout: 10000,
       windowsHide: true,
     })
-    return stdout
+    return String(stdout)
       .split('\n')
       .filter(Boolean)
       .map((line) => {

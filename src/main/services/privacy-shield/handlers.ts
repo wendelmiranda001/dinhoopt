@@ -34,7 +34,7 @@ export async function scanPrivacy(
     const reversible = hasRevert && isApplicable
     settings.push({
       id: def.id,
-      category: def.category,
+      category: def.category as PrivacySetting['category'],
       label: def.label,
       description: def.description,
       enabled,

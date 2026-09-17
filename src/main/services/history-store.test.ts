@@ -48,10 +48,14 @@ import { addHistoryEntry, clearHistory, getHistory } from './history-store'
 const SAMPLE_ENTRY: ScanHistoryEntry = {
   id: 'test-1',
   type: 'cleaner',
-  timestamp: Date.now(),
-  summary: 'Cleaned 100 MB',
-  totalSize: 100 * 1024 * 1024,
-  details: {},
+  timestamp: new Date().toISOString(),
+  duration: 1500,
+  totalItemsFound: 12,
+  totalItemsCleaned: 10,
+  totalItemsSkipped: 2,
+  totalSpaceSaved: 100 * 1024 * 1024,
+  categories: [],
+  errorCount: 0,
 }
 
 beforeEach(() => {
@@ -112,9 +116,9 @@ describe('addHistoryEntry', () => {
     // Verify the written data
     const saveCall = mocks.storeSave.mock.calls[0]
     expect(saveCall).toBeDefined()
-    const written = saveCall[0] as ScanHistoryEntry[]
+    const written = saveCall![0] as ScanHistoryEntry[]
     expect(written).toHaveLength(1)
-    expect(written[0].id).toBe('test-1')
+    expect(written[0]!.id).toBe('test-1')
 
     // Verify IPC sent
     expect(mocks.send).toHaveBeenCalledWith('history:changed')
@@ -138,9 +142,9 @@ describe('addHistoryEntry', () => {
     )
 
     const saveCall = mocks.storeSave.mock.calls[0]
-    const written = saveCall[0] as ScanHistoryEntry[]
+    const written = saveCall![0] as ScanHistoryEntry[]
     expect(written).toHaveLength(100)
-    expect(written[0].id).toBe('test-1')
+    expect(written[0]!.id).toBe('test-1')
   })
 
   it('handles missing window gracefully', async () => {

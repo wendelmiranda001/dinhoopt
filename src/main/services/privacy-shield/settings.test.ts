@@ -1,11 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
-const _noop = vi.fn()
 const noopAsync = vi.fn().mockResolvedValue(undefined)
-const _checkTrue = vi.fn().mockResolvedValue(true)
 const checkFalse = vi.fn().mockResolvedValue(false)
 const applicableTrue = vi.fn().mockResolvedValue(true)
-const _applicableFalse = vi.fn().mockResolvedValue(false)
 
 vi.mock('./fixes/ads', () => ({
   applyAdvertisingId: noopAsync,
@@ -307,7 +304,7 @@ describe('privacy-shield/settings.ts', () => {
     const { SETTINGS } = await import('./settings')
     const browser = SETTINGS.filter((s) => s.category === 'browser')
     expect(browser.length).toBeGreaterThanOrEqual(1)
-    expect(browser[0].id).toBe('browser-chrome-metrics')
+    expect(browser[0]!.id).toBe('browser-chrome-metrics')
   })
 
   it('settings with applicable function have it as optional', async () => {

@@ -74,7 +74,7 @@ function getProcessList(): ProcessInfo[] {
       const memNum = Number.parseFloat(memStr) / 1024
       return {
         pid: Number.parseInt(parts[1] || '0', 10),
-        name: parts[0].trim() || 'unknown',
+        name: (parts[0] ?? '').trim() || 'unknown',
         path: '',
         cpu: 0,
         memory: Math.round(memNum * 100) / 100,

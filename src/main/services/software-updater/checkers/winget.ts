@@ -235,7 +235,7 @@ export async function checkForUpdatesWinget(): Promise<UpdateCheckResult> {
         ['upgrade', '--accept-source-agreements', '--disable-interactivity'],
         { timeout: 15_000, maxBuffer: 10 * 1024 * 1024, windowsHide: true },
       )
-      stdout = result.stdout
+      stdout = String(result.stdout)
     } catch (err: unknown) {
       const e = err as { stdout?: string; message?: string; stderr?: string; code?: string }
       if (e?.stdout) {
@@ -314,7 +314,7 @@ async function attemptWingetUpgrade(
       maxBuffer: 10 * 1024 * 1024,
       windowsHide: true,
     })
-    upgradeStdout = result.stdout
+    upgradeStdout = String(result.stdout)
     exitCode = 0
   } catch (err: unknown) {
     const e = err as { stdout?: string; message?: string; stderr?: string; code?: string }
@@ -379,7 +379,7 @@ async function attemptElevatedUpgrade(appId: string): Promise<{ success: boolean
     const stillNeedsUpgrade = checkResult.stdout.includes(appId)
     return {
       success: !stillNeedsUpgrade,
-      output: stillNeedsUpgrade ? 'App still needs upgrade after elevated attempt' : stdout,
+      output: stillNeedsUpgrade ? 'App still needs upgrade after elevated attempt' : String(stdout),
     }
   } catch (err: unknown) {
     const e = err as { stdout?: string; message?: string; stderr?: string; code?: string }

@@ -235,7 +235,7 @@ describe('trackChildProcess', () => {
   })
 
   it('registers the child and removes it automatically on exit', () => {
-    trackChildProcess(fakeChild)
+    trackChildProcess(fakeChild as never)
     expect(fakeChild.once).toHaveBeenCalledWith('exit', expect.any(Function))
     const exitHandler = fakeChild.once.mock.calls.find((c) => c[0] === 'exit')?.[1]
 
@@ -255,7 +255,7 @@ describe('trackChildProcess', () => {
   })
 
   it('untrack() removes the child from the sweep set immediately', () => {
-    const untrack = trackChildProcess(fakeChild)
+    const untrack = trackChildProcess(fakeChild as never)
     untrack()
     execFileMockFn.mockReset()
     killAllChildren()

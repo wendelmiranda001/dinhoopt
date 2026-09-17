@@ -50,6 +50,7 @@ vi.mock('./scan-cache', () => ({
   getCachedItems: vi.fn(),
 }))
 
+import type { Stats } from 'node:fs'
 import { existsSync, constants as fsConstants } from 'node:fs'
 import { open, readdir, rename, rm, stat } from 'node:fs/promises'
 
@@ -590,7 +591,7 @@ describe('scanDirectory', () => {
       mtimeMs: OLD,
       isFile: () => false,
       isDirectory: () => false,
-    })
+    } as Stats)
 
     const result = await scanDirectory('C:\\logs', CleanerType.System, 'logs')
     expect(result.items).toHaveLength(1)

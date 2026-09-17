@@ -1,3 +1,4 @@
+import type { BrowserWindow } from 'electron'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DiNhoSettings, ScheduleEntry } from '../../shared/types'
 import {
@@ -39,7 +40,7 @@ vi.mock('electron', () => {
   const MockNotification = vi.fn(function () {
     return { show: vi.fn() }
   })
-  MockNotification.isSupported = vi.fn(() => false)
+  Object.assign(MockNotification, { isSupported: vi.fn(() => false) })
   return {
     Notification: MockNotification,
     BrowserWindow: MockBrowserWindow,
@@ -55,7 +56,7 @@ function makeEntry(overrides: Partial<ScheduleEntry> = {}): ScheduleEntry {
     day: 0,
     hour: 3,
     minute: 0,
-    tasks: ['cleaner', 'registry'],
+    tasks: ['cleaner:system', 'registry'],
     autoApply: false,
     lastRunAt: null,
     lastRunStatus: 'never',
@@ -191,17 +192,16 @@ describe('getNextScanTime', () => {
 
   it('uses legacy schedule when no multi-schedules exist', () => {
     vi.setSystemTime(new Date(2025, 5, 15, 1)) // Jun 15 1AM local
-    mockSettings = {
-      schedules: [],
-      schedule: { enabled: true, frequency: 'daily', day: 0, hour: 4 },
-    } as DiNhoSettings
+    mockSettings = makeSettings()
+    mockSettings.schedule = { enabled: true, frequency: 'daily', day: 0, hour: 4 }
     const next = getNextScanTime(mockSettings)
     expect(next).not.toBeNull()
     expect(next?.getHours()).toBe(4)
   })
 
   it('returns null for legacy schedule if disabled', () => {
-    mockSettings = { schedules: [], schedule: { enabled: false, frequency: 'daily', day: 0, hour: 4 } } as DiNhoSettings
+    mockSettings = makeSettings()
+    mockSettings.schedule = { enabled: false, frequency: 'daily', day: 0, hour: 4 }
     expect(getNextScanTime(mockSettings)).toBeNull()
   })
 })
@@ -210,7 +210,7 @@ describe('completeScheduleRun', () => {
   it('can be imported and called', async () => {
     const { completeScheduleRun } = await import('./scheduler')
     vi.useFakeTimers()
-    expect(() => completeScheduleRun('test-1', 'completed')).not.toThrow()
+    expect(() => completeScheduleRun('test-1', 'success')).not.toThrow()
     vi.useRealTimers()
   })
 })
@@ -275,10 +275,10 @@ describe('completeScheduleRun', () => {
   })
 
   it('calls updateScheduleEntry with correct args', () => {
-    completeScheduleRun('test-1', 'completed')
+    completeScheduleRun('test-1', 'success')
     expect(mockUpdateScheduleEntry).toHaveBeenCalledWith('test-1', {
       lastRunAt: expect.any(String),
-      lastRunStatus: 'completed',
+      lastRunStatus: 'success',
     })
   })
 
@@ -293,16 +293,16 @@ describe('completeScheduleRun', () => {
   it('clears inFlight timeout timer', () => {
     // Start a schedule to create in-flight state, then stop to get into cleanup path
     startScheduler(() => null)
-    completeScheduleRun('test-2', 'completed')
-    expect(() => completeScheduleRun('test-2', 'completed')).not.toThrow()
+    completeScheduleRun('test-2', 'success')
+    expect(() => completeScheduleRun('test-2', 'success')).not.toThrow()
   })
 
   it('does not throw when called with unknown scheduleId', () => {
-    expect(() => completeScheduleRun('unknown-id', 'completed')).not.toThrow()
+    expect(() => completeScheduleRun('unknown-id', 'success')).not.toThrow()
   })
 
   it('handles multiple completions', () => {
-    completeScheduleRun('sched-1', 'completed')
+    completeScheduleRun('sched-1', 'success')
     completeScheduleRun('sched-2', 'failed')
     expect(mockUpdateScheduleEntry).toHaveBeenCalledTimes(2)
   })
@@ -353,7 +353,7 @@ describe('startScheduler', () => {
     const mockMainWindow = {
       isDestroyed: vi.fn(() => false),
       webContents: { send: mockSend },
-    }
+    } as unknown as BrowserWindow
     const mockGetMainWindow = vi.fn(() => mockMainWindow)
 
     // Set time to 3:00 AM so the daily entry at hour 3 is within 2-min window
@@ -384,7 +384,7 @@ describe('startScheduler', () => {
     const mockMainWindow = {
       isDestroyed: vi.fn(() => true),
       webContents: { send: vi.fn() },
-    }
+    } as unknown as BrowserWindow
     const mockGetMainWindow = vi.fn(() => mockMainWindow)
 
     vi.setSystemTime(new Date(2025, 5, 15, 3, 0, 0))
@@ -427,7 +427,7 @@ describe('startScheduler', () => {
     const mockMainWindow = {
       isDestroyed: vi.fn(() => false),
       webContents: { send: mockSend },
-    }
+    } as unknown as BrowserWindow
     const mockGetMainWindow = vi.fn(() => mockMainWindow)
 
     vi.setSystemTime(new Date(2025, 5, 15, 3, 0, 0))
@@ -494,7 +494,7 @@ describe('isDueEntry weekly schedule', () => {
     const mockMainWindow = {
       isDestroyed: vi.fn(() => false),
       webContents: { send: mockSend },
-    }
+    } as unknown as BrowserWindow
     const mockGetMainWindow = vi.fn(() => mockMainWindow)
     return { mockSend, mockGetMainWindow }
   }
@@ -574,7 +574,7 @@ describe('isDueEntry monthly schedule', () => {
     const mockMainWindow = {
       isDestroyed: vi.fn(() => false),
       webContents: { send: mockSend },
-    }
+    } as unknown as BrowserWindow
     const mockGetMainWindow = vi.fn(() => mockMainWindow)
     return { mockSend, mockGetMainWindow }
   }
@@ -673,7 +673,7 @@ describe('triggerScheduleEntry notification', () => {
     const mockMainWindow = {
       isDestroyed: vi.fn(() => false),
       webContents: { send: mockSend },
-    }
+    } as unknown as BrowserWindow
     const mockGetMainWindow = vi.fn(() => mockMainWindow)
 
     mockSettings = makeSettings([makeEntry({ id: 'notif-test', hour: 3, minute: 0, enabled: true })])
@@ -702,7 +702,7 @@ describe('safety timeout', () => {
     const mockMainWindow = {
       isDestroyed: vi.fn(() => false),
       webContents: { send: mockSend },
-    }
+    } as unknown as BrowserWindow
     const mockGetMainWindow = vi.fn(() => mockMainWindow)
 
     vi.setSystemTime(new Date(2025, 5, 15, 3, 0, 0))
@@ -758,7 +758,7 @@ describe('completeScheduleRun timer cleanup', () => {
     const mockMainWindow = {
       isDestroyed: vi.fn(() => false),
       webContents: { send: vi.fn() },
-    }
+    } as unknown as BrowserWindow
     const mockGetMainWindow = vi.fn(() => mockMainWindow)
 
     vi.setSystemTime(new Date(2025, 5, 15, 3, 0, 0))
@@ -769,14 +769,14 @@ describe('completeScheduleRun timer cleanup', () => {
 
     mockUpdateScheduleEntry.mockClear()
 
-    completeScheduleRun('timer-cleanup', 'completed')
+    completeScheduleRun('timer-cleanup', 'success')
 
     // Subsequent completeScheduleRun should not throw
-    expect(() => completeScheduleRun('timer-cleanup', 'completed')).not.toThrow()
+    expect(() => completeScheduleRun('timer-cleanup', 'success')).not.toThrow()
     // updateScheduleEntry called a second time
     expect(mockUpdateScheduleEntry).toHaveBeenCalledWith(
       'timer-cleanup',
-      expect.objectContaining({ lastRunStatus: 'completed' }),
+      expect.objectContaining({ lastRunStatus: 'success' }),
     )
   })
 })
