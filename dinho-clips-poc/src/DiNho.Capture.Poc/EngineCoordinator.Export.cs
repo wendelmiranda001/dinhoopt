@@ -21,6 +21,10 @@ public sealed partial class EngineCoordinator
             _exportInProgress = true;
         }
 
+        // Feedback sonoro imediato — botão do front e atalho passam por aqui.
+        // Dispara antes do export/espera pós-clip para resposta instantânea.
+        ClipSavedSound();
+
         List<EncodedPacket>? video = null, audio = null;
 
         try

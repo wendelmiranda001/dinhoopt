@@ -179,6 +179,11 @@ public sealed partial class EngineCoordinator : IDisposable
     private int _outputWidth;
     private int _outputHeight;
 
+    // Feedback sonoro de clip salvo (static seam — testes podem substituir).
+    // Tanto o save pelo botão (IPC saveClip) quanto pelo atalho (hotkey) funilam
+    // em SaveClipAsync, então um único disparo cobre os dois.
+    internal static Action ClipSavedSound { get; set; } = NotificationSound.PlayClipSaved;
+
     // Eventos
     public event Action<EngineStatusValue>? OnStatusChanged;
 

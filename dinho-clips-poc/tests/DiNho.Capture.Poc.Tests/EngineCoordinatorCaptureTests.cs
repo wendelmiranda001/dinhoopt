@@ -2016,4 +2016,102 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
     }
 
     #endregion
+
+    #region ClipSavedSound — feedback sonoro ao salvar clip (cobre botão IPC e hotkey)
+
+    private static Task InvokeSaveClipAsync(EngineCoordinator coord)
+    {
+        var method = CoordinatorType.GetMethod("SaveClipAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        return (Task)method.Invoke(coord, new object?[] { null })!;
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (!condition() && sw.ElapsedMilliseconds < timeoutMs)
+            await Task.Delay(10);
+    }
+
+    private static string CreateTempClipsDir()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "DiNhoTests_" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    private static Action<AppConfig> FastSaveConfig()
+        => cfg =>
+        {
+            cfg.PostClipDurationSeconds = 0;
+            cfg.OutputDirectory = CreateTempClipsDir();
+        };
+
+    [Fact]
+    public async Task SaveClipAsync_WhenExportRuns_PlaysClipSavedSoundOnce()
+    {
+        var sounds = 0;
+        var original = EngineCoordinator.ClipSavedSound;
+        try
+        {
+            EngineCoordinator.ClipSavedSound = () => sounds++;
+            var coord = CreateWithMinimalDeps(FastSaveConfig());
+
+            await InvokeSaveClipAsync(coord);
+
+            Assert.Equal(1, sounds);
+        }
+        finally
+        {
+            EngineCoordinator.ClipSavedSound = original;
+        }
+    }
+
+    [Fact]
+    public async Task SaveClipAsync_WhileExportInProgress_DoesNotPlayDuplicateSound()
+    {
+        var sounds = 0;
+        var original = EngineCoordinator.ClipSavedSound;
+        try
+        {
+            EngineCoordinator.ClipSavedSound = () => sounds++;
+            var coord = CreateWithMinimalDeps(FastSaveConfig());
+            SetField(coord, "_exportInProgress", true);
+
+            await InvokeSaveClipAsync(coord);
+
+            Assert.Equal(0, sounds);
+        }
+        finally
+        {
+            EngineCoordinator.ClipSavedSound = original;
+        }
+    }
+
+    [Fact]
+    public async Task OnHotkeyPressed_SaveClipAction_PlaysClipSavedSoundViaCommonFunnel()
+    {
+        var sounds = 0;
+        var original = EngineCoordinator.ClipSavedSound;
+        try
+        {
+            EngineCoordinator.ClipSavedSound = () => sounds++;
+            var coord = CreateWithMinimalDeps(FastSaveConfig());
+            SetField(coord, "_pipeServer", new NamedPipeServer());
+
+            var method = CoordinatorType.GetMethod("OnHotkeyPressed", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            method.Invoke(coord, new object?[]
+            {
+                new HotkeyPressedEventArgs { Action = HotkeyAction.SaveClip }
+            });
+
+            await WaitUntilAsync(() => sounds >= 1, 3000);
+            Assert.True(sounds >= 1, "Hotkey de save não disparou o som de clip salvo");
+        }
+        finally
+        {
+            EngineCoordinator.ClipSavedSound = original;
+        }
+    }
+
+    #endregion
 }
