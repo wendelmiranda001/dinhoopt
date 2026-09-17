@@ -61,6 +61,12 @@ public sealed partial class EngineCoordinator
                         Log.E("EngineCoordinator", $"setMicDevice: falha ao recriar o mixer ({ex.Message}) — encerrando captura");
                         try { StopCapture(); }
                         catch (Exception stopEx) { Log.W("EngineCoordinator", $"setMicDevice: StopCapture pós-falha falhou: {stopEx.Message}"); }
+                        // Retorno antecipado: o deviceId novo já foi persistido no
+                        // config e o StopCapture anulou/dispôs o mixer. Seguir adiante
+                        // reaqueceria um mixer antigo/descartado (NRE + pipeline
+                        // fantasma) — estado inconsciente que o comentário 5.4 queria
+                        // eliminar.
+                        return new IpcMessage { Action = "ok" };
                     }
 
                     var pttModeAtReinit = PttModeHelper.Normalize(_config.Config.PttMode);

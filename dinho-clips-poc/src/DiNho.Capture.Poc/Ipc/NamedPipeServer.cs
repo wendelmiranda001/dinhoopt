@@ -254,7 +254,7 @@ public sealed class NamedPipeServer : IDisposable
                 var clientTask = Task.Run(() => HandleClientAsync(captured, ct), ct);
                 // 5.8: acompanha o handler até terminar para o Stop() poder aguardá-lo.
                 _clientTasks.TryAdd(clientTask.Id, clientTask);
-                _ = clientTask.ContinueWith(_ => _clientTasks.TryRemove(clientTask.Id, out _),
+                _ = clientTask.ContinueWith(t => _clientTasks.TryRemove(clientTask.Id, out _),
                     TaskContinuationOptions.ExecuteSynchronously);
             }
             catch (OperationCanceledException)
