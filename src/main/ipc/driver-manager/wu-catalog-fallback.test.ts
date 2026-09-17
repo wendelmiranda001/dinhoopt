@@ -48,16 +48,16 @@ describe('parseCatalogHtml', () => {
     const results = parseCatalogHtml(html, MOCK_DRIVER)
 
     expect(results).toHaveLength(2)
-    expect(results[0].updateId).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890')
-    expect(results[0].availableVersion).toBe('31.0.15.5135')
-    expect(results[0].downloadSize).toBe('15.2 MB')
-    expect(results[0].deviceName).toBe('NVIDIA GeForce RTX 4090')
-    expect(results[0].deviceId).toBe('PCI\\VEN_10DE&DEV_2484')
-    expect(results[0].currentVersion).toBe('31.0.14.7239')
-    expect(results[0].selected).toBe(true)
+    expect(results[0]!.updateId).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890')
+    expect(results[0]!.availableVersion).toBe('31.0.15.5135')
+    expect(results[0]!.downloadSize).toBe('15.2 MB')
+    expect(results[0]!.deviceName).toBe('NVIDIA GeForce RTX 4090')
+    expect(results[0]!.deviceId).toBe('PCI\\VEN_10DE&DEV_2484')
+    expect(results[0]!.currentVersion).toBe('31.0.14.7239')
+    expect(results[0]!.selected).toBe(true)
 
-    expect(results[1].updateId).toBe('b2c3d4e5-f6a7-8901-bcde-f12345678901')
-    expect(results[1].availableVersion).toBe('32.0.1.0001')
+    expect(results[1]!.updateId).toBe('b2c3d4e5-f6a7-8901-bcde-f12345678901')
+    expect(results[1]!.availableVersion).toBe('32.0.1.0001')
   })
 
   it('returns empty array for HTML with no matching rows', () => {
@@ -97,7 +97,7 @@ describe('parseCatalogHtml', () => {
     `
     const results = parseCatalogHtml(html, MOCK_DRIVER)
     expect(results).toHaveLength(1)
-    expect(results[0].updateId).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890')
+    expect(results[0]!.updateId).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890')
   })
 
   it('handles version extraction from various title formats', () => {
@@ -110,9 +110,9 @@ describe('parseCatalogHtml', () => {
     `
     const results = parseCatalogHtml(html, MOCK_DRIVER)
     expect(results).toHaveLength(3)
-    expect(results[0].availableVersion).toBe('6.0.1.8638')
-    expect(results[1].availableVersion).toBe('28.3.1.0')
-    expect(results[2].availableVersion).toBe('12.0.1.3')
+    expect(results[0]!.availableVersion).toBe('6.0.1.8638')
+    expect(results[1]!.availableVersion).toBe('28.3.1.0')
+    expect(results[2]!.availableVersion).toBe('12.0.1.3')
   })
 
   it('uses date as version fallback when no version in title', () => {
@@ -123,8 +123,8 @@ describe('parseCatalogHtml', () => {
     `
     const results = parseCatalogHtml(html, MOCK_DRIVER)
     expect(results).toHaveLength(1)
-    expect(results[0].availableVersion).toBe('10/25/2024')
-    expect(results[0].provider).toBe('Windows 10')
+    expect(results[0]!.availableVersion).toBe('10/25/2024')
+    expect(results[0]!.provider).toBe('Windows 10')
   })
 
   it('handles data-updateid with curly braces', () => {
@@ -135,7 +135,7 @@ describe('parseCatalogHtml', () => {
     `
     const results = parseCatalogHtml(html, MOCK_DRIVER)
     expect(results).toHaveLength(1)
-    expect(results[0].updateId).toBe('A1B2C3D4-E5F6-7890-ABCD-EF1234567890')
+    expect(results[0]!.updateId).toBe('A1B2C3D4-E5F6-7890-ABCD-EF1234567890')
   })
 })
 
@@ -162,8 +162,8 @@ describe('searchCatalogForDrivers', () => {
     const results = await searchCatalogForDrivers([MOCK_DRIVER])
 
     expect(results).toHaveLength(1)
-    expect(results[0].updateId).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890')
-    expect(results[0].deviceName).toBe('NVIDIA GeForce RTX 4090')
+    expect(results[0]!.updateId).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890')
+    expect(results[0]!.deviceName).toBe('NVIDIA GeForce RTX 4090')
   })
 
   it('handles PowerShell errors gracefully', async () => {

@@ -47,6 +47,7 @@ vi.mock('../services/logger.service', () => ({
 
 // ── SUT ──
 
+import type { EmptyFolderScanResult } from '@shared/types'
 import type { BrowserWindow } from 'electron'
 import { registerEmptyFolderCleanerIpc } from './empty-folder-cleaner.ipc'
 
@@ -473,7 +474,11 @@ describe('registerEmptyFolderCleanerIpc', () => {
         return []
       })
       const handler = getHandler('empty-folders:scan')
-      const result = await handler(undefined, { directory: ROOT, maxDepth: 10, excludePatterns: [] })
+      const result = (await handler(undefined, {
+        directory: ROOT,
+        maxDepth: 10,
+        excludePatterns: [],
+      })) as EmptyFolderScanResult
       // Desktop should be protected (parent matches HOME), NOT in results
       expect(result.folders.map((f) => f.name)).not.toContain('Desktop')
     })
@@ -490,7 +495,11 @@ describe('registerEmptyFolderCleanerIpc', () => {
         return []
       })
       const handler = getHandler('empty-folders:scan')
-      const result = await handler(undefined, { directory: ROOT, maxDepth: 10, excludePatterns: [] })
+      const result = (await handler(undefined, {
+        directory: ROOT,
+        maxDepth: 10,
+        excludePatterns: [],
+      })) as EmptyFolderScanResult
       // HOME not set, so isProtectedFolder skips the user profile check,
       // Desktop is not protected → appears in empty folders
       expect(result.folders.map((f) => f.name)).toContain('Desktop')
@@ -523,7 +532,11 @@ describe('registerEmptyFolderCleanerIpc', () => {
         return []
       })
 
-      const result = await scanHandler(undefined, { directory: ROOT, maxDepth: 10, excludePatterns: [] })
+      const result = (await scanHandler(undefined, {
+        directory: ROOT,
+        maxDepth: 10,
+        excludePatterns: [],
+      })) as EmptyFolderScanResult
       expect(result.cancelled).toBe(true)
     })
   })
@@ -575,7 +588,7 @@ describe('registerEmptyFolderCleanerIpc', () => {
       const resultPromise = handler(undefined, { directory: ROOT, maxDepth: 10, excludePatterns: [] })
       // Advance enough for both readdir calls (300ms each = 600ms) + 500ms throttle gap
       await vi.advanceTimersByTimeAsync(1200)
-      const result = await resultPromise
+      const result = (await resultPromise) as EmptyFolderScanResult
       // Progress should have been sent at least once
       expect(mocks.webContentsSend).toHaveBeenCalledWith('empty-folders:progress', expect.anything())
       expect(result.cancelled).toBe(false)

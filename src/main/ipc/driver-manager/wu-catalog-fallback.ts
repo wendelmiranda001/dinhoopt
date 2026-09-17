@@ -27,7 +27,7 @@ export function parseCatalogHtml(html: string, driver: StaleDriver): DriverUpdat
 
   while ((rowMatch = rowRegex.exec(html)) !== null) {
     const fullRow = rowMatch[0] // includes <tr> tag with attributes
-    const rowHtml = rowMatch[1] // content between <tr> and </tr>
+    const rowHtml = rowMatch[1]! // content between <tr> and </tr>
 
     // Extract UpdateID from the <tr> tag attributes — patterns:
     //   data-updateid="{GUID}"
@@ -41,7 +41,7 @@ export function parseCatalogHtml(html: string, driver: StaleDriver): DriverUpdat
     for (const pat of idPatterns) {
       const m = fullRow.match(pat)
       if (m) {
-        updateId = m[1]
+        updateId = m[1]!
         break
       }
     }
@@ -56,7 +56,7 @@ export function parseCatalogHtml(html: string, driver: StaleDriver): DriverUpdat
     let cellMatch: RegExpExecArray | null
     while ((cellMatch = cellRegex.exec(rowHtml)) !== null) {
       // Strip HTML tags, collapse whitespace, trim
-      const text = cellMatch[1]
+      const text = cellMatch[1]!
         .replace(/<[^>]+>/g, '')
         .replace(/\s+/g, ' ')
         .trim()
@@ -70,7 +70,6 @@ export function parseCatalogHtml(html: string, driver: StaleDriver): DriverUpdat
     if (!title || title.length < 3) continue
 
     const products = cells[2] || ''
-    const _classification = cells[3] || ''
     const lastUpdated = cells[4] || ''
     const size = cells[5] || ''
 
@@ -83,7 +82,7 @@ export function parseCatalogHtml(html: string, driver: StaleDriver): DriverUpdat
     for (const pat of versionPatterns) {
       const vm = title.match(pat)
       if (vm) {
-        version = vm[1]
+        version = vm[1]!
         break
       }
     }
@@ -123,7 +122,7 @@ export async function searchCatalogForDrivers(
   const seen = new Set<string>()
 
   for (let i = 0; i < staleDrivers.length; i++) {
-    const driver = staleDrivers[i]
+    const driver = staleDrivers[i]!
     if (!driver.hardwareId) continue
 
     onProgress?.({
@@ -174,7 +173,9 @@ async function searchCatalogSingle(driver: StaleDriver): Promise<DriverUpdate[]>
     windowsHide: true,
   })
 
-  const lines = stdout.split('\n').map((l) => l.trim())
+  const lines = String(stdout)
+    .split('\n')
+    .map((l) => l.trim())
 
   // Check for error
   const errorLine = lines.find((l) => l.startsWith('CATALOG_ERROR|'))
@@ -238,16 +239,16 @@ export async function getStaleDriversForCatalog(): Promise<StaleDriver[]> {
     })
 
     const stale: StaleDriver[] = []
-    for (const line of stdout.split('\n')) {
+    for (const line of String(stdout).split('\n')) {
       const trimmed = line.trim()
       if (!trimmed.startsWith('STALE|')) continue
       const parts = trimmed.split('|')
       if (parts.length < 4) continue
 
       stale.push({
-        hardwareId: parts[1],
-        deviceName: parts[2],
-        currentVersion: parts[3],
+        hardwareId: parts[1]!,
+        deviceName: parts[2]!,
+        currentVersion: parts[3]!,
         className: '',
       })
     }

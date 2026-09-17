@@ -234,7 +234,8 @@ function handlePipeMessage(msg: PipeMessage): void {
         getLogger().warning('clips-pipe', `Long-running command "${originalCmd}" failed: ${msg.payload.error}`)
         pending.reject(new Error(String(msg.payload.error)))
       } else {
-        pending.resolve({ cmd: originalCmd, payload: msg.payload.value as Record<string, unknown> | undefined })
+        const value = msg.payload.value as Record<string, unknown> | undefined
+        pending.resolve({ cmd: originalCmd, ...(value !== undefined ? { payload: value } : {}) })
       }
     } else {
       getLogger().warning('clips-pipe', `No pending long-running request for cmd="${originalCmd}"`)

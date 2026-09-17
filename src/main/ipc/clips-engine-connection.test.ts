@@ -7,20 +7,17 @@ let dataHandlers: Array<(chunk: Buffer) => void> = []
 let errorHandlers: Array<(err: Error) => void> = []
 let closeHandlers: Array<() => void> = []
 let timeoutHandlers: Array<() => void> = []
-let _connectHandler: (() => void) | null = null
 
 function resetMockSocket(): void {
   dataHandlers = []
   errorHandlers = []
   closeHandlers = []
   timeoutHandlers = []
-  _connectHandler = null
 }
 
 const mockSocket = {
   on: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
     if (event === 'connect') {
-      _connectHandler = cb as () => void
       cb()
     } else if (event === 'data') {
       dataHandlers.push(cb as (chunk: Buffer) => void)
@@ -72,7 +69,10 @@ vi.mock('../services/clips-config-manager', () => ({
 }))
 vi.mock('../services/thumbnail-generator', () => ({ getCachedThumbnailPath: vi.fn(() => null) }))
 
+import type { NonSharedBuffer } from 'node:buffer'
+import type { ExecFileException, ExecFileOptions } from 'node:child_process'
 import { execFile, spawn } from 'node:child_process'
+import type { PathLike } from 'node:fs'
 import { existsSync } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { connect } from 'node:net'
@@ -100,6 +100,10 @@ import { connectPipe, disconnectPipe, getPipeSocket } from './clips-pipe'
 
 const ORIG_ENV = { ...process.env }
 
+function setPackaged(value: boolean): void {
+  Object.defineProperty(app, 'isPackaged', { value, configurable: true })
+}
+
 // ─── Helpers ───────────────────────────────────────────────
 function makeMockChild() {
   return {
@@ -117,7 +121,6 @@ function makeFakeSocket() {
   return {
     on: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
       if (event === 'connect') {
-        _connectHandler = cb as () => void
         cb()
       } else if (event === 'data') {
         dataHandlers.push(cb as (chunk: Buffer) => void)
@@ -142,9 +145,15 @@ function mockFfmpegDuration(stderr: string) {
   vi.mocked(execFile).mockImplementation(
     (
       _cmd: string,
-      _args: readonly string[],
-      _opts: unknown,
-      cb?: (err: Error | null, stdout: string, stderr: string) => void,
+      _args: readonly string[] | null | undefined,
+      _opts: ExecFileOptions | null | undefined,
+      cb?:
+        | ((
+            error: ExecFileException | null,
+            stdout: string | NonSharedBuffer,
+            stderr: string | NonSharedBuffer,
+          ) => void)
+        | null,
     ) => {
       if (cb) cb(null, '', stderr)
       return undefined as never
@@ -216,7 +225,7 @@ describe('getEnginePath', () => {
 
   it('returns env var path when set and exists', () => {
     process.env.DINHO_CLIPS_ENGINE_PATH = 'D:\\custom\\engine.exe'
-    vi.mocked(existsSync).mockImplementation((p: string) => p === 'D:\\custom\\engine.exe')
+    vi.mocked(existsSync).mockImplementation((p: PathLike) => p.toString() === 'D:\\custom\\engine.exe')
     expect(getEnginePath()).toBe('D:\\custom\\engine.exe')
   })
 
@@ -229,41 +238,41 @@ describe('getEnginePath', () => {
 
   it('returns desktop dev path when USERPROFILE is set and path exists', () => {
     process.env.USERPROFILE = 'C:\\Users\\TestDev'
-    vi.mocked(app).isPackaged = false
+    setPackaged(false)
     const sub = engineSubpath(true)
     const desktopPath = join('C:\\Users\\TestDev', 'Desktop', 'dinho-clips-poc', sub)
-    vi.mocked(existsSync).mockImplementation((p: string) => p === desktopPath)
+    vi.mocked(existsSync).mockImplementation((p: PathLike) => p.toString() === desktopPath)
     expect(getEnginePath()).toBe(desktopPath)
   })
 
   it('returns __dirname dev path when desktop candidate is empty and path exists', () => {
     delete process.env.USERPROFILE
-    vi.mocked(app).isPackaged = false
+    setPackaged(false)
     const sub = engineSubpath(true)
     const dirnamePath = join(__dirname, '..', '..', 'dinho-clips-poc', sub)
-    vi.mocked(existsSync).mockImplementation((p: string) => p === dirnamePath)
+    vi.mocked(existsSync).mockImplementation((p: PathLike) => p.toString() === dirnamePath)
     expect(getEnginePath()).toBe(dirnamePath)
   })
 
   it('returns clips-engine path (candidate 2)', () => {
     delete process.env.USERPROFILE
-    vi.mocked(app).isPackaged = false
+    setPackaged(false)
     const clipsPath = join(__dirname, '..', '..', 'clips-engine', 'DiNho.Capture.Poc.exe')
-    vi.mocked(existsSync).mockImplementation((p: string) => p === clipsPath)
+    vi.mocked(existsSync).mockImplementation((p: PathLike) => p.toString() === clipsPath)
     expect(getEnginePath()).toBe(clipsPath)
   })
 
   it('returns resourcesPath path when packaged', () => {
-    vi.mocked(app).isPackaged = true
+    setPackaged(true)
     delete process.env.USERPROFILE
     const resourcesPath = join('', 'clips-engine', 'DiNho.Capture.Poc.exe')
-    vi.mocked(existsSync).mockImplementation((p: string) => p === resourcesPath)
+    vi.mocked(existsSync).mockImplementation((p: PathLike) => p.toString() === resourcesPath)
     expect(getEnginePath()).toBe(resourcesPath)
   })
 
   it('returns cwd fallback when no candidate exists and USERPROFILE cleared', () => {
     delete process.env.USERPROFILE
-    vi.mocked(app).isPackaged = false
+    setPackaged(false)
     vi.mocked(existsSync).mockReturnValue(false)
     const sub = engineSubpath(true)
     // Last candidate is cwd, fallback = candidates[1] when no desktop
@@ -273,7 +282,7 @@ describe('getEnginePath', () => {
 
   it('returns desktop fallback when nothing matches and USERPROFILE is set', () => {
     process.env.USERPROFILE = 'C:\\Users\\TestDev'
-    vi.mocked(app).isPackaged = false
+    setPackaged(false)
     vi.mocked(existsSync).mockReturnValue(false)
     const sub = engineSubpath(true)
     const desktopPath = join('C:\\Users\\TestDev', 'Desktop', 'dinho-clips-poc', sub)
@@ -282,7 +291,7 @@ describe('getEnginePath', () => {
 
   it('returns fallback candidates[1] when desktop is empty and existsSync returns none', () => {
     delete process.env.USERPROFILE
-    vi.mocked(app).isPackaged = false
+    setPackaged(false)
     vi.mocked(existsSync).mockReturnValue(false)
     const sub = engineSubpath(true)
     const expected = join(__dirname, '..', '..', 'dinho-clips-poc', sub)
@@ -290,7 +299,7 @@ describe('getEnginePath', () => {
   })
 
   it('uses Release subpath when isPackaged is true', () => {
-    vi.mocked(app).isPackaged = true
+    setPackaged(true)
     process.env.USERPROFILE = 'C:\\Users\\TestDev'
     const sub = join(
       'src',
@@ -302,7 +311,7 @@ describe('getEnginePath', () => {
       'DiNho.Capture.Poc.exe',
     )
     const desktopPath = join('C:\\Users\\TestDev', 'Desktop', 'dinho-clips-poc', sub)
-    vi.mocked(existsSync).mockImplementation((p: string) => p === desktopPath)
+    vi.mocked(existsSync).mockImplementation((p: PathLike) => p.toString() === desktopPath)
     expect(getEnginePath()).toBe(desktopPath)
   })
 })
@@ -326,9 +335,15 @@ describe('getVideoDuration', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(new Error('ENOENT'), '', '')
         return undefined as never
@@ -1390,7 +1405,7 @@ describe('stopEngineProcess', () => {
 // ─── startEngine ───────────────────────────────────────────
 describe('startEngine', () => {
   beforeEach(() => {
-    vi.mocked(app).isPackaged = false
+    setPackaged(false)
     vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([])
   })
 
@@ -1500,7 +1515,7 @@ describe('startEngine', () => {
   })
 
   it('skips devtools when packaged', async () => {
-    vi.mocked(app).isPackaged = true
+    setPackaged(true)
     const mockWin = {
       isDestroyed: vi.fn(() => false),
       webContents: { send: vi.fn(), openDevTools: vi.fn() },
@@ -1752,7 +1767,7 @@ describe('handshake', () => {
   beforeEach(() => {
     vi.mocked(spawn).mockReturnValue(makeMockChild() as never)
     vi.mocked(existsSync).mockReturnValue(true)
-    vi.mocked(app).isPackaged = false
+    setPackaged(false)
     vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([])
   })
 

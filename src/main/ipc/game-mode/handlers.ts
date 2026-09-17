@@ -158,7 +158,7 @@ async function checkDirectStorage(): Promise<DirectStorageStatus> {
       ],
       { timeout: 15000, windowsHide: true },
     )
-    const parsed = JSON.parse(stdout)
+    const parsed = JSON.parse(String(stdout))
     const drives = Array.isArray(parsed) ? parsed : [parsed]
     for (const d of drives) {
       const health = String(d.HealthStatus ?? 'Unknown')

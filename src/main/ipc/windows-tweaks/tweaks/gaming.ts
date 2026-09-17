@@ -1,15 +1,9 @@
 import { IPC } from '@shared/channels'
+import type { GamingTimerStatus } from '@shared/types'
 import { ipcMain } from 'electron'
 import { execFileAsync } from '../../../services/exec-utf8'
 import { getLogger } from '../../../services/logger.service'
 import type { WindowGetter } from '../../index'
-
-export interface GamingTimerStatus {
-  hpetOff: boolean
-  tscSyncPolicy: 'legacy' | 'enhanced' | 'default'
-  dynamicTickDisabled: boolean
-  autoTuningDisabled: boolean
-}
 
 async function queryBcdEditEnum(): Promise<string> {
   try {
@@ -17,7 +11,7 @@ async function queryBcdEditEnum(): Promise<string> {
       timeout: 10000,
       windowsHide: true,
     })
-    return stdout
+    return String(stdout)
   } catch {
     return ''
   }
@@ -34,7 +28,7 @@ async function getTimerStatus(): Promise<GamingTimerStatus> {
     const [bcdOut, tuningOut] = await Promise.all([
       queryBcdEditEnum(),
       execFileAsync('netsh', ['int', 'tcp', 'show', 'global'], { timeout: 10000, windowsHide: true })
-        .then((r) => r.stdout)
+        .then((r) => String(r.stdout))
         .catch(() => ''),
     ])
 
@@ -143,16 +137,16 @@ async function getVbsStatus(): Promise<{ enabled: boolean; requirePlatformSecuri
       ['query', 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\DeviceGuard', '/v', 'EnableVirtualizationBasedSecurity'],
       { timeout: 10000, windowsHide: true },
     )
-    const enabledMatch = stdout.match(/EnableVirtualizationBasedSecurity\s+REG_DWORD\s+0x([0-9a-fA-F]+)/i)
-    const enabled = enabledMatch ? Number.parseInt(enabledMatch[1], 16) !== 0 : true
+    const enabledMatch = String(stdout).match(/EnableVirtualizationBasedSecurity\s+REG_DWORD\s+0x([0-9a-fA-F]+)/i)
+    const enabled = enabledMatch ? Number.parseInt(enabledMatch[1] ?? '0', 16) !== 0 : true
 
     const { stdout: pfsOut } = await execFileAsync(
       'reg.exe',
       ['query', 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\DeviceGuard', '/v', 'RequirePlatformSecurityFeatures'],
       { timeout: 10000, windowsHide: true },
     )
-    const pfsMatch = pfsOut.match(/RequirePlatformSecurityFeatures\s+REG_DWORD\s+0x([0-9a-fA-F]+)/i)
-    const requirePlatformSecurity = pfsMatch ? Number.parseInt(pfsMatch[1], 16) : 1
+    const pfsMatch = String(pfsOut).match(/RequirePlatformSecurityFeatures\s+REG_DWORD\s+0x([0-9a-fA-F]+)/i)
+    const requirePlatformSecurity = pfsMatch ? Number.parseInt(pfsMatch[1] ?? '1', 16) : 1
 
     return { enabled, requirePlatformSecurity }
   } catch {
@@ -208,8 +202,8 @@ async function getHagsStatus(): Promise<{ enabled: boolean }> {
       ['query', 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers', '/v', 'HwSchMode'],
       { timeout: 10000, windowsHide: true },
     )
-    const match = stdout.match(/HwSchMode\s+REG_DWORD\s+0x([0-9a-fA-F]+)/i)
-    const enabled = match ? Number.parseInt(match[1], 16) === 2 : true
+    const match = String(stdout).match(/HwSchMode\s+REG_DWORD\s+0x([0-9a-fA-F]+)/i)
+    const enabled = match ? Number.parseInt(match[1] ?? '0', 16) === 2 : true
     return { enabled }
   } catch {
     return { enabled: true }

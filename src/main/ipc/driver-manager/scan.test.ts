@@ -100,17 +100,17 @@ Atributos:         Universal
     const result = await scanDrivers()
 
     expect(result.packages.length).toBe(2)
-    expect(result.packages[0].publishedName).toBe('oem0.inf')
-    expect(result.packages[0].originalName).toBe('haswellesystem.inf')
-    expect(result.packages[0].provider).toBe('INTEL')
-    expect(result.packages[0].className).toBe('System')
-    expect(result.packages[0].version).toBe('10.1.2.19')
-    expect(result.packages[0].date).toBe('01/26/2016')
-    expect(result.packages[0].signer).toBe('Microsoft Windows Hardware Compatibility Publisher')
+    expect(result.packages[0]!.publishedName).toBe('oem0.inf')
+    expect(result.packages[0]!.originalName).toBe('haswellesystem.inf')
+    expect(result.packages[0]!.provider).toBe('INTEL')
+    expect(result.packages[0]!.className).toBe('System')
+    expect(result.packages[0]!.version).toBe('10.1.2.19')
+    expect(result.packages[0]!.date).toBe('01/26/2016')
+    expect(result.packages[0]!.signer).toBe('Microsoft Windows Hardware Compatibility Publisher')
 
-    expect(result.packages[1].publishedName).toBe('oem18.inf')
-    expect(result.packages[1].provider).toBe('DEV47APPS')
-    expect(result.packages[1].className).toBe('MEDIA')
+    expect(result.packages[1]!.publishedName).toBe('oem18.inf')
+    expect(result.packages[1]!.provider).toBe('DEV47APPS')
+    expect(result.packages[1]!.className).toBe('MEDIA')
   })
 
   it('parses English pnputil output correctly', async () => {
@@ -131,8 +131,8 @@ Attributes:         Legacy
     const result = await scanDrivers()
 
     expect(result.packages.length).toBe(1)
-    expect(result.packages[0].publishedName).toBe('oem0.inf')
-    expect(result.packages[0].provider).toBe('INTEL')
+    expect(result.packages[0]!.publishedName).toBe('oem0.inf')
+    expect(result.packages[0]!.provider).toBe('INTEL')
   })
 
   it('parses combined date+version field', async () => {
@@ -152,8 +152,8 @@ Atributos:         Legacy
     const result = await scanDrivers()
 
     expect(result.packages.length).toBe(1)
-    expect(result.packages[0].version).toBe('31.0.15.5135')
-    expect(result.packages[0].date).toBe('2024-01-15')
+    expect(result.packages[0]!.version).toBe('31.0.15.5135')
+    expect(result.packages[0]!.date).toBe('2024-01-15')
   })
 
   it('skips non-oem entries', async () => {

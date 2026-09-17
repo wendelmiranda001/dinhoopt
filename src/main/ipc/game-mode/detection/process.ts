@@ -100,9 +100,10 @@ export async function killProcessesByName(
     const { stdout } = await execFileAsync('tasklist', ['/FO', 'CSV', '/NH'], {
       timeout: 10000,
       windowsHide: true,
+      encoding: 'utf-8',
     })
     const lowerNames = new Set(names.map((n) => n.toLowerCase()))
-    const lines = stdout.split('\n').filter(Boolean)
+    const lines = String(stdout).split('\n').filter(Boolean)
 
     for (const line of lines) {
       const match = line.match(/^"([^"]+)","(\d+)"/)

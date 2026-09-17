@@ -110,6 +110,8 @@ describe('registerPerfMonitorIpc', () => {
           getProcessName: vi.fn(),
           killProcess: vi.fn(),
           getDiskHealth: vi.fn(),
+          startProcessPolling: vi.fn(),
+          stopProcessPolling: vi.fn(),
         }
       })
       registerPerfMonitorIpc(() => null)
@@ -132,6 +134,8 @@ describe('registerPerfMonitorIpc', () => {
           getProcessName: vi.fn(),
           killProcess: vi.fn(),
           getDiskHealth: vi.fn(),
+          startProcessPolling: vi.fn(),
+          stopProcessPolling: vi.fn(),
         }
       })
       const sender = { id: 1 }
@@ -153,6 +157,8 @@ describe('registerPerfMonitorIpc', () => {
           getProcessName: vi.fn(),
           killProcess: vi.fn(),
           getDiskHealth: vi.fn(),
+          startProcessPolling: vi.fn(),
+          stopProcessPolling: vi.fn(),
         }
       })
       const sender = { id: 1 }
@@ -175,6 +181,8 @@ describe('registerPerfMonitorIpc', () => {
           getProcessName: vi.fn(),
           killProcess: vi.fn(),
           getDiskHealth: vi.fn(),
+          startProcessPolling: vi.fn(),
+          stopProcessPolling: vi.fn(),
         }
       })
       const mockOn = vi.fn()
@@ -239,6 +247,8 @@ describe('registerPerfMonitorIpc', () => {
           getProcessName: vi.fn(),
           killProcess: vi.fn(),
           getDiskHealth: vi.fn(),
+          startProcessPolling: vi.fn(),
+          stopProcessPolling: vi.fn(),
         }
       })
       const mockOn = vi.fn()
@@ -276,6 +286,8 @@ describe('registerPerfMonitorIpc', () => {
           getProcessName: vi.fn(),
           killProcess: vi.fn(),
           getDiskHealth: vi.fn(),
+          startProcessPolling: vi.fn(),
+          stopProcessPolling: vi.fn(),
         }
       })
       registerPerfMonitorIpc(() => null)
@@ -327,6 +339,8 @@ describe('registerPerfMonitorIpc', () => {
           getProcessName: mockGetProcessName,
           killProcess: vi.fn(),
           getDiskHealth: vi.fn(),
+          startProcessPolling: vi.fn(),
+          stopProcessPolling: vi.fn(),
         }
       })
       registerPerfMonitorIpc(() => null)
@@ -347,6 +361,8 @@ describe('registerPerfMonitorIpc', () => {
           stopMonitoring: vi.fn(),
           getProcessName: vi.fn().mockResolvedValue('notepad.exe'),
           killProcess: mockKill,
+          startProcessPolling: vi.fn(),
+          stopProcessPolling: vi.fn(),
           getDiskHealth: vi.fn(),
         }
       })
@@ -367,6 +383,8 @@ describe('registerPerfMonitorIpc', () => {
           stopMonitoring: vi.fn(),
           getProcessName: vi.fn().mockResolvedValue('notepad.exe'),
           killProcess: vi.fn().mockResolvedValue({ success: false, error: 'Access denied' }),
+          startProcessPolling: vi.fn(),
+          stopProcessPolling: vi.fn(),
           getDiskHealth: vi.fn(),
         }
       })
@@ -407,6 +425,8 @@ describe('registerPerfMonitorIpc', () => {
           stopMonitoring: vi.fn(),
           getProcessName: vi.fn(),
           killProcess: vi.fn(),
+          startProcessPolling: vi.fn(),
+          stopProcessPolling: vi.fn(),
           getDiskHealth: vi.fn().mockReturnValue(mockHealth),
         }
       })

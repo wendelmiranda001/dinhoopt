@@ -1,3 +1,4 @@
+import type { WindowsTweakState } from '@shared/types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockExecFileAsync = vi.fn()
@@ -17,11 +18,11 @@ const mockIpcMainHandle = vi.fn()
 
 vi.mock('../../services/exec-utf8', () => ({
   execFileAsync: (...args: unknown[]) => mockExecFileAsync(...args),
-  psUtf8: (...args: unknown[]) => mockPsUtf8(...args),
+  psUtf8: (s: string) => mockPsUtf8(s),
 }))
 
 vi.mock('../../services/logger.service', () => ({
-  getLogger: (...args: unknown[]) => mockGetLogger(...args),
+  getLogger: () => mockGetLogger(),
 }))
 
 vi.mock('../../services/elevation', () => ({
@@ -610,7 +611,7 @@ describe('handlers.ts', () => {
 
       const listHandler = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'windows-tweaks:list')![1]
       const result = await listHandler()
-      const tcpTweak = result.find((s) => s.tweak.id === 'tcp-no-delay')
+      const tcpTweak = result.find((s: WindowsTweakState) => s.tweak.id === 'tcp-no-delay')
       expect(tcpTweak?.applied).toBe(true)
     })
 
@@ -630,7 +631,7 @@ describe('handlers.ts', () => {
 
       const listHandler = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'windows-tweaks:list')![1]
       const result = await listHandler()
-      const stickyTweak = result.find((s) => s.tweak.id === 'sticky-keys-off')
+      const stickyTweak = result.find((s: WindowsTweakState) => s.tweak.id === 'sticky-keys-off')
       expect(stickyTweak?.applied).toBe(true)
     })
 
@@ -650,7 +651,7 @@ describe('handlers.ts', () => {
 
       const listHandler = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'windows-tweaks:list')![1]
       const result = await listHandler()
-      const tcpTweak = result.find((s) => s.tweak.id === 'tcp-no-delay')
+      const tcpTweak = result.find((s: WindowsTweakState) => s.tweak.id === 'tcp-no-delay')
       expect(tcpTweak?.applied).toBe(false)
     })
 
@@ -667,7 +668,7 @@ describe('handlers.ts', () => {
 
       const listHandler = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'windows-tweaks:list')![1]
       const result = await listHandler()
-      const tcpTweak = result.find((s) => s.tweak.id === 'tcp-no-delay')
+      const tcpTweak = result.find((s: WindowsTweakState) => s.tweak.id === 'tcp-no-delay')
       expect(tcpTweak?.applied).toBe(false)
     })
 
@@ -684,7 +685,7 @@ describe('handlers.ts', () => {
 
       const listHandler = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'windows-tweaks:list')![1]
       const result = await listHandler()
-      const tcpTweak = result.find((s) => s.tweak.id === 'tcp-no-delay')
+      const tcpTweak = result.find((s: WindowsTweakState) => s.tweak.id === 'tcp-no-delay')
       expect(tcpTweak?.applied).toBe(false)
     })
 
@@ -774,7 +775,7 @@ describe('handlers.ts', () => {
 
       const listHandler = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'windows-tweaks:list')![1]
       const result = await listHandler()
-      const aspmTweak = result.find((s) => s.tweak.id === 'pcie-aspm-off')
+      const aspmTweak = result.find((s: WindowsTweakState) => s.tweak.id === 'pcie-aspm-off')
       expect(aspmTweak?.applied).toBe(true)
     })
 
@@ -790,7 +791,7 @@ describe('handlers.ts', () => {
 
       const listHandler = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'windows-tweaks:list')![1]
       const result = await listHandler()
-      const aspmTweak = result.find((s) => s.tweak.id === 'pcie-aspm-off')
+      const aspmTweak = result.find((s: WindowsTweakState) => s.tweak.id === 'pcie-aspm-off')
       expect(aspmTweak?.applied).toBe(false)
     })
 
@@ -808,7 +809,7 @@ describe('handlers.ts', () => {
 
       const listHandler = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'windows-tweaks:list')![1]
       const result = await listHandler()
-      const aspmTweak = result.find((s) => s.tweak.id === 'pcie-aspm-off')
+      const aspmTweak = result.find((s: WindowsTweakState) => s.tweak.id === 'pcie-aspm-off')
       expect(aspmTweak?.applied).toBe(false)
     })
 
@@ -826,7 +827,7 @@ describe('handlers.ts', () => {
 
       const listHandler = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'windows-tweaks:list')![1]
       const result = await listHandler()
-      const aspmTweak = result.find((s) => s.tweak.id === 'pcie-aspm-off')
+      const aspmTweak = result.find((s: WindowsTweakState) => s.tweak.id === 'pcie-aspm-off')
       expect(aspmTweak?.applied).toBe(false)
     })
   })
@@ -988,7 +989,7 @@ describe('handlers.ts', () => {
 
       const listHandler = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'windows-tweaks:list')![1]
       const result = await listHandler()
-      const found = result.find((s) => s.tweak.id === 'test-interface')
+      const found = result.find((s: WindowsTweakState) => s.tweak.id === 'test-interface')
       expect(found?.applied).toBe(true)
     })
 
@@ -1003,7 +1004,7 @@ describe('handlers.ts', () => {
 
       const listHandler = mockIpcMainHandle.mock.calls.find((c) => c[0] === 'windows-tweaks:list')![1]
       const result = await listHandler()
-      const found = result.find((s) => s.tweak.id === 'test-interface')
+      const found = result.find((s: WindowsTweakState) => s.tweak.id === 'test-interface')
       expect(found?.applied).toBe(false)
     })
   })

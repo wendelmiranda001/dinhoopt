@@ -10,17 +10,27 @@ const mocks = vi.hoisted(() => ({
     error: vi.fn(),
   },
 
-  execFileAsync: vi.fn(() => Promise.resolve({ stdout: '', stderr: '' })),
-  execNativeUtf8: vi.fn(() => Promise.resolve({ stdout: '', stderr: '' })),
-  psUtf8: vi.fn((cmd: string) => `[Console]::OutputEncoding = ...; ${cmd}`),
+  execFileAsync: vi.fn<(...args: unknown[]) => Promise<{ stdout: string; stderr: string }>>(() =>
+    Promise.resolve({ stdout: '', stderr: '' }),
+  ),
+  execNativeUtf8: vi.fn<(...args: unknown[]) => Promise<{ stdout: string; stderr: string }>>(() =>
+    Promise.resolve({ stdout: '', stderr: '' }),
+  ),
+  psUtf8: vi.fn<(...args: unknown[]) => string>(
+    (...args: unknown[]) => `[Console]::OutputEncoding = ...; ${String(args[0] ?? '')}`,
+  ),
 
   validateStringArray: vi.fn(),
 
-  getDnsCacheEntries: vi.fn(() => Promise.resolve([])),
-  flushDnsCache: vi.fn(() => Promise.resolve(true)),
-  getWifiProfiles: vi.fn(() => Promise.resolve([])),
-  deleteWifiProfile: vi.fn(() => Promise.resolve(true)),
-  clearArpCache: vi.fn(() => Promise.resolve(true)),
+  getDnsCacheEntries: vi.fn<(...args: unknown[]) => Promise<Array<{ domain: string; resolvedAddress: string }>>>(() =>
+    Promise.resolve([]),
+  ),
+  flushDnsCache: vi.fn<(...args: unknown[]) => Promise<boolean>>(() => Promise.resolve(true)),
+  getWifiProfiles: vi.fn<(...args: unknown[]) => Promise<Array<{ name: string; security: string }>>>(() =>
+    Promise.resolve([]),
+  ),
+  deleteWifiProfile: vi.fn<(...args: unknown[]) => Promise<boolean>>(() => Promise.resolve(true)),
+  clearArpCache: vi.fn<(...args: unknown[]) => Promise<boolean>>(() => Promise.resolve(true)),
 }))
 
 function buildPlatformMock() {
@@ -135,7 +145,7 @@ describe('scanNetwork', () => {
     const items = await scanNetwork()
 
     expect(items).toHaveLength(1)
-    expect(items[0].type).toBe('dns-cache')
+    expect(items[0]!.type).toBe('dns-cache')
   })
 
   it('returns empty array when nothing found', async () => {
@@ -175,7 +185,7 @@ describe('scanNetwork', () => {
       expect.objectContaining({ timeout: 10000, windowsHide: true }),
     )
     expect(items).toHaveLength(1)
-    expect(items[0].type).toBe('dns-cache')
+    expect(items[0]!.type).toBe('dns-cache')
   })
 
   it('handles PowerShell DNS count failure gracefully', async () => {
@@ -556,7 +566,7 @@ describe('registerNetworkCleanupIpc', () => {
       const items = await handler()
 
       expect(items).toHaveLength(1)
-      expect(items[0].type).toBe('dns-cache')
+      expect(items[0]!.type).toBe('dns-cache')
     })
   })
 

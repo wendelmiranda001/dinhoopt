@@ -229,7 +229,7 @@ async function scanViaWuComApi(onProgress?: (data: DriverUpdateProgress) => void
   })
 
   const updates: DriverUpdate[] = []
-  const lines = stdout
+  const lines = String(stdout)
     .trim()
     .split('\n')
     .map((l: string) => l.trim())
@@ -340,7 +340,7 @@ async function queryAllInstalledDrivers(): Promise<DriverUpdate[]> {
   const drivers: DriverUpdate[] = []
   const seen = new Set<string>()
 
-  const lines = stdout
+  const lines = String(stdout)
     .trim()
     .split('\n')
     .map((l: string) => l.trim())
@@ -482,7 +482,7 @@ export async function installDriverUpdates(
       windowsHide: true,
     })
 
-    const lines = stdout
+    const lines = String(stdout)
       .trim()
       .split('\n')
       .map((l: string) => l.trim())
@@ -492,7 +492,7 @@ export async function installDriverUpdates(
       if (line.startsWith('STATUS|')) {
         const parts = line.split('|')
         const phase = parts[1] === 'installing' ? ('installing' as const) : ('downloading' as const)
-        const total = Number.parseInt(parts[2], 10) || wuUpdateIds.length
+        const total = Number.parseInt(parts[2]!, 10) || wuUpdateIds.length
         onProgress?.({
           phase,
           current: 0,
@@ -516,8 +516,8 @@ export async function installDriverUpdates(
         errors.push({ deviceName: parts[1] || 'Unknown', reason: parts[2] || 'Install failed' })
       } else if (line.startsWith('RESULT|')) {
         const parts = line.split('|')
-        installed = Number.parseInt(parts[1], 10) || installed
-        failed = Number.parseInt(parts[2], 10) || failed
+        installed = Number.parseInt(parts[1]!, 10) || installed
+        failed = Number.parseInt(parts[2]!, 10) || failed
         rebootRequired = parts[3] === 'True' || parts[3] === 'true'
       }
     }

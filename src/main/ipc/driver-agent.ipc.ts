@@ -69,8 +69,9 @@ export function registerDriverAgentIpc(_getWindow: WindowGetter): void {
         )
         return {
           success: result.failed === 0,
-          error:
-            result.errors.length > 0 ? result.errors.map((e) => `${e.deviceName}: ${e.reason}`).join('; ') : undefined,
+          ...(result.errors.length > 0
+            ? { error: result.errors.map((e) => `${e.deviceName}: ${e.reason}`).join('; ') }
+            : {}),
           rebootRequired: result.rebootRequired,
         }
       } catch (err) {

@@ -31,23 +31,23 @@ function parseInfFile(infPath: string): Partial<DriverStoreEntry> {
     const versionMatch = content.match(/DriverVer\s*=\s*(.+)/i)
     if (versionMatch) {
       // Format: "mm/dd/yyyy,x.y.z.w" or just "x.y.z.w"
-      const parts = versionMatch[1].split(',')
+      const parts = versionMatch[1]!.split(',')
       if (parts.length >= 2) {
-        result.date = parts[0].trim()
-        result.version = parts[1].trim()
+        result.date = parts[0]!.trim()
+        result.version = parts[1]!.trim()
       } else {
-        result.version = parts[0].trim()
+        result.version = parts[0]!.trim()
       }
     }
 
     const providerMatch = content.match(/Provider\s*=\s*%?(.+)%?\s*$/i)
     if (providerMatch) {
-      result.provider = providerMatch[1].trim()
+      result.provider = providerMatch[1]!.trim()
     }
 
     const classMatch = content.match(/^Class\s*=\s*(.+)$/im)
     if (classMatch) {
-      result.className = classMatch[1].trim()
+      result.className = classMatch[1]!.trim()
     }
 
     const classGuidMatch = content.match(/^ClassGUID\s*=\s*(.+)$/im)
@@ -61,7 +61,7 @@ function parseInfFile(infPath: string): Partial<DriverStoreEntry> {
       // Try to find the actual hardware ID string from string definitions
       const stringDef = content.match(new RegExp(`${hwIdMatch[1]}\\s*=\\s*"(.+)"`, 'i'))
       if (stringDef) {
-        result.hardwareId = stringDef[1]
+        result.hardwareId = stringDef[1]!
       }
     }
 
@@ -69,7 +69,7 @@ function parseInfFile(infPath: string): Partial<DriverStoreEntry> {
     if (!result.hardwareId) {
       const directHwId = content.match(/(PCI\\[^\s,;]+|USB\\[^\s,;]+|ACPI\\[^\s,;]+)/i)
       if (directHwId) {
-        result.hardwareId = directHwId[1]
+        result.hardwareId = directHwId[1]!
       }
     }
 
@@ -135,6 +135,7 @@ export async function scanDriverStoreForUpdates(
 
   for (let i = 0; i < folders.length; i++) {
     const folderName = folders[i]
+    if (!folderName) continue
 
     onProgress?.({
       phase: 'checking',
@@ -194,6 +195,7 @@ export async function scanDriverStoreForUpdates(
     // Sort by version descending
     entries.sort((a, b) => compareVersions(b.version, a.version))
     const newest = entries[0]
+    if (!newest) continue
 
     // Check if the active driver is older
     const activeVer = activeDrivers.get(hwId)
@@ -247,7 +249,7 @@ async function getActiveDriverMap(): Promise<Map<string, string>> {
       windowsHide: true,
     })
 
-    for (const line of stdout.split('\n')) {
+    for (const line of String(stdout).split('\n')) {
       const trimmed = line.trim()
       if (!trimmed?.includes('|')) continue
       const [hwId, version] = trimmed.split('|', 2)

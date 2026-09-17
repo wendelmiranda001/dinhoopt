@@ -315,7 +315,7 @@ describe('registerDriverManagerIpc', () => {
       const handler = getHandler('driver:scan')
       await handler()
       expect(mockWin.webContents.send).toHaveBeenCalled()
-      expect(mockWin.webContents.send.mock.calls[0][0]).toBe('driver:progress')
+      expect(mockWin.webContents.send.mock.calls[0]![0]).toBe('driver:progress')
     })
   })
 
@@ -329,7 +329,7 @@ describe('registerDriverManagerIpc', () => {
       const handler = getHandler('driver:update:scan')
       await handler()
       expect(mockWin.webContents.send).toHaveBeenCalled()
-      expect(mockWin.webContents.send.mock.calls[0][0]).toBe('driver:update:progress')
+      expect(mockWin.webContents.send.mock.calls[0]![0]).toBe('driver:update:progress')
     })
   })
 
@@ -372,7 +372,7 @@ describe('scanDrivers', () => {
       .mockResolvedValueOnce({ stdout: '' })
     const result = await scanDrivers()
     expect(result.packages).toHaveLength(1)
-    expect(result.packages[0].publishedName).toBe('oem0.inf')
+    expect(result.packages[0]!.publishedName).toBe('oem0.inf')
   })
 
   it('filters out entries without valid PublishedName', async () => {
@@ -401,7 +401,7 @@ describe('scanDrivers', () => {
       .mockResolvedValueOnce({ stdout: '' })
     const result = await scanDrivers()
     expect(result.packages).toHaveLength(1)
-    expect(result.packages[0].publishedName).toBe('oem0.inf')
+    expect(result.packages[0]!.publishedName).toBe('oem0.inf')
   })
 
   it('falls back to pnputil for active driver detection when WMI fails', async () => {
@@ -423,7 +423,7 @@ describe('scanDrivers', () => {
     mocks.execNativeUtf8.mockResolvedValueOnce({ stdout: 'Driver Name: oem0.inf\n' })
     const result = await scanDrivers()
     expect(result.packages).toHaveLength(1)
-    expect(result.packages[0].isCurrent).toBe(true)
+    expect(result.packages[0]!.isCurrent).toBe(true)
     expect(mocks.execNativeUtf8).toHaveBeenCalledWith('pnputil', ['/enum-devices', '/connected'], expect.any(Object))
   })
 
@@ -581,7 +581,7 @@ describe('scanDrivers', () => {
     mocks.statSync.mockReturnValueOnce({ size: 3000 })
 
     const result = await scanDrivers()
-    expect(result.packages[0].size).toBe(3000)
+    expect(result.packages[0]!.size).toBe(3000)
   })
 
   it('handles empty drivers from parseEnumDrivers', async () => {
@@ -632,8 +632,8 @@ describe('scanDrivers', () => {
 
     const result = await scanDrivers()
     expect(result.packages).toHaveLength(2)
-    expect(result.packages[0].version).toBe('10.0.1')
-    expect(result.packages[1].version).toBe('10.0.1')
+    expect(result.packages[0]!.version).toBe('10.0.1')
+    expect(result.packages[1]!.version).toBe('10.0.1')
   })
 
   it('parses driver date and version from combined field via pnputil fallback', async () => {
@@ -651,8 +651,8 @@ describe('scanDrivers', () => {
 
     const result = await scanDrivers()
     expect(result.packages).toHaveLength(1)
-    expect(result.packages[0].version).toBe('10.0.1')
-    expect(result.packages[0].date).toBe('2024-01-01')
+    expect(result.packages[0]!.version).toBe('10.0.1')
+    expect(result.packages[0]!.date).toBe('2024-01-01')
   })
 })
 
@@ -819,7 +819,7 @@ describe('scanDriverUpdates', () => {
 
     const result = await scanDriverUpdates()
     expect(result.updates).toHaveLength(1)
-    expect(result.updates[0].deviceName).toBe('Intel Graphics')
+    expect(result.updates[0]!.deviceName).toBe('Intel Graphics')
   })
 
   it('falls back to availableDate when version not in title', async () => {
@@ -829,7 +829,7 @@ describe('scanDriverUpdates', () => {
 
     const result = await scanDriverUpdates()
     expect(result.updates).toHaveLength(1)
-    expect(result.updates[0].availableVersion).toBe('2024-06-01')
+    expect(result.updates[0]!.availableVersion).toBe('2024-06-01')
   })
 
   it('falls back to deviceName when updateTitle is empty', async () => {
@@ -839,7 +839,7 @@ describe('scanDriverUpdates', () => {
 
     const result = await scanDriverUpdates()
     expect(result.updates).toHaveLength(1)
-    expect(result.updates[0].updateTitle).toBe('Realtek Audio')
+    expect(result.updates[0]!.updateTitle).toBe('Realtek Audio')
   })
 
   it('handles error with only message property — falls back gracefully', async () => {
@@ -862,8 +862,8 @@ describe('scanDriverUpdates', () => {
     const result = await scanDriverUpdates()
     expect(result.updates).toHaveLength(2)
     // scanDriverUpdates preserves input order before any grouping
-    expect(result.updates[0].availableVersion).toBe('31.0.1')
-    expect(result.updates[1].availableVersion).toBe('31.0.2')
+    expect(result.updates[0]!.availableVersion).toBe('31.0.1')
+    expect(result.updates[1]!.availableVersion).toBe('31.0.2')
   })
 })
 
@@ -1005,6 +1005,6 @@ describe('installDriverUpdates', () => {
 
     const result = await installDriverUpdates(['upd-001'])
     expect(result.failed).toBe(1)
-    expect(result.errors[0].reason).toBe('Install failed')
+    expect(result.errors[0]!.reason).toBe('Install failed')
   })
 })

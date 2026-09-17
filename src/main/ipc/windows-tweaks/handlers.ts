@@ -42,7 +42,7 @@ async function runPsScript(script: string): Promise<string> {
     ['-NoProfile', '-NonInteractive', '-Command', psUtf8(script)],
     { timeout: 30000, windowsHide: true },
   )
-  return stdout
+  return String(stdout)
 }
 
 const POWERCFG_TWEAKS = new Set(['pcie-aspm-off', 'usb-selective-suspend-off', 'processor-min-max'])
@@ -90,10 +90,10 @@ async function applyPowerCfgTweak(tweakId: string, action: 'apply' | 'revert'): 
   const basePowerKey = 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Power\\PowerSettings'
 
   const listOut = await execFileAsync('powercfg', ['/LIST'], { timeout: 10000, windowsHide: true })
-  const guids = [...listOut.stdout.matchAll(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi)].map((m) => m[0])
+  const guids = [...String(listOut.stdout).matchAll(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi)].map((m) => m[0])
 
   const activeOut = await execFileAsync('powercfg', ['/GETACTIVESCHEME'], { timeout: 5000, windowsHide: true })
-  const activeGuid = activeOut.stdout.match(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/i)?.[0]
+  const activeGuid = String(activeOut.stdout).match(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/i)?.[0]
 
   for (const s of settings) {
     const val = s[valueKey]
@@ -136,7 +136,7 @@ async function checkPowerCfgTweak(tweakId: string, expectedValue: number): Promi
     timeout: 10000,
     windowsHide: true,
   })
-  const guidMatch = schemeOut.match(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/i)
+  const guidMatch = String(schemeOut).match(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/i)
   if (!guidMatch) return false
   const schemeGuid = guidMatch[0]
   for (const s of settings) {
@@ -146,7 +146,7 @@ async function checkPowerCfgTweak(tweakId: string, expectedValue: number): Promi
         timeout: 10000,
         windowsHide: true,
       })
-      stdout = result.stdout
+      stdout = String(result.stdout)
     } catch {
       getLogger().warning(
         'windows-tweaks',
@@ -156,7 +156,9 @@ async function checkPowerCfgTweak(tweakId: string, expectedValue: number): Promi
     }
     const match = stdout.match(/Current AC Power Setting Index: 0x([0-9a-fA-F]+)/i)
     if (!match) return false
-    if (Number.parseInt(match[1], 16) !== expectedValue) return false
+    const hex = match[1]
+    if (hex === undefined) return false
+    if (Number.parseInt(hex, 16) !== expectedValue) return false
   }
   return true
 }
@@ -305,7 +307,7 @@ async function checkTweakApplied(tweak: WindowsTweakDef): Promise<boolean> {
       windowsHide: true,
     })
 
-    const lines = stdout
+    const lines = String(stdout)
       .split('\n')
       .map((l) => l.trim())
       .filter(Boolean)

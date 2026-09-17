@@ -1,5 +1,6 @@
 import { IPC } from '@shared/channels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { WindowGetter } from './index'
 
 const mockHandle = vi.fn()
 vi.mock('electron', () => ({
@@ -87,19 +88,20 @@ describe('registerComplianceAuditorIpc', () => {
     const mockWin = { isDestroyed: () => false, webContents: mockWebContents }
     const getWindow = () => mockWin
 
-    vi.mocked(scanCompliance).mockImplementation(async (onProgress: (data: object) => void) => {
-      onProgress({ phase: 'scanning', current: 1, total: 5 })
-      return { checks: [], score: 100, succeeded: 0, failed: 0, errors: [] }
+    vi.mocked(scanCompliance).mockImplementation(async (onProgress) => {
+      onProgress?.({ current: 1, total: 5, currentLabel: 'scanning', category: 'uac' })
+      return { checks: [], score: 100, total: 0, compliant: 0 }
     })
 
-    registerComplianceAuditorIpc(getWindow)
+    registerComplianceAuditorIpc(getWindow as unknown as WindowGetter)
     const scanHandler = mockHandle.mock.calls.find((c: any[]) => c[0] === IPC.COMPLIANCE_SCAN)?.[1]
     await scanHandler()
 
     expect(mockWebContents.send).toHaveBeenCalledWith(IPC.COMPLIANCE_PROGRESS, {
-      phase: 'scanning',
       current: 1,
       total: 5,
+      currentLabel: 'scanning',
+      category: 'uac',
     })
   })
 
@@ -115,12 +117,12 @@ describe('registerComplianceAuditorIpc', () => {
     const mockWin = { isDestroyed: () => false, webContents: mockWebContents }
     const getWindow = () => mockWin
 
-    vi.mocked(scanCompliance).mockImplementation(async (onProgress: (data: object) => void) => {
-      onProgress({ phase: 'scanning' })
-      return { checks: [], score: 100, succeeded: 0, failed: 0, errors: [] }
+    vi.mocked(scanCompliance).mockImplementation(async (onProgress) => {
+      onProgress?.({ current: 1, total: 5, currentLabel: 'scanning', category: 'uac' })
+      return { checks: [], score: 100, total: 0, compliant: 0 }
     })
 
-    registerComplianceAuditorIpc(getWindow)
+    registerComplianceAuditorIpc(getWindow as unknown as WindowGetter)
     const scanHandler = mockHandle.mock.calls.find((c: any[]) => c[0] === IPC.COMPLIANCE_SCAN)?.[1]
 
     await expect(scanHandler()).resolves.not.toThrow()

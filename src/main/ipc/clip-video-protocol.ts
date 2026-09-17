@@ -20,7 +20,7 @@ const MIME_TYPES: Readonly<Record<string, string>> = {
 }
 
 function toWebStream(stream: import('node:stream').Readable): ReadableStream<Uint8Array> {
-  return Readable.toWeb(stream)
+  return Readable.toWeb(stream) as ReadableStream<Uint8Array>
 }
 
 /**

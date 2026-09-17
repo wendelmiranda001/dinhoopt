@@ -1,4 +1,5 @@
 import type { RegistryEntry } from '@shared/types'
+import type { BrowserWindow } from 'electron'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { collectBackupTargets, fixRegistryEntries, registerRegistryCleanerIpc, scanRegistry } from './handlers'
 
@@ -48,7 +49,7 @@ const mockHandlers = new Map<string, (...args: unknown[]) => unknown>()
 
 vi.mock('electron', () => ({
   ipcMain: {
-    handle: vi.fn((channel: string, handler: unknown) => {
+    handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => {
       mockHandlers.set(channel, handler)
     }),
   },
@@ -59,7 +60,7 @@ vi.mock('../../services/ipc-validation', () => ({
 }))
 
 vi.mock('../../services/logger.service', () => ({
-  getLogger: (...args: unknown[]) => mockGetLogger(...args),
+  getLogger: () => mockGetLogger(),
 }))
 
 vi.mock('../../services/registry-cleaner.service', () => ({
@@ -89,21 +90,20 @@ const loggerInstance = (mockGetLogger as ReturnType<typeof vi.fn>).mock.results[
 
 let savedPlatform: string
 
-function callHandler(channel: string, ...args: unknown[]) {
+function callHandler<T>(channel: string, ...args: unknown[]): Promise<T> {
   const handler = mockHandlers.get(channel)
   if (!handler) throw new Error(`No handler for ${channel}`)
-  return handler({}, ...args)
+  return handler({}, ...args) as Promise<T>
 }
 
 const mockEntry: RegistryEntry = {
   id: 'test-entry-1',
-  path: 'HKLM\\SOFTWARE\\Test',
-  key: 'TestKey',
-  value: 'bad',
-  kind: 'REG_SZ',
-  category: 'obsolete',
-  severity: 'low',
-  description: 'Test entry',
+  type: 'obsolete',
+  keyPath: 'HKLM\\SOFTWARE\\Test',
+  valueName: 'TestKey',
+  issue: 'Test entry',
+  risk: 'low',
+  selected: false,
 }
 
 describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
@@ -127,7 +127,7 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
   describe('REGISTRY_SCAN', () => {
     it('returns empty on non-win32', async () => {
       Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
-      const result = await callHandler('cleaner:registry:scan')
+      const result = await callHandler<RegistryEntry[]>('cleaner:registry:scan')
       expect(result).toEqual([])
       expect(loggerInstance.warning).toHaveBeenCalledWith('registry-cleaner', 'Registry scan skipped — not Windows')
     })
@@ -135,29 +135,29 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
     it('returns entries on successful scan', async () => {
       mockScanRegistry.mockResolvedValue([mockEntry])
       mockGetSettings.mockReturnValue({ registryIgnoredTweaks: [] })
-      const result = await callHandler('cleaner:registry:scan')
+      const result = await callHandler<RegistryEntry[]>('cleaner:registry:scan')
       expect(result).toHaveLength(1)
-      expect(result[0].id).toBe('test-entry-1')
+      expect(result[0]!.id).toBe('test-entry-1')
     })
 
     it('applies ignored tweaks after scan', async () => {
       mockScanRegistry.mockResolvedValue([mockEntry])
       mockGetSettings.mockReturnValue({ registryIgnoredTweaks: ['sig1'] })
-      await callHandler('cleaner:registry:scan')
+      await callHandler<RegistryEntry[]>('cleaner:registry:scan')
       expect(mockApplyIgnoredTweaks).toHaveBeenCalledWith([mockEntry], ['sig1'])
     })
 
     it('handles empty registryIgnoredTweaks', async () => {
       mockScanRegistry.mockResolvedValue([])
       mockGetSettings.mockReturnValue({})
-      await callHandler('cleaner:registry:scan')
+      await callHandler<RegistryEntry[]>('cleaner:registry:scan')
       expect(mockApplyIgnoredTweaks).toHaveBeenCalledWith([], [])
     })
 
     it('stores scan results in session', async () => {
       mockScanRegistry.mockResolvedValue([mockEntry])
       mockGetSettings.mockReturnValue({ registryIgnoredTweaks: [] })
-      await callHandler('cleaner:registry:scan')
+      await callHandler<RegistryEntry[]>('cleaner:registry:scan')
       expect(mockState.scanSessions.size).toBe(1)
     })
 
@@ -168,7 +168,7 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
 
       mockScanRegistry.mockResolvedValue([])
       mockGetSettings.mockReturnValue({ registryIgnoredTweaks: [] })
-      await callHandler('cleaner:registry:scan')
+      await callHandler<RegistryEntry[]>('cleaner:registry:scan')
       expect(abortSpy).toHaveBeenCalled()
     })
 
@@ -178,7 +178,7 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
         throw new DOMException('The operation was aborted', 'AbortError')
       })
 
-      const result = await callHandler('cleaner:registry:scan')
+      const result = await callHandler<RegistryEntry[]>('cleaner:registry:scan')
       expect(result).toEqual([])
       expect(loggerInstance.info).toHaveBeenCalledWith('registry-cleaner', 'Registry scan cancelled')
     })
@@ -187,7 +187,7 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       mockScanRegistry.mockRejectedValue(new Error('real error'))
       mockGetSettings.mockReturnValue({ registryIgnoredTweaks: [] })
 
-      await expect(callHandler('cleaner:registry:scan')).rejects.toThrow('real error')
+      await expect(callHandler<RegistryEntry[]>('cleaner:registry:scan')).rejects.toThrow('real error')
       expect(loggerInstance.error).toHaveBeenCalledWith('registry-cleaner', 'Registry scan failed: real error')
     })
 
@@ -195,21 +195,21 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       mockScanRegistry.mockRejectedValue('string error')
       mockGetSettings.mockReturnValue({ registryIgnoredTweaks: [] })
 
-      await expect(callHandler('cleaner:registry:scan')).rejects.toBe('string error')
+      await expect(callHandler<RegistryEntry[]>('cleaner:registry:scan')).rejects.toBe('string error')
       expect(loggerInstance.error).toHaveBeenCalledWith('registry-cleaner', 'Registry scan failed: Unknown error')
     })
 
     it('clears scanAbort in finally block', async () => {
       mockScanRegistry.mockResolvedValue([])
       mockGetSettings.mockReturnValue({ registryIgnoredTweaks: [] })
-      await callHandler('cleaner:registry:scan')
+      await callHandler<RegistryEntry[]>('cleaner:registry:scan')
       expect(mockState.scanAbort).toBeNull()
     })
 
     it('clears scanAbort on error in finally', async () => {
       mockScanRegistry.mockRejectedValue(new Error('fail'))
       mockGetSettings.mockReturnValue({ registryIgnoredTweaks: [] })
-      await expect(callHandler('cleaner:registry:scan')).rejects.toThrow()
+      await expect(callHandler<RegistryEntry[]>('cleaner:registry:scan')).rejects.toThrow()
       expect(mockState.scanAbort).toBeNull()
     })
 
@@ -218,7 +218,7 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       mockGetSettings.mockReturnValue({ registryIgnoredTweaks: [] })
 
       for (let i = 0; i < 6; i++) {
-        await callHandler('cleaner:registry:scan')
+        await callHandler<RegistryEntry[]>('cleaner:registry:scan')
       }
       expect(mockState.scanSessions.size).toBeLessThanOrEqual(4)
     })
@@ -227,13 +227,21 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
   describe('REGISTRY_FIX', () => {
     it('returns zeros on non-win32', async () => {
       Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
-      const result = await callHandler('cleaner:registry:fix', ['id1'])
+      const result = await callHandler<{
+        fixed: number
+        failed: number
+        failures: { issue: string; reason: string }[]
+      }>('cleaner:registry:fix', ['id1'])
       expect(result).toEqual({ fixed: 0, failed: 0, failures: [] })
     })
 
     it('returns zeros when validation fails', async () => {
       mockValidateStringArray.mockReturnValue(null)
-      const result = await callHandler('cleaner:registry:fix', [123])
+      const result = await callHandler<{
+        fixed: number
+        failed: number
+        failures: { issue: string; reason: string }[]
+      }>('cleaner:registry:fix', [123])
       expect(result).toEqual({ fixed: 0, failed: 0, failures: [] })
     })
 
@@ -245,7 +253,11 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       sessionMap.set('test-entry-1', mockEntry)
       mockState.scanSessions.set('session-1', sessionMap)
 
-      const result = await callHandler('cleaner:registry:fix', ['test-entry-1'])
+      const result = await callHandler<{
+        fixed: number
+        failed: number
+        failures: { issue: string; reason: string }[]
+      }>('cleaner:registry:fix', ['test-entry-1'])
       expect(result.fixed).toBe(1)
       expect(result.failed).toBe(0)
     })
@@ -262,7 +274,11 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       sessionMap.set('test-entry-1', mockEntry)
       mockState.scanSessions.set('session-1', sessionMap)
 
-      const result = await callHandler('cleaner:registry:fix', ['test-entry-1'])
+      const result = await callHandler<{
+        fixed: number
+        failed: number
+        failures: { issue: string; reason: string }[]
+      }>('cleaner:registry:fix', ['test-entry-1'])
       expect(result.failed).toBe(1)
     })
 
@@ -270,7 +286,11 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       mockValidateStringArray.mockReturnValue(['nonexistent-id'])
       mockFixRegistryEntries.mockResolvedValue({ fixed: 0, failed: 0, failures: [] })
 
-      const result = await callHandler('cleaner:registry:fix', ['nonexistent-id'])
+      const result = await callHandler<{
+        fixed: number
+        failed: number
+        failures: { issue: string; reason: string }[]
+      }>('cleaner:registry:fix', ['nonexistent-id'])
       expect(result).toEqual({ fixed: 0, failed: 0, failures: [] })
       expect(mockFixRegistryEntries).toHaveBeenCalledWith([], expect.any(Function), expect.anything())
     })
@@ -288,11 +308,17 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       sessionMap.set('test-entry-1', mockEntry)
       mockState.scanSessions.set('session-1', sessionMap)
 
-      const mockWin = { webContents: { send: vi.fn() }, isDestroyed: vi.fn().mockReturnValue(false) }
+      const mockWin = {
+        webContents: { send: vi.fn() },
+        isDestroyed: vi.fn().mockReturnValue(false),
+      } as unknown as BrowserWindow
       mockHandlers.clear()
       registerRegistryCleanerIpc(() => mockWin)
 
-      await callHandler('cleaner:registry:fix', ['test-entry-1'])
+      await callHandler<{ fixed: number; failed: number; failures: { issue: string; reason: string }[] }>(
+        'cleaner:registry:fix',
+        ['test-entry-1'],
+      )
       expect(mockWin.webContents.send).toHaveBeenCalledWith(
         'registry:fix:progress',
         expect.objectContaining({ current: 1, total: 1 }),
@@ -312,11 +338,17 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       sessionMap.set('test-entry-1', mockEntry)
       mockState.scanSessions.set('s', sessionMap)
 
-      const mockWin = { webContents: { send: vi.fn() }, isDestroyed: vi.fn().mockReturnValue(true) }
+      const mockWin = {
+        webContents: { send: vi.fn() },
+        isDestroyed: vi.fn().mockReturnValue(true),
+      } as unknown as BrowserWindow
       mockHandlers.clear()
       registerRegistryCleanerIpc(() => mockWin)
 
-      await callHandler('cleaner:registry:fix', ['test-entry-1'])
+      await callHandler<{ fixed: number; failed: number; failures: { issue: string; reason: string }[] }>(
+        'cleaner:registry:fix',
+        ['test-entry-1'],
+      )
       expect(mockWin.webContents.send).not.toHaveBeenCalled()
     })
 
@@ -328,7 +360,10 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       mockValidateStringArray.mockReturnValue([])
       mockFixRegistryEntries.mockResolvedValue({ fixed: 0, failed: 0, failures: [] })
 
-      await callHandler('cleaner:registry:fix', [])
+      await callHandler<{ fixed: number; failed: number; failures: { issue: string; reason: string }[] }>(
+        'cleaner:registry:fix',
+        [],
+      )
       expect(abortSpy).toHaveBeenCalled()
     })
 
@@ -346,11 +381,15 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
         },
       )
 
-      const result = await callHandler('cleaner:registry:fix', ['test-entry-1'])
+      const result = await callHandler<{
+        fixed: number
+        failed: number
+        failures: { issue: string; reason: string }[]
+      }>('cleaner:registry:fix', ['test-entry-1'])
       expect(result.fixed).toBe(0)
       expect(result.failed).toBe(0)
       expect(result.failures).toHaveLength(1)
-      expect(result.failures[0].issue).toBe('Cancelled')
+      expect(result.failures[0]!.issue).toBe('Cancelled')
     })
 
     it('throws non-abort fix errors', async () => {
@@ -361,7 +400,12 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       sessionMap.set('test-entry-1', mockEntry)
       mockState.scanSessions.set('s', sessionMap)
 
-      await expect(callHandler('cleaner:registry:fix', ['test-entry-1'])).rejects.toThrow('fix error')
+      await expect(
+        callHandler<{ fixed: number; failed: number; failures: { issue: string; reason: string }[] }>(
+          'cleaner:registry:fix',
+          ['test-entry-1'],
+        ),
+      ).rejects.toThrow('fix error')
     })
 
     it('handles non-Error thrown values during fix', async () => {
@@ -372,13 +416,21 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       sessionMap.set('test-entry-1', mockEntry)
       mockState.scanSessions.set('s', sessionMap)
 
-      await expect(callHandler('cleaner:registry:fix', ['test-entry-1'])).rejects.toBe(42)
+      await expect(
+        callHandler<{ fixed: number; failed: number; failures: { issue: string; reason: string }[] }>(
+          'cleaner:registry:fix',
+          ['test-entry-1'],
+        ),
+      ).rejects.toBe(42)
     })
 
     it('clears fixAbort in finally block', async () => {
       mockValidateStringArray.mockReturnValue([])
       mockFixRegistryEntries.mockResolvedValue({ fixed: 0, failed: 0, failures: [] })
-      await callHandler('cleaner:registry:fix', [])
+      await callHandler<{ fixed: number; failed: number; failures: { issue: string; reason: string }[] }>(
+        'cleaner:registry:fix',
+        [],
+      )
       expect(mockState.fixAbort).toBeNull()
     })
 
@@ -390,7 +442,12 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       sessionMap.set('test-entry-1', mockEntry)
       mockState.scanSessions.set('s', sessionMap)
 
-      await expect(callHandler('cleaner:registry:fix', ['test-entry-1'])).rejects.toThrow()
+      await expect(
+        callHandler<{ fixed: number; failed: number; failures: { issue: string; reason: string }[] }>(
+          'cleaner:registry:fix',
+          ['test-entry-1'],
+        ),
+      ).rejects.toThrow()
       expect(mockState.fixAbort).toBeNull()
     })
 
@@ -406,7 +463,11 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       mockState.scanSessions.set('s1', session1)
       mockState.scanSessions.set('s2', session2)
 
-      const result = await callHandler('cleaner:registry:fix', ['test-entry-1', 'entry-2'])
+      const result = await callHandler<{
+        fixed: number
+        failed: number
+        failures: { issue: string; reason: string }[]
+      }>('cleaner:registry:fix', ['test-entry-1', 'entry-2'])
       expect(mockFixRegistryEntries).toHaveBeenCalledWith([mockEntry, entry2], expect.any(Function), expect.anything())
       expect(result.fixed).toBe(2)
     })
@@ -422,7 +483,10 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       mockState.scanSessions.set('s1', session1)
       mockState.scanSessions.set('s2', session2)
 
-      await callHandler('cleaner:registry:fix', ['test-entry-1'])
+      await callHandler<{ fixed: number; failed: number; failures: { issue: string; reason: string }[] }>(
+        'cleaner:registry:fix',
+        ['test-entry-1'],
+      )
       expect(mockFixRegistryEntries).toHaveBeenCalledWith([mockEntry], expect.any(Function), expect.anything())
     })
 
@@ -434,8 +498,11 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       sessionMap.set('test-entry-1', mockEntry)
       mockState.scanSessions.set('s', sessionMap)
 
-      await callHandler('cleaner:registry:fix', ['test-entry-1'])
-      const callArgs = mockFixRegistryEntries.mock.calls[0]
+      await callHandler<{ fixed: number; failed: number; failures: { issue: string; reason: string }[] }>(
+        'cleaner:registry:fix',
+        ['test-entry-1'],
+      )
+      const callArgs = mockFixRegistryEntries.mock.calls[0]!
       expect(callArgs[2]).toBeInstanceOf(AbortSignal)
     })
 
@@ -455,7 +522,11 @@ describe('registry-cleaner/handlers.ts — registerRegistryCleanerIpc', () => {
       mockHandlers.clear()
       registerRegistryCleanerIpc(() => null)
 
-      const result = await callHandler('cleaner:registry:fix', ['test-entry-1'])
+      const result = await callHandler<{
+        fixed: number
+        failed: number
+        failures: { issue: string; reason: string }[]
+      }>('cleaner:registry:fix', ['test-entry-1'])
       expect(result.fixed).toBe(1)
     })
   })

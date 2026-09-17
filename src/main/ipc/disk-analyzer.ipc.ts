@@ -139,7 +139,7 @@ export async function getDrives(): Promise<DriveInfo[]> {
     })
 
     const drives: DriveInfo[] = []
-    for (const line of stdout.trim().split('\n')) {
+    for (const line of String(stdout).trim().split('\n')) {
       const [letter, label, used, free] = line.trim().split('|')
       if (letter && used && free) {
         const usedSpace = Number.parseInt(used, 10) || 0

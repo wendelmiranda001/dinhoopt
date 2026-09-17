@@ -936,7 +936,7 @@ describe('WINDOWS_TWEAKS_NETSH_TCP handler', () => {
     stubExecFile({ stdout: 'ERROR: Access denied' })
     registerWindowsTweaksIpc(() => null)
     const handler = getHandler('windows-tweaks:netsh-tcp')
-    const result = await handler({}, 'apply')
+    const result = (await handler({}, 'apply')) as { success: boolean; error?: string }
     expect(result.success).toBe(false)
     expect(result.error).toBe('Access denied')
   })
@@ -945,7 +945,7 @@ describe('WINDOWS_TWEAKS_NETSH_TCP handler', () => {
     stubExecFile('', new Error('PowerShell not found'))
     registerWindowsTweaksIpc(() => null)
     const handler = getHandler('windows-tweaks:netsh-tcp')
-    const result = await handler({}, 'apply')
+    const result = (await handler({}, 'apply')) as { success: boolean; error?: string }
     expect(result.success).toBe(false)
     expect(result.error).toBeTruthy()
   })
@@ -1012,7 +1012,7 @@ describe('applyRegistryTweak ntfs-last-access-off', () => {
     })
     registerWindowsTweaksIpc(() => null)
     const handler = getHandler('windows-tweaks:apply')
-    const result = await handler({}, ['ntfs-last-access-off'])
+    const result = (await handler({}, ['ntfs-last-access-off'])) as { succeeded: number }
     expect(result.succeeded).toBe(1)
     expect(cmds.some((c) => c.includes('fsutil'))).toBe(true)
   })
@@ -1037,7 +1037,7 @@ describe('revertRegistryTweak ntfs-last-access-off', () => {
     })
     registerWindowsTweaksIpc(() => null)
     const handler = getHandler('windows-tweaks:revert')
-    const result = await handler({}, ['ntfs-last-access-off'])
+    const result = (await handler({}, ['ntfs-last-access-off'])) as { succeeded: number }
     expect(result.succeeded).toBe(1)
     expect(cmds.some((c) => c.includes('fsutil'))).toBe(true)
   })
@@ -1128,7 +1128,7 @@ describe('applyPowerCfgTweak without active GUID', () => {
     })
     registerWindowsTweaksIpc(() => null)
     const handler = getHandler('windows-tweaks:apply')
-    const result = await handler({}, ['pcie-aspm-off'])
+    const result = (await handler({}, ['pcie-aspm-off'])) as { succeeded: number }
     expect(result.succeeded).toBe(1)
     // Should NOT call /SETACTIVE since there's no active GUID
     expect(cmds.some((c) => c.includes('/SETACTIVE'))).toBe(false)

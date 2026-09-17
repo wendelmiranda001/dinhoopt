@@ -40,10 +40,11 @@ Get-ChildItem -Path '${dir.replace(/'/g, "''")}' -Filter '*.lnk' -Recurse -Error
     const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', psUtf8(psScript)], {
       timeout: 30000,
       windowsHide: true,
+      encoding: 'utf-8',
     })
 
     const results: ShortcutInfo[] = []
-    for (const line of stdout.trim().split('\n')) {
+    for (const line of String(stdout).trim().split('\n')) {
       const trimmed = line.trim()
       if (!trimmed) continue
       const sepIdx = trimmed.lastIndexOf('|')

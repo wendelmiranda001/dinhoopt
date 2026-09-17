@@ -12,7 +12,7 @@ const mockRegisterGaming = vi.fn()
 vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn((channel: string, handler: unknown) => {
-      mockHandlers.set(channel, handler)
+      mockHandlers.set(channel, handler as (...args: unknown[]) => unknown)
     }),
   },
 }))

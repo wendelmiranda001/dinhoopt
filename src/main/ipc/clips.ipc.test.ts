@@ -127,6 +127,8 @@ function resetEngineMocks(): void {
   mockInvalidateDurationCache.mockReset()
 }
 
+import type { NonSharedBuffer } from 'node:buffer'
+import type { ExecFileException, ExecFileOptions } from 'node:child_process'
 import { execFile, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { access, stat as fsStat, mkdir, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
@@ -137,9 +139,9 @@ import { config as clipsConfig } from '../services/clips-config-manager'
 import { registerClipsIpc } from './clips.ipc'
 import { resetClipsCache, stopEngineProcess } from './clips-engine-connection'
 
-function captureHandlers(): Map<string, (...args: unknown[]) => unknown> {
-  const handlers = new Map<string, (...args: unknown[]) => unknown>()
-  vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: (...args: unknown[]) => unknown) => {
+function captureHandlers(): Map<string, (...args: any[]) => any> {
+  const handlers = new Map<string, (...args: any[]) => any>()
+  vi.mocked(ipcMain.handle).mockImplementation((channel, handler) => {
     handlers.set(channel, handler)
     return undefined as never
   })
@@ -147,12 +149,12 @@ function captureHandlers(): Map<string, (...args: unknown[]) => unknown> {
   return handlers
 }
 
-function getSyncHandler<T>(handlers: Map<string, (...args: unknown[]) => unknown>, channel: string): () => T {
+function getSyncHandler<T>(handlers: Map<string, (...args: any[]) => any>, channel: string): () => T {
   const handler = handlers.get(channel)!
   return () => handler() as T
 }
 
-function getAsyncHandler(handlers: Map<string, (...args: unknown[]) => unknown>, channel: string) {
+function getAsyncHandler(handlers: Map<string, (...args: any[]) => any>, channel: string) {
   return handlers.get(channel)!
 }
 
@@ -233,9 +235,15 @@ describe('CLIPS_LIST_CLIPS', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', stderr)
         return undefined as never
@@ -356,9 +364,15 @@ describe('CLIPS_LIST_CLIPS', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(new Error('ffmpeg not found'), '', '')
         return undefined as never
@@ -827,7 +841,6 @@ describe('CLIPS_SELECT_OUTPUT_DIR', () => {
     vi.mocked(dialog.showOpenDialog).mockResolvedValue({
       canceled: false,
       filePaths: ['D:\\Clipes'],
-      bookmarks: undefined,
     })
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_SELECT_OUTPUT_DIR)
@@ -837,7 +850,7 @@ describe('CLIPS_SELECT_OUTPUT_DIR', () => {
 
   it('returns null when dialog is canceled', async () => {
     const { dialog } = await import('electron')
-    vi.mocked(dialog.showOpenDialog).mockResolvedValue({ canceled: true, filePaths: [], bookmarks: undefined })
+    vi.mocked(dialog.showOpenDialog).mockResolvedValue({ canceled: true, filePaths: [] })
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_SELECT_OUTPUT_DIR)
     const result = (await handler()) as string | null
@@ -850,7 +863,6 @@ describe('CLIPS_SELECT_OUTPUT_DIR', () => {
     vi.mocked(dialog.showOpenDialog).mockResolvedValue({
       canceled: false,
       filePaths: ['D:\\Clipes'],
-      bookmarks: undefined,
     })
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_SELECT_OUTPUT_DIR)
@@ -1092,9 +1104,15 @@ describe('CLIPS_GET_RUNNING_PROCESSES', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '"chrome.exe","1234"\n"explorer.exe","5678"\n', '')
         return undefined as never
@@ -1112,9 +1130,15 @@ describe('CLIPS_GET_RUNNING_PROCESSES', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '"chrome.exe","1234"\ninvalid line\n"good.exe","9999"\n', '')
         return undefined as never
@@ -1130,9 +1154,15 @@ describe('CLIPS_GET_RUNNING_PROCESSES', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(new Error('tasklist not found'), '', '')
         return undefined as never
@@ -1148,9 +1178,15 @@ describe('CLIPS_GET_RUNNING_PROCESSES', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return undefined as never
@@ -1503,9 +1539,15 @@ describe('CLIPS_TRIM_CLIP', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -1525,9 +1567,15 @@ describe('CLIPS_TRIM_CLIP', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -1548,9 +1596,15 @@ describe('CLIPS_TRIM_CLIP', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -1569,9 +1623,15 @@ describe('CLIPS_TRIM_CLIP', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -1581,7 +1641,7 @@ describe('CLIPS_TRIM_CLIP', () => {
     const handler = getAsyncHandler(handlers, IPC.CLIPS_TRIM_CLIP)
     const result = (await handler({}, 'clip.mp4', 10, 20)) as ClipTrimResult
     expect(result.success).toBe(true)
-    const args = vi.mocked(execFile).mock.calls[0][1]
+    const args = vi.mocked(execFile).mock.calls[0]?.[1] as string[]
     expect(args).toContain('-c')
     expect(args).toContain('copy')
     expect(args).not.toContain('libx264')
@@ -1593,9 +1653,15 @@ describe('CLIPS_TRIM_CLIP', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -1605,7 +1671,7 @@ describe('CLIPS_TRIM_CLIP', () => {
     const handler = getAsyncHandler(handlers, IPC.CLIPS_TRIM_CLIP)
     const result = (await handler({}, 'clip.mp4', 10, 20, true)) as ClipTrimResult
     expect(result.success).toBe(true)
-    const args = vi.mocked(execFile).mock.calls[0][1]
+    const args = vi.mocked(execFile).mock.calls[0]?.[1] as string[]
     expect(args).toContain('libx264')
     expect(args).toContain('-c:v')
     expect(args).toContain('-crf')
@@ -1617,9 +1683,15 @@ describe('CLIPS_TRIM_CLIP', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(new Error('ffmpeg error'), '', '')
         return mockFFProc as never
@@ -1666,12 +1738,18 @@ describe('CLIPS_TRIM_CLIP', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        args: readonly string[],
+        args: readonly string[] | null | undefined,
         _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (!cb) return mockFFProc as never
-        if (args.includes('-hide_banner')) {
+        if (args?.includes('-hide_banner')) {
           cb(null, '', '  Stream #0:0: Video: h264 (High), yuv420p, 1280x720, 60 fps, 60 tbr')
         } else {
           cb(null, '', '')
@@ -1735,9 +1813,15 @@ describe('CLIPS_TRIM_CLIP', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -1757,9 +1841,15 @@ describe('CLIPS_TRIM_CLIP', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -1780,9 +1870,15 @@ describe('CLIPS_TRIM_CLIP', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -1802,9 +1898,15 @@ describe('CLIPS_TRIM_CLIP', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -1862,9 +1964,15 @@ describe('CLIPS_MERGE_CLIPS', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -1884,9 +1992,15 @@ describe('CLIPS_MERGE_CLIPS', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(new Error('merge failed'), '', '')
         return mockFFProc as never
@@ -1931,9 +2045,15 @@ describe('CLIPS_MERGE_CLIPS', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -1962,9 +2082,15 @@ describe('CLIPS_MERGE_CLIPS', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -1974,7 +2100,7 @@ describe('CLIPS_MERGE_CLIPS', () => {
     const handler = getAsyncHandler(handlers, IPC.CLIPS_MERGE_CLIPS)
     const result = (await handler({}, ['clip1.mp4', 'clip2.mp4'])) as ClipMergeResult
     expect(result.success).toBe(true)
-    const args = vi.mocked(execFile).mock.calls[0][1] as string[]
+    const args = vi.mocked(execFile).mock.calls[0]?.[1] as string[]
     expect(args).toContain('copy')
     expect(args).not.toContain('libx264')
     expect(args).not.toContain('-vf')
@@ -1986,9 +2112,15 @@ describe('CLIPS_MERGE_CLIPS', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -2015,12 +2147,18 @@ describe('CLIPS_MERGE_CLIPS', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        args: readonly string[],
+        args: readonly string[] | null | undefined,
         _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (!cb) return mockFFProc as never
-        if (args.includes('-hide_banner')) {
+        if (args?.includes('-hide_banner')) {
           cb(null, '', '  Stream #0:0: Video: h264 (High), yuv420p, 1280x720, 60 fps, 60 tbr')
         } else {
           cb(null, '', '')
@@ -2051,9 +2189,15 @@ describe('CLIPS_MERGE_CLIPS', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -2063,7 +2207,7 @@ describe('CLIPS_MERGE_CLIPS', () => {
     const handler = getAsyncHandler(handlers, IPC.CLIPS_MERGE_CLIPS)
     const result = (await handler({}, ['clip1.mp4', 'clip2.mp4'], 'sr')) as ClipMergeResult
     expect(result.success).toBe(true)
-    const args = vi.mocked(execFile).mock.calls[0][1] as string[]
+    const args = vi.mocked(execFile).mock.calls[0]?.[1] as string[]
     expect(args).toContain('copy')
     expect(args).not.toContain('libx264')
     expect(args).not.toContain('-vf')
@@ -2075,9 +2219,15 @@ describe('CLIPS_MERGE_CLIPS', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -2099,9 +2249,15 @@ describe('CLIPS_MERGE_CLIPS', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', '')
         return mockFFProc as never
@@ -2286,9 +2442,15 @@ describe('CLIPS_GET_DURATIONS', () => {
     vi.mocked(execFile).mockImplementation(
       (
         _cmd: string,
-        _args: readonly string[],
-        _opts: unknown,
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
       ) => {
         if (cb) cb(null, '', stderr)
         return undefined as never

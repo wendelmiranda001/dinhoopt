@@ -402,7 +402,7 @@ vi.mock('../services/scan-cache', () => ({
   cacheItems: (...args: unknown[]) => mockCacheItems(...args),
 }))
 
-import type { CleanResult } from '@shared/types'
+import type { CleanResult, ScanResult } from '@shared/types'
 import { registerShortcutCleanerIpc } from './shortcut-cleaner.ipc'
 
 function getHandler(channel: string): (...args: unknown[]) => unknown {
@@ -417,10 +417,6 @@ function mockWindow() {
 
 const defaultPlatform = process.platform
 
-// Save original env
-const _origEnv = { ...process.env }
-// Common homedir
-const _HOME_DIR = '/home/user'
 const WIN_HOME = 'C:\\Users\\User'
 
 function setPlatform(p: string) {
@@ -498,7 +494,7 @@ describe('registerShortcutCleanerIpc: SHORTCUT_SCAN', () => {
 
       registerShortcutCleanerIpc(() => mockWindow() as never)
       const handler = getHandler('cleaner:shortcut:scan')
-      const results = await handler()
+      const results = (await handler()) as ScanResult[]
 
       expect(results).toHaveLength(1)
       expect(results[0]!.subcategory).toBe('Desktop Shortcuts')
@@ -615,7 +611,7 @@ describe('registerShortcutCleanerIpc: SHORTCUT_SCAN', () => {
 
       registerShortcutCleanerIpc(() => null)
       const handler = getHandler('cleaner:shortcut:scan')
-      const results = await handler()
+      const results = (await handler()) as ScanResult[]
 
       expect(results).toHaveLength(1)
       expect(results[0]!.items).toHaveLength(1)
@@ -629,7 +625,7 @@ describe('registerShortcutCleanerIpc: SHORTCUT_SCAN', () => {
 
       registerShortcutCleanerIpc(() => mockWindow() as never)
       const handler = getHandler('cleaner:shortcut:scan')
-      const results = await handler()
+      const results = (await handler()) as ScanResult[]
 
       expect(results).toHaveLength(1)
       expect(results[0]!.items[0]!.size).toBe(0)

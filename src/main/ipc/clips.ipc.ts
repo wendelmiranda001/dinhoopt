@@ -6,7 +6,6 @@ import type {
   AudioSessionInfo,
   ClipInfo,
   ClipMergeResult,
-  ClipsConfig,
   ClipTrimResult,
   HotkeyBinding,
   IpcResult,
@@ -139,10 +138,11 @@ export function registerClipsIpc(): void {
       return { success: true }
     }
     const result = await sendWithFallback('stopCapture')
-    if (result.success) {
-      setEngineCapturing(false)
+    if (!result.success) {
+      return { success: false, error: result.error ?? 'Failed to stop capture' }
     }
-    return result
+    setEngineCapturing(false)
+    return { success: true }
   })
 
   ipcMain.handle(IPC.CLIPS_SAVE_CLIP, async (): Promise<IpcResult> => {
@@ -258,22 +258,23 @@ export function registerClipsIpc(): void {
       getLogger().warning('clips', 'RenameClip failed: Invalid new name')
       return { success: false, error: 'Invalid new name' }
     }
-    if (newName.endsWith('.mp4')) {
-      newName = newName.slice(0, -4)
+    let resolvedName = newName
+    if (resolvedName.endsWith('.mp4')) {
+      resolvedName = resolvedName.slice(0, -4)
     }
-    if (!newName) {
+    if (!resolvedName) {
       getLogger().warning('clips', 'RenameClip failed: Invalid new name (empty after stripping .mp4)')
       return { success: false, error: 'Invalid new name' }
     }
-    newName = `${newName}.mp4`
+    resolvedName = `${resolvedName}.mp4`
     const oldPath = clipPathInOutputDir(clipName)
     if (!oldPath) {
       getLogger().warning('clips', `RenameClip failed: Invalid old clip name '${clipName}'`)
       return { success: false, error: 'Invalid old clip name' }
     }
-    const newPath = clipPathInOutputDir(newName)
+    const newPath = clipPathInOutputDir(resolvedName)
     if (!newPath) {
-      getLogger().warning('clips', `RenameClip failed: Invalid new clip name '${newName}'`)
+      getLogger().warning('clips', `RenameClip failed: Invalid new clip name '${resolvedName}'`)
       return { success: false, error: 'Invalid new clip name' }
     }
     try {
@@ -282,14 +283,14 @@ export function registerClipsIpc(): void {
         return { success: false, error: 'Clip not found' }
       }
       if (await fileExists(newPath)) {
-        getLogger().warning('clips', `RenameClip failed: A clip named '${newName}' already exists`)
+        getLogger().warning('clips', `RenameClip failed: A clip named '${resolvedName}' already exists`)
         return { success: false, error: 'A clip with that name already exists' }
       }
       await rename(oldPath, newPath)
       const outputDir = getDefaultOutputDir()
       const oldThumbPath = getCachedThumbnailPath(outputDir, clipName)
       if (oldThumbPath && (await fileExists(oldThumbPath))) {
-        const newThumbPath = join(outputDir, '.thumbnails', `${newName.replace(/\.mp4$/, '')}.jpg`)
+        const newThumbPath = join(outputDir, '.thumbnails', `${resolvedName.replace(/\.mp4$/, '')}.jpg`)
         try {
           await rename(oldThumbPath, newThumbPath)
         } catch {
@@ -298,7 +299,7 @@ export function registerClipsIpc(): void {
       }
       const oldEngineThumb = join(outputDir, `${clipName.replace(/\.mp4$/, '')}.thumb.jpg`)
       if (await fileExists(oldEngineThumb)) {
-        const newEngineThumb = join(outputDir, `${newName.replace(/\.mp4$/, '')}.thumb.jpg`)
+        const newEngineThumb = join(outputDir, `${resolvedName.replace(/\.mp4$/, '')}.thumb.jpg`)
         try {
           await rename(oldEngineThumb, newEngineThumb)
         } catch {
@@ -307,7 +308,7 @@ export function registerClipsIpc(): void {
       }
       const oldFavPath = join(outputDir, `.${clipName}.favorite`)
       if (await fileExists(oldFavPath)) {
-        const newFavPath = join(outputDir, `.${newName}.favorite`)
+        const newFavPath = join(outputDir, `.${resolvedName}.favorite`)
         try {
           await rename(oldFavPath, newFavPath)
         } catch {
@@ -342,7 +343,7 @@ export function registerClipsIpc(): void {
     return getThumbnailDataUrl(getDefaultOutputDir(), clipName)
   })
 
-  ipcMain.handle(IPC.CLIPS_GET_CONFIG, (): ClipsConfig => getCurrentConfigPayload() as ClipsConfig)
+  ipcMain.handle(IPC.CLIPS_GET_CONFIG, () => getCurrentConfigPayload())
 
   ipcMain.handle(IPC.CLIPS_SET_CONFIG, async (_event, config: unknown): Promise<IpcResult> => {
     getLogger().info('clips', `Config update requested: ${JSON.stringify(config)}`)
@@ -461,7 +462,7 @@ export function registerClipsIpc(): void {
     }
     const result = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
     if (result.canceled || !result.filePaths.length) return null
-    const selectedPath = result.filePaths[0]
+    const selectedPath = result.filePaths[0]!
     C.outputDirectory = selectedPath
     return selectedPath
   })
@@ -766,7 +767,7 @@ export function registerClipsIpc(): void {
         if (_amdDetected !== true) {
           getLogger().warning('clips', 'MergeClips enhance ignored: no AMD GPU detected')
         } else {
-          const res = await probeVideoResolution(getFfmpegPath(), safePaths[0])
+          const res = await probeVideoResolution(getFfmpegPath(), safePaths[0]!)
           if (res) {
             enhanceVf = buildAmfEnhanceVf(enhanceOption, res.w, res.h)
           } else {
@@ -893,7 +894,7 @@ export function registerClipsIpc(): void {
         : {
             success: false,
             error: result.error ?? 'Upload failed',
-            code: result.cancelled ? 'ABORTED' : undefined,
+            ...(result.cancelled ? { code: 'ABORTED' } : {}),
           }
     } finally {
       _publishingPaths.delete(safe)

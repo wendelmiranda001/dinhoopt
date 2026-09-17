@@ -282,7 +282,7 @@ export async function scanFirewallRules(
 
   const rules: FirewallRule[] = []
   let total = 0
-  for (const rawLine of stdout.split('\n')) {
+  for (const rawLine of String(stdout).split('\n')) {
     const line = rawLine.trim()
     if (!line) continue
     if (line.startsWith('TOTAL|')) {
@@ -387,7 +387,7 @@ try {
       timeout: changes.length * 5_000 + 30_000,
     })
 
-    for (const rawLine of stdout.split('\n')) {
+    for (const rawLine of String(stdout).split('\n')) {
       const line = rawLine.trim()
       if (line.startsWith('OK|')) {
         succeeded++

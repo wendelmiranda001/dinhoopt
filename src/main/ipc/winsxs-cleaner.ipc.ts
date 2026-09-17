@@ -69,7 +69,7 @@ async function runAnalyze(): Promise<AnalyzeResult> {
     ['/c', 'chcp 65001 >nul & DISM /English /Online /Cleanup-Image /AnalyzeComponentStore'],
     { timeout: 120_000, windowsHide: true },
   )
-  return parseAnalyzeOutput(stdout)
+  return parseAnalyzeOutput(String(stdout))
 }
 
 export function registerWinSxSCleanerIpc(getWindow: WindowGetter): void {

@@ -13,7 +13,7 @@ vi.mock('electron', () => ({
 }))
 
 let spawnEventCallbacks: Record<string, (chunk: Buffer) => void> = {}
-let spawnCloseCallback: ((code: number) => void) | null = null
+let spawnCloseCallback: ((code: number | null) => void) | null = null
 let spawnErrorCallback: ((err: Error) => void) | null = null
 let lastSpawnedChild: {
   pid: number
@@ -44,7 +44,7 @@ vi.mock('child_process', () => {
       },
       stderr: { on: vi.fn() },
       on: (event: string, cb: unknown) => {
-        if (event === 'close') spawnCloseCallback = cb as (code: number) => void
+        if (event === 'close') spawnCloseCallback = cb as (code: number | null) => void
         if (event === 'error') spawnErrorCallback = cb as (err: Error) => void
       },
       kill: vi.fn(() => {
@@ -83,7 +83,7 @@ function mockWindow() {
 }
 
 function mockDestroyedWindow() {
-  return { isDestroyed: () => true, webContents: { send: mockSend } }
+  return { isDestroyed: () => true, webContents: { send: mockSend } } as never
 }
 
 // ── Helpers ──
@@ -399,8 +399,8 @@ describe('WINSXS_CLEAN handler', () => {
 
     const stdoutOnData = spawnEventCallbacks.data
     expect(stdoutOnData).toBeDefined()
-    stdoutOnData(Buffer.from('50.0%'))
-    stdoutOnData(Buffer.from('50.0%'))
+    stdoutOnData!(Buffer.from('50.0%'))
+    stdoutOnData!(Buffer.from('50.0%'))
 
     if (spawnCloseCallback) spawnCloseCallback(0)
     await promise
@@ -515,7 +515,7 @@ describe('WINSXS_CLEAN handler', () => {
 
     const stdoutOnData = spawnEventCallbacks.data
     expect(stdoutOnData).toBeDefined()
-    stdoutOnData(Buffer.from('50.0%'))
+    stdoutOnData!(Buffer.from('50.0%'))
 
     expect(spawnCloseCallback).toBeDefined()
     spawnCloseCallback!(0)

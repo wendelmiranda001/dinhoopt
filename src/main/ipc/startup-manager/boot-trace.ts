@@ -59,7 +59,7 @@ export async function getBootTrace(): Promise<StartupBootTrace> {
 
     const { stdout } = await execFileAsync('powershell', psArgs(bootScript), { timeout: 15000, windowsHide: true })
 
-    const lines = stdout
+    const lines = String(stdout)
       .trim()
       .split('\n')
       .map((l: string) => l.trim())

@@ -158,7 +158,7 @@ async function runWithConcurrency<T>(tasks: Array<() => Promise<T>>, limit: numb
   async function worker(): Promise<void> {
     while (nextIdx < tasks.length) {
       const idx = nextIdx++
-      results[idx] = await tasks[idx]()
+      results[idx] = await tasks[idx]!()
     }
   }
 
@@ -353,30 +353,47 @@ export async function readClipsFromDisk(): Promise<ClipInfo[]> {
 
 export function getCurrentStatus(): ClipsEngineStatus {
   const e = readEngineStatus()
+  const captureBackend = e.captureBackend || undefined
+  const encoder = e.encoder || undefined
+  const estimatedRamMB = e.estimatedRamMB || undefined
+  const diskSpaceOk = e.diskSpaceOk
+  const currentGame = C.customGameProcess || e.currentGame || undefined
+  const customGameProcess = C.customGameProcess || undefined
+  const lastCrashRecovered = e.lastCrashRecovered || undefined
+  const audioLoopback = e.audioLoopback || undefined
+  const audioFallback = e.audioFallback || undefined
+  const replayBufferBytes = e.replayBufferBytes || undefined
+  const replayBufferVideoFrames = e.replayBufferVideoFrames || undefined
+  const replayBufferVideoBytes = e.replayBufferVideoBytes || undefined
+  const replayBufferAudioPackets = e.replayBufferAudioPackets || undefined
+  const replayBufferAudioBytes = e.replayBufferAudioBytes || undefined
+  const droppedFrames = e.droppedFrames || undefined
+  const gpuBusyDrops = e.gpuBusyDrops || undefined
+  const calibrationTier = e.calibrationTier || undefined
   return {
     running: _isEngineRunning(),
     capturing: e.capturing,
     uptime: _isEngineRunning() ? Math.floor((Date.now() - e.startTime) / 1000) : 0,
     fps: C.engineFps,
     replayTimeSeconds: C.engineReplayTimeSeconds,
-    captureBackend: e.captureBackend || undefined,
-    encoder: e.encoder || undefined,
-    estimatedRamMB: e.estimatedRamMB || undefined,
-    diskSpaceOk: e.diskSpaceOk,
-    currentGame: C.customGameProcess || e.currentGame || undefined,
-    customGameProcess: C.customGameProcess || undefined,
-    lastCrashRecovered: e.lastCrashRecovered || undefined,
-    audioLoopback: e.audioLoopback || undefined,
-    audioFallback: e.audioFallback || undefined,
     audioSampleRate: C.audioSampleRate,
-    replayBufferBytes: e.replayBufferBytes || undefined,
-    replayBufferVideoFrames: e.replayBufferVideoFrames || undefined,
-    replayBufferVideoBytes: e.replayBufferVideoBytes || undefined,
-    replayBufferAudioPackets: e.replayBufferAudioPackets || undefined,
-    replayBufferAudioBytes: e.replayBufferAudioBytes || undefined,
-    droppedFrames: e.droppedFrames || undefined,
-    gpuBusyDrops: e.gpuBusyDrops || undefined,
-    calibrationTier: e.calibrationTier || undefined,
+    ...(captureBackend ? { captureBackend } : {}),
+    ...(encoder ? { encoder } : {}),
+    ...(estimatedRamMB ? { estimatedRamMB } : {}),
+    ...(diskSpaceOk != null ? { diskSpaceOk } : {}),
+    ...(currentGame ? { currentGame } : {}),
+    ...(customGameProcess ? { customGameProcess } : {}),
+    ...(lastCrashRecovered ? { lastCrashRecovered } : {}),
+    ...(audioLoopback ? { audioLoopback } : {}),
+    ...(audioFallback ? { audioFallback } : {}),
+    ...(replayBufferBytes ? { replayBufferBytes } : {}),
+    ...(replayBufferVideoFrames ? { replayBufferVideoFrames } : {}),
+    ...(replayBufferVideoBytes ? { replayBufferVideoBytes } : {}),
+    ...(replayBufferAudioPackets ? { replayBufferAudioPackets } : {}),
+    ...(replayBufferAudioBytes ? { replayBufferAudioBytes } : {}),
+    ...(droppedFrames ? { droppedFrames } : {}),
+    ...(gpuBusyDrops ? { gpuBusyDrops } : {}),
+    ...(calibrationTier ? { calibrationTier } : {}),
   }
 }
 

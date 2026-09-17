@@ -470,24 +470,24 @@ describe('scanServices', () => {
     const result = await scanServices()
 
     expect(result.totalCount).toBe(2)
-    expect(result.services[0]).toMatchObject({
+    expect(result.services[0]!).toMatchObject({
       name: 'WSearch',
       displayName: 'Windows Search',
       status: 'Running',
       startType: 'Automatic',
       isMicrosoft: false,
     })
-    expect(result.services[1]).toMatchObject({
+    expect(result.services[1]!).toMatchObject({
       name: 'Spooler',
       displayName: 'Print Spooler',
       status: 'Stopped',
       startType: 'Manual',
       isMicrosoft: true,
     })
-    expect(result.services[0].originalStartType).toBe('Automatic')
-    expect(result.services[1].originalStartType).toBe('Manual')
-    expect(result.services[0].selected).toBe(false)
-    expect(result.services[1].selected).toBe(false)
+    expect(result.services[0]!.originalStartType).toBe('Automatic')
+    expect(result.services[1]!.originalStartType).toBe('Manual')
+    expect(result.services[0]!.selected).toBe(false)
+    expect(result.services[1]!.selected).toBe(false)
   })
 
   it('resolves dependencies from second PowerShell call', async () => {
@@ -500,8 +500,8 @@ describe('scanServices', () => {
 
     const result = await scanServices()
 
-    expect(result.services[0].dependsOn).toEqual(['RpcSs'])
-    expect(result.services[0].dependents).toEqual(['SearchUI'])
+    expect(result.services[0]!.dependsOn).toEqual(['RpcSs'])
+    expect(result.services[0]!.dependents).toEqual(['SearchUI'])
   })
 
   it('handles dependency resolution failure gracefully', async () => {
@@ -514,8 +514,8 @@ describe('scanServices', () => {
     const result = await scanServices()
 
     expect(result.totalCount).toBe(1)
-    expect(result.services[0].dependsOn).toEqual([])
-    expect(result.services[0].dependents).toEqual([])
+    expect(result.services[0]!.dependsOn).toEqual([])
+    expect(result.services[0]!.dependents).toEqual([])
   })
 
   it('calls progress every 20 services during classification', async () => {
@@ -523,14 +523,14 @@ describe('scanServices', () => {
     const lines = names.map((n) => svcLine(n, n, 'Running', 'Auto', '', 'True'))
     mocks.execFileAsync.mockResolvedValue({ stdout: lines.join('\n'), stderr: '' })
     mocks.lookupServiceSafety.mockReturnValue({ safety: 'caution', category: 'unknown', note: '' })
-    const onProgress = vi.fn()
+    const onProgress = vi.fn<(p: ServiceScanProgress) => void>()
 
     await scanServices(onProgress)
 
     const classifyCalls = onProgress.mock.calls.filter((c: [ServiceScanProgress]) => c[0].phase === 'classifying')
     expect(classifyCalls.length).toBeGreaterThanOrEqual(2)
-    expect(classifyCalls[0][0].current).toBe(0)
-    expect(classifyCalls[classifyCalls.length - 1][0].current).toBe(40)
+    expect(classifyCalls[0]![0].current).toBe(0)
+    expect(classifyCalls[classifyCalls.length - 1]![0].current).toBe(40)
   })
 
   it('calculates correct statistics', async () => {
@@ -565,7 +565,7 @@ describe('scanServices', () => {
     const result = await scanServices()
 
     expect(result.totalCount).toBe(1)
-    expect(result.services[0].name).toBe('Good')
+    expect(result.services[0]!.name).toBe('Good')
   })
 
   it('uses lookupServiceSafety for each service', async () => {
@@ -583,10 +583,10 @@ describe('scanServices', () => {
     expect(mocks.lookupServiceSafety).toHaveBeenCalledTimes(2)
     expect(mocks.lookupServiceSafety).toHaveBeenNthCalledWith(1, 'WSearch')
     expect(mocks.lookupServiceSafety).toHaveBeenNthCalledWith(2, 'Spooler')
-    expect(result.services[0].safety).toBe('caution')
-    expect(result.services[0].category).toBe('misc')
-    expect(result.services[1].safety).toBe('caution')
-    expect(result.services[1].category).toBe('print')
+    expect(result.services[0]!.safety).toBe('caution')
+    expect(result.services[0]!.category).toBe('misc')
+    expect(result.services[1]!.safety).toBe('caution')
+    expect(result.services[1]!.category).toBe('print')
   })
 
   it('returns empty result when no services found', async () => {
@@ -613,7 +613,7 @@ describe('scanServices', () => {
 
     const result = await scanServices()
 
-    expect(result.services[0].incompatibleGames).toEqual(['fivem', 'minecraft'])
+    expect(result.services[0]!.incompatibleGames).toEqual(['fivem', 'minecraft'])
   })
 
   it('normalizes all start type variants including Boot, System, AutoDelayed', async () => {
@@ -627,9 +627,9 @@ describe('scanServices', () => {
 
     const result = await scanServices()
 
-    expect(result.services[0].startType).toBe('Boot')
-    expect(result.services[1].startType).toBe('System')
-    expect(result.services[2].startType).toBe('AutomaticDelayed')
+    expect(result.services[0]!.startType).toBe('Boot')
+    expect(result.services[1]!.startType).toBe('System')
+    expect(result.services[2]!.startType).toBe('AutomaticDelayed')
   })
 
   it('normalizes all status variants including StartPending, StopPending, Paused', async () => {
@@ -643,9 +643,9 @@ describe('scanServices', () => {
 
     const result = await scanServices()
 
-    expect(result.services[0].status).toBe('StartPending')
-    expect(result.services[1].status).toBe('StopPending')
-    expect(result.services[2].status).toBe('Paused')
+    expect(result.services[0]!.status).toBe('StartPending')
+    expect(result.services[1]!.status).toBe('StopPending')
+    expect(result.services[2]!.status).toBe('Paused')
   })
 
   it('handles DEP parsing with empty dependency fields', async () => {
@@ -658,8 +658,8 @@ describe('scanServices', () => {
 
     const result = await scanServices()
 
-    expect(result.services[0].dependsOn).toEqual([])
-    expect(result.services[0].dependents).toEqual([])
+    expect(result.services[0]!.dependsOn).toEqual([])
+    expect(result.services[0]!.dependents).toEqual([])
   })
 
   it('uses fallback defaults for unrecognized startType/status', async () => {
@@ -669,8 +669,8 @@ describe('scanServices', () => {
 
     const result = await scanServices()
 
-    expect(result.services[0].startType).toBe('Manual')
-    expect(result.services[0].status).toBe('Unknown')
+    expect(result.services[0]!.startType).toBe('Manual')
+    expect(result.services[0]!.status).toBe('Unknown')
   })
 })
 
@@ -761,7 +761,7 @@ describe('applyServiceChanges', () => {
     expect(result.succeeded).toBe(2)
     expect(result.failed).toBe(1)
     expect(result.errors).toHaveLength(1)
-    expect(result.errors[0]).toEqual({ name: 'Spooler', displayName: 'Print Spooler', reason: 'Access denied' })
+    expect(result.errors[0]!).toEqual({ name: 'Spooler', displayName: 'Print Spooler', reason: 'Access denied' })
   })
 
   it('handles PowerShell execution error', async () => {
@@ -773,7 +773,7 @@ describe('applyServiceChanges', () => {
     expect(result.succeeded).toBe(0)
     expect(result.failed).toBe(1)
     expect(result.errors).toHaveLength(1)
-    expect(result.errors[0].reason).toBe('PowerShell crashed')
+    expect(result.errors[0]!.reason).toBe('PowerShell crashed')
   })
 
   it('maps targetStartType through ALLOWED_TYPES', async () => {
@@ -792,7 +792,7 @@ describe('applyServiceChanges', () => {
 
     expect(result.succeeded).toBe(4)
     // Verify the PowerShell script contains correct startup types
-    const scriptCall = mocks.execFileAsync.mock.calls[0][2] as { timeout: number }
+    const scriptCall = mocks.execFileAsync.mock.calls[0]![2] as { timeout: number }
     expect(scriptCall.timeout).toBeGreaterThan(0)
   })
 
@@ -804,7 +804,7 @@ describe('applyServiceChanges', () => {
 
     expect(result.succeeded).toBe(0)
     expect(result.failed).toBe(1)
-    expect(result.errors[0].reason).toBe('PowerShell execution failed')
+    expect(result.errors[0]!.reason).toBe('PowerShell execution failed')
   })
 
   it('falls back to Disabled for unknown targetStartType', async () => {
@@ -827,7 +827,7 @@ describe('applyServiceChanges', () => {
     ])
 
     expect(result.failed).toBe(2)
-    expect(result.errors[0]).toEqual({ name: 'SvcName', displayName: '', reason: 'Unknown error' })
+    expect(result.errors[0]!).toEqual({ name: 'SvcName', displayName: '', reason: 'Unknown error' })
     expect(result.errors[1]).toEqual({ name: '', displayName: '', reason: 'Unknown error' })
   })
 

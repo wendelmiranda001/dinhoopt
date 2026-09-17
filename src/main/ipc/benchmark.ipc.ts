@@ -56,9 +56,9 @@ async function measureCpuUsage(isCancelled: () => boolean): Promise<number> {
             'Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average | Select-Object -ExpandProperty Average',
           ),
         ],
-        { timeout: 5000, windowsHide: true },
+        { timeout: 5000, windowsHide: true, encoding: 'utf-8' },
       )
-      const val = Number.parseInt(stdout.trim(), 10)
+      const val = Number.parseInt(String(stdout).trim(), 10)
       if (!Number.isNaN(val)) total += val
       await sleep(500)
     }
@@ -80,9 +80,9 @@ async function measureRam(): Promise<{ free: number; total: number }> {
           '$os=Get-CimInstance Win32_OperatingSystem; @{Free=[math]::Round($os.FreePhysicalMemory/1024); Total=[math]::Round($os.TotalVisibleMemorySize/1024)} | ConvertTo-Json -Compress',
         ),
       ],
-      { timeout: 5000, windowsHide: true },
+      { timeout: 5000, windowsHide: true, encoding: 'utf-8' },
     )
-    const parsed = JSON.parse(stdout.trim())
+    const parsed = JSON.parse(String(stdout).trim())
     return { free: parsed.Free, total: parsed.Total }
   } catch {
     return { free: 0, total: 0 }
@@ -98,8 +98,9 @@ async function measurePing(isCancelled: () => boolean): Promise<{ avg: number; j
       const { stdout } = await execFileAsync('ping', ['-n', '1', '-w', '3000', '8.8.8.8'], {
         timeout: 5000,
         windowsHide: true,
+        encoding: 'utf-8',
       })
-      const match = stdout.match(/time[=<](\d+)ms/i)
+      const match = String(stdout).match(/time[=<](\d+)ms/i)
       if (match) {
         const t = Number.parseInt(match[1] ?? '', 10)
         times.push(t)
@@ -131,9 +132,9 @@ async function measureDpcLatency(isCancelled: () => boolean): Promise<number> {
             '(Get-CimInstance Win32_PerfRawData_Counters_TimerResolution | Select-Object -ExpandProperty Percent_Interval_Timer_Rate) -replace ",", ""',
           ),
         ],
-        { timeout: 5000, windowsHide: true },
+        { timeout: 5000, windowsHide: true, encoding: 'utf-8' },
       )
-      const val = Number.parseInt(stdout.trim(), 10)
+      const val = Number.parseInt(String(stdout).trim(), 10)
       if (!Number.isNaN(val) && val > maxLatency) maxLatency = val
       await sleep(300)
     }
@@ -155,9 +156,9 @@ async function measureTemperature(): Promise<number | null> {
           'Get-CimInstance MSAcpi_ThermalZoneTemperature -Namespace "root/wmi" | Select-Object -ExpandProperty CurrentTemperature | ForEach-Object { [math]::Round(($_ - 2732) / 10) }',
         ),
       ],
-      { timeout: 5000, windowsHide: true },
+      { timeout: 5000, windowsHide: true, encoding: 'utf-8' },
     )
-    const temps = stdout
+    const temps = String(stdout)
       .trim()
       .split('\n')
       .map((s) => Number.parseInt(s.trim(), 10))
@@ -181,9 +182,9 @@ async function countTweaksApplied(): Promise<number> {
           '$count=0; @("MouseSpeed","MouseThreshold1","MouseThreshold2","MenuShowDelay").foreach({ $v=Get-ItemPropertyValue -Path "HKCU:\\Control Panel\\Mouse" -Name $_ -ErrorAction SilentlyContinue; if($v -eq "0"){$count++} }); $count',
         ),
       ],
-      { timeout: 10000, windowsHide: true },
+      { timeout: 10000, windowsHide: true, encoding: 'utf-8' },
     )
-    const c = Number.parseInt(stdout.trim(), 10)
+    const c = Number.parseInt(String(stdout).trim(), 10)
     return Number.isNaN(c) ? 0 : c
   } catch {
     return 0

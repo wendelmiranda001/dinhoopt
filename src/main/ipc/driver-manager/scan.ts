@@ -63,7 +63,7 @@ async function parseEnumDrivers(): Promise<RawDriver[]> {
         } | ConvertTo-Json -Compress
     `
     const { stdout } = await execFileAsync('powershell', psArgs(script), { timeout: 30000, windowsHide: true })
-    const parsed = JSON.parse(stdout.trim())
+    const parsed = JSON.parse(String(stdout).trim())
     const items = Array.isArray(parsed) ? parsed : parsed ? [parsed] : []
     const drivers: RawDriver[] = []
 
@@ -201,7 +201,7 @@ async function parseEnumDriversPnpUtil(): Promise<RawDriver[]> {
     for (const line of block.trim().split('\n')) {
       const match = line.match(/^\s*(.+?)\s*:\s+(.+)$/)
       if (match) {
-        rawFields[match[1].trim()] = match[2].trim()
+        rawFields[match[1]!.trim()] = match[2]!.trim()
       }
     }
 
@@ -227,8 +227,8 @@ async function parseEnumDriversPnpUtil(): Promise<RawDriver[]> {
     if (combined && (!version || !date)) {
       const dvMatch = combined.match(/^(\d{4}[-/]\d{2}[-/]\d{2}|\d{2}\/\d{2}\/\d{4})\s+(\S+)$/)
       if (dvMatch) {
-        if (!date) date = dvMatch[1]
-        if (!version || version === combined) version = dvMatch[2]
+        if (!date) date = dvMatch[1]!
+        if (!version || version === combined) version = dvMatch[2]!
       }
     }
 
@@ -267,7 +267,7 @@ async function getOemFolderMap(): Promise<Map<string, string[]>> {
     `
     const { stdout } = await execFileAsync('powershell', psArgs(script), { timeout: 15000, windowsHide: true })
 
-    for (const line of stdout.trim().split('\n')) {
+    for (const line of String(stdout).trim().split('\n')) {
       const trimmed = line.trim()
       if (!trimmed) continue
       const [oemName, foldersStr] = trimmed.split('|', 2)
@@ -302,7 +302,7 @@ async function getActiveDriverNames(): Promise<Set<string>> {
     `
     const { stdout } = await execFileAsync('powershell', psArgs(script), { timeout: 30000, windowsHide: true })
 
-    for (const line of stdout.trim().split('\n')) {
+    for (const line of String(stdout).trim().split('\n')) {
       const name = line.trim().toLowerCase()
       if (name) active.add(name)
     }
@@ -314,7 +314,7 @@ async function getActiveDriverNames(): Promise<Set<string>> {
       })
       const matches = stdout.matchAll(/Driver Name:\s*(oem\d+\.inf)/gi)
       for (const m of matches) {
-        active.add(m[1].toLowerCase())
+        active.add(m[1]!.toLowerCase())
       }
     } catch {
       /* can't determine active drivers */
@@ -378,7 +378,7 @@ export async function scanDrivers(onProgress?: (data: DriverScanProgress) => voi
     group.sort((a, b) => compareVersions(b.version, a.version))
 
     for (let i = 0; i < group.length; i++) {
-      const d = group[i]
+      const d = group[i]!
       const isActive = activeNames.has(d.publishedName.toLowerCase())
       const isNewest = i === 0
 
@@ -396,7 +396,7 @@ export async function scanDrivers(onProgress?: (data: DriverScanProgress) => voi
         const folders = oemFolderMap.get(d.publishedName.toLowerCase()) || []
         if (folders.length > 0) {
           // Use the first (and usually only) matching folder
-          folderPath = join(DRIVER_STORE, folders[0])
+          folderPath = join(DRIVER_STORE, folders[0]!)
           size = dirSize(folderPath)
         }
       } catch {
@@ -466,7 +466,7 @@ export async function cleanDrivers(publishedNames: string[]): Promise<DriverClea
       let preSize = 0
       const folders = oemFolderMap.get(name.toLowerCase()) || []
       if (folders.length > 0) {
-        preSize = dirSize(join(DRIVER_STORE, folders[0]))
+        preSize = dirSize(join(DRIVER_STORE, folders[0]!))
       }
 
       await execNativeUtf8('pnputil', ['/delete-driver', name], {

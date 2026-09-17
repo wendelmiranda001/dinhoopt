@@ -59,6 +59,7 @@ vi.mock('./validation', () => ({ validateGameModeConfig: vi.fn() }))
 import { existsSync, readdirSync } from 'node:fs'
 import { access, readdir } from 'node:fs/promises'
 import { IPC } from '@shared/channels'
+import type { GameModeConfig } from '@shared/types'
 import { loadClipsConfig } from '../../services/clips-config-store'
 import { execFileAsync } from '../../services/exec-utf8'
 import {
@@ -140,53 +141,60 @@ beforeEach(() => {
   vi.mocked(execFileAsync).mockReset()
   vi.mocked(isDetectorRunning).mockReset().mockReturnValue(false)
   vi.mocked(startGameDetector).mockReset()
-  vi.mocked(startGameDetector).mockImplementation(
-    (opts: { onGameDetected: (n: string) => Promise<void>; onGameExited: () => Promise<void> }) => {
-      state.callbacks.onGameDetected = opts.onGameDetected
-      state.callbacks.onGameExited = opts.onGameExited
-    },
-  )
+  vi.mocked(startGameDetector).mockImplementation((cbs) => {
+    state.callbacks.onGameDetected = (name: string) => Promise.resolve(cbs.onGameDetected(name))
+    state.callbacks.onGameExited = () => Promise.resolve(cbs.onGameExited())
+  })
   vi.mocked(stopGameDetector).mockReset()
   vi.mocked(suppressCurrentGame).mockReset()
-  vi.mocked(runGameModeAudit).mockReset().mockResolvedValue({})
+  vi.mocked(runGameModeAudit)
+    .mockReset()
+    .mockResolvedValue({
+      timestamp: '',
+      phase: 'pre-activation',
+      checks: [],
+      summary: { passed: 0, warnings: 0, errors: 0 },
+    })
   vi.mocked(getSettings).mockReset()
   setGameMode()
-  vi.mocked(loadClipsConfig).mockReset().mockReturnValue({ autoStartCapture: false })
-  vi.mocked(startClipCapture).mockReset().mockResolvedValue({})
+  vi.mocked(loadClipsConfig)
+    .mockReset()
+    .mockReturnValue({ autoStartCapture: false } as never)
+  vi.mocked(startClipCapture).mockReset().mockResolvedValue({ success: true })
   vi.mocked(activateGameMode)
     .mockReset()
-    .mockImplementation(async (_cfg: unknown, sendProgress?: (d: unknown) => void) => {
-      sendProgress?.({ phase: 'idle', progress: 0 })
-      return { succeeded: 1, failed: 0, errors: [], snapshot: {} }
+    .mockImplementation(async (_cfg, sendProgress) => {
+      sendProgress?.({ phase: 'idle', progress: 0 } as never)
+      return { succeeded: 1, failed: 0, errors: [] as never[], snapshot: {} as never }
     })
-  vi.mocked(deactivateGameMode).mockReset().mockResolvedValue({ restored: 0 })
+  vi.mocked(deactivateGameMode).mockReset().mockResolvedValue({ restored: 0, failed: 0, errors: [] })
   vi.mocked(readSnapshot).mockReset().mockReturnValue(null)
   vi.mocked(deleteSnapshot).mockReset()
-  vi.mocked(getGameModeStatus).mockReset().mockReturnValue({ active: false })
+  vi.mocked(getGameModeStatus).mockReset().mockReturnValue({ active: false, activatedAt: null, pendingRestore: false })
   vi.mocked(validateGameModeConfig)
     .mockReset()
-    .mockImplementation((c: unknown) => c ?? null)
+    .mockImplementation((c) => (c ?? null) as GameModeConfig | null)
 
   vi.mocked(existsSync).mockImplementation((p: unknown) => fsTree.has(String(p)))
-  vi.mocked(readdirSync).mockImplementation((p: string, opts?: { withFileTypes?: boolean }) => {
+  vi.mocked(readdirSync).mockImplementation(((p: string, opts?: { withFileTypes?: boolean }) => {
     const e = fsTree.get(p)
     if (!e) throw new Error('ENOENT')
     if (opts?.withFileTypes) return e.dirs.map((name) => ({ name, isDirectory: () => true }))
     return e.files
-  })
+  }) as never)
 
   vi.mocked(access).mockImplementation(async (p: unknown) => {
     if (!fsTree.has(String(p))) throw new Error('ENOENT')
   })
-  vi.mocked(readdir).mockImplementation(async (p: string, opts?: { withFileTypes?: boolean }) => {
+  vi.mocked(readdir).mockImplementation((async (p: string, opts?: { withFileTypes?: boolean }) => {
     const e = fsTree.get(p)
     if (!e) throw new Error('ENOENT')
     if (opts?.withFileTypes)
       return e.dirs.map((name) => ({ name, isDirectory: () => true }) as import('node:fs').Dirent)
     return e.files
-  })
+  }) as never)
 
-  registerGameModeIpc(getWindow)
+  registerGameModeIpc(getWindow as never)
 })
 
 describe('registerGameModeIpc', () => {
@@ -219,11 +227,11 @@ describe('registerGameModeIpc', () => {
   })
 
   it('rejects activation when a snapshot is already active', async () => {
-    vi.mocked(readSnapshot).mockReturnValue({ active: true })
+    vi.mocked(readSnapshot).mockReturnValue({ active: true } as never)
     const res = (await getHandler(IPC.GAME_MODE_ACTIVATE)(null, {})) as {
       errors: { reason: string }[]
     }
-    expect(res.errors[0].reason).toBe('Game Mode is already active')
+    expect(res.errors[0]!.reason).toBe('Game Mode is already active')
     expect(state.logger.warning).toHaveBeenCalledWith(
       'game-mode',
       'Game Mode is already active — re-activation rejected',
@@ -232,7 +240,7 @@ describe('registerGameModeIpc', () => {
   })
 
   it('clears a stale inactive snapshot before activating', async () => {
-    vi.mocked(readSnapshot).mockReturnValue({ active: false })
+    vi.mocked(readSnapshot).mockReturnValue({ active: false } as never)
     const res = (await getHandler(IPC.GAME_MODE_ACTIVATE)(null, {})) as { succeeded: number }
     expect(deleteSnapshot).toHaveBeenCalled()
     expect(state.logger.warning).toHaveBeenCalledWith(
@@ -285,7 +293,7 @@ describe('registerGameModeIpc', () => {
   })
 
   it('runs an audit with the current config and snapshot for a valid phase', async () => {
-    vi.mocked(readSnapshot).mockReturnValue({ active: true })
+    vi.mocked(readSnapshot).mockReturnValue({ active: true } as never)
     vi.mocked(runGameModeAudit).mockResolvedValue({ phase: 'pre-activation' } as never)
     const res = (await getHandler(IPC.GAME_MODE_RUN_AUDIT)(null, 'pre-activation')) as { phase: string }
     expect(res.phase).toBe('pre-activation')
@@ -346,7 +354,7 @@ describe('checkDirectStorage (via DIRECTSTORAGE_CHECK)', () => {
     fsTree.set(BASE1, { dirs: ['GameA'], files: [] })
     fsTree.set(join(BASE1, 'GameA'), { dirs: [], files: ['directstorage.dll'] })
     fsTree.set(BASE4, { dirs: ['GameA'], files: [] })
-    vi.mocked(readdir).mockImplementation(async (p: string, opts?: { withFileTypes?: boolean }) => {
+    vi.mocked(readdir).mockImplementation((async (p: string, opts?: { withFileTypes?: boolean }) => {
       const path = String(p)
       if (path === BASE4) throw new Error('denied')
       const e = fsTree.get(path)
@@ -354,7 +362,7 @@ describe('checkDirectStorage (via DIRECTSTORAGE_CHECK)', () => {
       if (opts?.withFileTypes)
         return e.dirs.map((name) => ({ name, isDirectory: () => true }) as import('node:fs').Dirent)
       return e.files
-    })
+    }) as never)
     vi.mocked(execFileAsync).mockResolvedValue({ stdout: '[]', stderr: '' })
     const res = (await getHandler(IPC.GAME_MODE_DIRECTSTORAGE_CHECK)()) as {
       supported: boolean
@@ -378,7 +386,7 @@ describe('checkDirectStorage (via DIRECTSTORAGE_CHECK)', () => {
     }
     expect(res.nvmeHealthy).toBe(false)
     expect(res.nvmeDrives.map((d) => d.health)).toEqual(['Healthy', 'Caution', 'Bad', 'Unknown'])
-    expect(res.nvmeDrives[3].model).toBe('Unknown')
+    expect(res.nvmeDrives[3]!.model).toBe('Unknown')
   })
 })
 
@@ -419,7 +427,7 @@ describe('initGameDetector', () => {
     Object.defineProperty(process, 'platform', { value: 'linux', configurable: true, writable: true })
     try {
       initGameDetector(
-        getWindow,
+        getWindow as never,
         () => {},
         () => {},
       )
@@ -432,7 +440,7 @@ describe('initGameDetector', () => {
 
 describe('onGameDetected callback', () => {
   it('returns early when a snapshot already exists', async () => {
-    vi.mocked(readSnapshot).mockReturnValue({ active: true })
+    vi.mocked(readSnapshot).mockReturnValue({ active: true } as never)
     const { onGameDetected } = await setupDetector()
     await onGameDetected('game.exe')
     expect(activateGameMode).not.toHaveBeenCalled()
@@ -445,7 +453,7 @@ describe('onGameDetected callback', () => {
   })
 
   it('activates with the profile merge and starts clip capture when configured', async () => {
-    vi.mocked(loadClipsConfig).mockReturnValue({ autoStartCapture: true })
+    vi.mocked(loadClipsConfig).mockReturnValue({ autoStartCapture: true } as never)
     const win = liveWindow()
     const { onGameDetected } = await setupDetector({
       gameProfiles: { 'game.exe': { enabledOptimizations: ['p1'] } },
@@ -509,14 +517,14 @@ describe('onGameExited callback', () => {
 describe('refreshGameDetector', () => {
   it('forwards the window to initGameDetector and starts the detector', () => {
     setGameMode({ autoDetect: true })
-    refreshGameDetector(getWindow)
+    refreshGameDetector(getWindow as never)
     expect(startGameDetector).toHaveBeenCalled()
   })
 
   it('sends progress and auto events when a live window is present', async () => {
     setGameMode({ autoDetect: true })
     const win = liveWindow()
-    refreshGameDetector(getWindow)
+    refreshGameDetector(getWindow as never)
     await state.callbacks.onGameDetected!('game.exe')
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.GAME_MODE_PROGRESS, { phase: 'idle', progress: 0 })
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.GAME_MODE_AUTO_EVENT, {
@@ -532,7 +540,7 @@ describe('refreshGameDetector', () => {
 
   it('skips sending when no window is present', async () => {
     setGameMode({ autoDetect: true })
-    refreshGameDetector(getWindow)
+    refreshGameDetector(getWindow as never)
     await state.callbacks.onGameDetected!('game.exe')
     await state.callbacks.onGameExited!()
     expect(deactivateGameMode).toHaveBeenCalled()
@@ -542,7 +550,7 @@ describe('refreshGameDetector', () => {
     setGameMode({ autoDetect: true })
     const win = { isDestroyed: () => true, webContents: { send: vi.fn() } }
     getWindow.mockReturnValue(win)
-    refreshGameDetector(getWindow)
+    refreshGameDetector(getWindow as never)
     await state.callbacks.onGameDetected!('game.exe')
     expect(win.webContents.send).not.toHaveBeenCalled()
   })

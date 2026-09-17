@@ -366,7 +366,7 @@ describe('SYSTEM_SCAN handler', () => {
 
     registerSystemCleanerIpc(() => null)
     const handler = getHandler('cleaner:system:scan')
-    const results = await handler()
+    const results = (await handler()) as Array<{ items: Array<{ selected: boolean }>; itemCount: number }>
     expect(results).toHaveLength(1)
     expect(results[0]!.items.every((i) => i.selected === false)).toBe(true)
     expect(results[0]!.itemCount).toBe(2)

@@ -52,7 +52,7 @@ export function registerRecycleBinIpc(): void {
         { windowsHide: true },
       )
 
-      const [countStr, sizeStr] = stdout.trim().split('|')
+      const [countStr, sizeStr] = String(stdout).trim().split('|')
       const count = Number.parseInt(countStr!, 10) || 0
       const size = Number.parseInt(sizeStr!, 10) || 0
 
@@ -142,7 +142,7 @@ export function registerRecycleBinIpc(): void {
         ),
         { windowsHide: true },
       )
-      const [remainingStr, afterSizeStr] = stdout.trim().split('|')
+      const [remainingStr, afterSizeStr] = String(stdout).trim().split('|')
       const remaining = Number.parseInt(remainingStr!, 10) || 0
       const afterSize = Number.parseInt(afterSizeStr!, 10) || 0
       const actualCleaned = Math.max(0, sizeBeforeClean - afterSize)

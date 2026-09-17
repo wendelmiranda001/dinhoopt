@@ -458,7 +458,7 @@ describe('writeSnapshot', () => {
     const snap = validSnapshot()
     writeSnapshot(snap)
     expect(mockWriteFileSync).toHaveBeenCalledTimes(1)
-    const [path, content] = mockWriteFileSync.mock.calls[0]
+    const [path, content] = mockWriteFileSync.mock.calls[0]!
     expect(path).toContain('game-mode-snapshot.json')
     const parsed = JSON.parse(content)
     expect(parsed.activatedAt).toBe(snap.activatedAt)
@@ -475,7 +475,7 @@ describe('deleteSnapshot', () => {
     mockUnlinkSync.mockImplementation(() => {})
     deleteSnapshot()
     expect(mockUnlinkSync).toHaveBeenCalledTimes(1)
-    expect(mockUnlinkSync.mock.calls[0][0]).toContain('game-mode-snapshot.json')
+    expect(mockUnlinkSync.mock.calls[0]![0]).toContain('game-mode-snapshot.json')
   })
 
   it('silently handles deletion error (file already gone)', () => {

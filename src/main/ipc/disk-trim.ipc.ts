@@ -145,7 +145,7 @@ Get-Partition | ForEach-Object {
 
   let parsed: { disks?: WinPhysicalDisk[] | WinPhysicalDisk; volumes?: WinVolume[] | WinVolume } = {}
   try {
-    parsed = JSON.parse(stdout)
+    parsed = JSON.parse(String(stdout))
   } catch {
     return []
   }
@@ -229,13 +229,13 @@ $events | ConvertTo-Json -Depth 2 -Compress
       windowsHide: true,
       maxBuffer: 1024 * 1024,
     })
-    if (!stdout.trim()) {
+    if (!String(stdout).trim()) {
       _winLastTrimCache = {}
       return
     }
     const data: Array<{ When: string; Msg: string }> = (() => {
       try {
-        const j = JSON.parse(stdout)
+        const j = JSON.parse(String(stdout))
         return Array.isArray(j) ? j : [j]
       } catch {
         return []

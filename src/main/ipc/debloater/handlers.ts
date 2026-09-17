@@ -38,11 +38,15 @@ export async function scanBloatware(): Promise<BloatwareApp[]> {
         }
         [PSCustomObject]@{ Name = $_.Name; PackageFullName = $_.PackageFullName; InstallLocation = $_.InstallLocation; Size = $size }
       } | ConvertTo-Json -Compress`
-    const { stdout } = await execFileAsync('powershell', psArgs(appxScript), { timeout: 60000, windowsHide: true })
+    const { stdout } = await execFileAsync('powershell', psArgs(appxScript), {
+      timeout: 60000,
+      windowsHide: true,
+      encoding: 'utf-8',
+    })
 
     let installedPackages: { Name: string; PackageFullName: string; InstallLocation: string; Size: number }[] = []
     try {
-      const parsed = JSON.parse(stdout)
+      const parsed = JSON.parse(String(stdout))
       installedPackages = Array.isArray(parsed) ? parsed : [parsed]
     } catch {
       installedPackages = []
@@ -87,11 +91,12 @@ export async function scanBloatware(): Promise<BloatwareApp[]> {
     const { stdout: provStdout } = await execFileAsync('powershell', psArgs(provScript), {
       timeout: 30000,
       windowsHide: true,
+      encoding: 'utf-8',
     })
 
     let provisionedPackages: { Name: string }[] = []
     try {
-      const parsed = JSON.parse(provStdout)
+      const parsed = JSON.parse(String(provStdout))
       provisionedPackages = Array.isArray(parsed) ? parsed : [parsed]
     } catch {
       getLogger().warning('debloater', `Failed to parse provisioned packages JSON: ${provStdout.slice(0, 120)}`)
@@ -134,6 +139,7 @@ export async function scanBloatware(): Promise<BloatwareApp[]> {
     const { stdout: win32Stdout } = await execFileAsync('powershell', psArgs(win32Script), {
       timeout: 30000,
       windowsHide: true,
+      encoding: 'utf-8',
     })
 
     let win32Apps: {
@@ -145,7 +151,7 @@ export async function scanBloatware(): Promise<BloatwareApp[]> {
       ProductCode: string
     }[] = []
     try {
-      const parsed = JSON.parse(win32Stdout)
+      const parsed = JSON.parse(String(win32Stdout))
       win32Apps = Array.isArray(parsed) ? parsed : [parsed]
     } catch {
       getLogger().warning('debloater', `Failed to parse Win32 apps JSON: ${win32Stdout.slice(0, 120)}`)

@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
 import { IPC, RENDERER_LOG } from '@shared/channels'
+import type { LogLevel } from '@shared/types'
 import { app, type BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import {
   checkForUpdates,
@@ -121,7 +122,7 @@ export function registerCleanerIpc(getWindow: WindowGetter): void {
 
   // Renderer-side log relay
   ipcMain.on(RENDERER_LOG, (_event, level: string, message: string) => {
-    getLogger().log(level, 'Renderer', message)
+    getLogger().log(level as LogLevel, 'Renderer', message)
   })
 
   ipcMain.handle(IPC.CLEANER_OPEN_LOCATION, (_event, filePath: unknown) => {

@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { type ClientRequest, get, type IncomingMessage } from 'node:https'
+import type { ClientRequest, IncomingMessage } from 'node:http'
+import { get } from 'node:https'
 import { join } from 'node:path'
 import { getLogger } from '../services/logger.service'
 import { convertWinapp2Vars, parseWinapp2 } from './winapp2-import.ipc'

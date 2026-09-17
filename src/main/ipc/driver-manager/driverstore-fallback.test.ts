@@ -26,7 +26,7 @@ vi.mock('node:fs', () => ({
   statSync: (...args: unknown[]) => mockStatSync(...args),
 }))
 
-function makeWmiDriver(hardwareId: string, version: string, _infName: string): string {
+function makeWmiDriver(hardwareId: string, version: string, _infName = ''): string {
   return `${hardwareId}|${version}`
 }
 
@@ -99,10 +99,10 @@ describe('scanDriverStoreForUpdates', () => {
     const result = await scanDriverStoreForUpdates()
 
     expect(result).toHaveLength(1)
-    expect(result[0].availableVersion).toBe('31.0.15.5135')
-    expect(result[0].currentVersion).toBe('31.0.14.7239')
-    expect(result[0].updateId).toContain('local-store://')
-    expect(result[0].selected).toBe(true)
+    expect(result[0]!.availableVersion).toBe('31.0.15.5135')
+    expect(result[0]!.currentVersion).toBe('31.0.14.7239')
+    expect(result[0]!.updateId).toContain('local-store://')
+    expect(result[0]!.selected).toBe(true)
   })
 
   it('ignores when active driver is already latest', async () => {

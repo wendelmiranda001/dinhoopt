@@ -1,4 +1,5 @@
 import type { BloatwareApp } from '@shared/types'
+import type { BrowserWindow } from 'electron'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { mockWin32UninstallCommands, mockExecFileAsync, mockPsArgs, mockGetLogger, mockValidateStringArray } =
@@ -20,7 +21,7 @@ const mockHandlers = new Map<string, (...args: unknown[]) => unknown>()
 
 vi.mock('electron', () => ({
   ipcMain: {
-    handle: vi.fn((channel: string, handler: unknown) => {
+    handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => {
       mockHandlers.set(channel, handler)
     }),
   },
@@ -28,7 +29,7 @@ vi.mock('electron', () => ({
 
 vi.mock('../../services/exec-utf8', () => ({
   execFileAsync: (...args: unknown[]) => mockExecFileAsync(...args),
-  psArgs: (...args: unknown[]) => mockPsArgs(...args),
+  psArgs: (script: string) => mockPsArgs(script),
 }))
 
 vi.mock('../../services/ipc-validation', () => ({
@@ -36,7 +37,7 @@ vi.mock('../../services/ipc-validation', () => ({
 }))
 
 vi.mock('../../services/logger.service', () => ({
-  getLogger: (...args: unknown[]) => mockGetLogger(...args),
+  getLogger: () => mockGetLogger(),
 }))
 
 vi.mock('./bloatware/registry', () => ({
@@ -89,10 +90,10 @@ const { registerDebloaterIpc, scanBloatware, removeBloatware, clearWin32Cache, K
 
 let savedPlatform: string
 
-function callHandler(channel: string, ...args: unknown[]) {
+function callHandler<T>(channel: string, ...args: unknown[]): Promise<T> {
   const handler = mockHandlers.get(channel)
   if (!handler) throw new Error(`No handler for ${channel}`)
-  return handler({}, ...args)
+  return handler({}, ...args) as Promise<T>
 }
 
 describe('debloater/handlers.ts — registerDebloaterIpc', () => {
@@ -112,19 +113,19 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
   describe('DEBLOATER_SCAN', () => {
     it('returns empty on non-win32 platform', async () => {
       Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       expect(result).toEqual([])
     })
 
     it('returns empty array when no bloatware found', async () => {
       mockExecFileAsync.mockRejectedValue(new Error('failed'))
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       expect(result).toEqual([])
     })
 
     it('returns empty when JSON parse fails in Phase 1', async () => {
       mockExecFileAsync.mockResolvedValue({ stdout: 'not-json', stderr: '' })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       expect(result).toEqual([])
     })
 
@@ -141,7 +142,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         if (cmd === 'powershell') return Promise.resolve({ stdout: appxData, stderr: '' })
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       expect(result.length).toBeGreaterThanOrEqual(1)
       const candy = result.find((a: BloatwareApp) => a.packageName === 'king.com.CandyCrushSaga')
       expect(candy).toBeTruthy()
@@ -159,7 +160,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         },
       ])
       mockExecFileAsync.mockResolvedValue({ stdout: appxData, stderr: '' })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       const candy = result.find((a: BloatwareApp) => a.packageName === 'king.com.CandyCrushSaga')
       expect(candy!.size).toContain('GB')
     })
@@ -169,7 +170,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         { Name: 'king.com.CandyCrushSaga', PackageFullName: 'pkg', InstallLocation: 'C:\\', Size: 5120 },
       ])
       mockExecFileAsync.mockResolvedValue({ stdout: appxData, stderr: '' })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       const candy = result.find((a: BloatwareApp) => a.packageName === 'king.com.CandyCrushSaga')
       expect(candy!.size).toContain('KB')
     })
@@ -179,7 +180,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         { Name: 'king.com.CandyCrushSaga', PackageFullName: 'pkg', InstallLocation: 'C:\\', Size: 100 },
       ])
       mockExecFileAsync.mockResolvedValue({ stdout: appxData, stderr: '' })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       const candy = result.find((a: BloatwareApp) => a.packageName === 'king.com.CandyCrushSaga')
       expect(candy!.size).toBe('100 B')
     })
@@ -189,7 +190,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         { Name: 'king.com.CandyCrushSaga', PackageFullName: 'pkg', InstallLocation: 'C:\\', Size: 0 },
       ])
       mockExecFileAsync.mockResolvedValue({ stdout: appxData, stderr: '' })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       const candy = result.find((a: BloatwareApp) => a.packageName === 'king.com.CandyCrushSaga')
       expect(candy!.size).toBe('Unknown')
     })
@@ -202,7 +203,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         Size: 0,
       })
       mockExecFileAsync.mockResolvedValue({ stdout: singleObj, stderr: '' })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       expect(result.length).toBeGreaterThanOrEqual(1)
     })
 
@@ -216,7 +217,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       const weather = result.find((a: BloatwareApp) => a.packageName === 'Microsoft.BingWeather')
       expect(weather).toBeTruthy()
       expect(weather!.size).toBe('Provisioned')
@@ -235,7 +236,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       const weatherApps = result.filter((a: BloatwareApp) => a.packageName === 'Microsoft.BingWeather')
       expect(weatherApps).toHaveLength(1)
     })
@@ -259,7 +260,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       const thirdParty = result.find((a: BloatwareApp) => a.packageName === 'ThirdParty.App')
       expect(thirdParty).toBeTruthy()
       expect(thirdParty!.size).toContain('MB')
@@ -285,7 +286,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       expect(result.length).toBeGreaterThanOrEqual(1)
     })
 
@@ -308,7 +309,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      await callHandler('debloater:scan')
+      await callHandler<BloatwareApp[]>('debloater:scan')
       expect(mockWin32UninstallCommands.has('ThirdParty.App')).toBe(true)
       expect(mockWin32UninstallCommands.get('ThirdParty.App')).toEqual({ type: 'msi', command: '{ABC-123}' })
     })
@@ -332,7 +333,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       const app = result.find((a: BloatwareApp) => a.packageName === 'ThirdParty.App')
       expect(app!.size).toContain('GB')
     })
@@ -356,7 +357,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       const app = result.find((a: BloatwareApp) => a.packageName === 'ThirdParty.App')
       expect(app!.size).toBe('Win32')
     })
@@ -383,7 +384,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       const candyApps = result.filter((a: BloatwareApp) => a.packageName === 'king.com.CandyCrushSaga')
       expect(candyApps).toHaveLength(1)
     })
@@ -407,7 +408,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       expect(result).toHaveLength(0)
     })
 
@@ -420,7 +421,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       expect(result).toEqual([])
     })
 
@@ -433,7 +434,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       expect(result).toEqual([])
     })
 
@@ -447,7 +448,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       const weather = result.find((a: BloatwareApp) => a.packageName === 'Microsoft.BingWeather.Something')
       expect(weather).toBeTruthy()
       expect(weather!.size).toBe('Provisioned')
@@ -472,7 +473,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       const app = result.find((a: BloatwareApp) => a.packageName === 'ThirdParty.App')
       expect(app).toBeTruthy()
     })
@@ -487,7 +488,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       const weather = result.find((a: BloatwareApp) => a.packageName === 'Microsoft.BingWeather')
       expect(weather).toBeTruthy()
     })
@@ -509,7 +510,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       expect(result.length).toBeGreaterThanOrEqual(1)
     })
 
@@ -532,7 +533,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       const app = result.find((a: BloatwareApp) => a.packageName === 'ThirdParty.App')
       expect(app!.size).toBe('10 KB')
     })
@@ -556,7 +557,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         }
         return Promise.reject(new Error('no'))
       })
-      const result = await callHandler('debloater:scan')
+      const result = await callHandler<BloatwareApp[]>('debloater:scan')
       const app = result.find((a: BloatwareApp) => a.packageName === 'ThirdParty.App')
       expect(app!.size).toBe('1024 B')
     })
@@ -565,20 +566,24 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
   describe('DEBLOATER_REMOVE', () => {
     it('returns zero on non-win32 platform', async () => {
       Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
-      const result = await callHandler('debloater:remove', ['king.com.CandyCrushSaga'])
+      const result = await callHandler<{ removed: number; failed: number }>('debloater:remove', [
+        'king.com.CandyCrushSaga',
+      ])
       expect(result).toEqual({ removed: 0, failed: 0 })
     })
 
     it('returns zero when validation fails', async () => {
       mockValidateStringArray.mockReturnValue(null)
-      const result = await callHandler('debloater:remove', ['invalid'])
+      const result = await callHandler<{ removed: number; failed: number }>('debloater:remove', ['invalid'])
       expect(result).toEqual({ removed: 0, failed: 0 })
     })
 
     it('removes known AppX package successfully', async () => {
       mockValidateStringArray.mockReturnValue(['king.com.CandyCrushSaga'])
       mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: '' })
-      const result = await callHandler('debloater:remove', ['king.com.CandyCrushSaga'])
+      const result = await callHandler<{ removed: number; failed: number }>('debloater:remove', [
+        'king.com.CandyCrushSaga',
+      ])
       expect(result.removed).toBe(1)
       expect(result.failed).toBe(0)
     })
@@ -586,7 +591,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
     it('removes unknown package name (not in KNOWN_BLOATWARE)', async () => {
       mockValidateStringArray.mockReturnValue(['unknown.package'])
       mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: '' })
-      const result = await callHandler('debloater:remove', ['unknown.package'])
+      const result = await callHandler<{ removed: number; failed: number }>('debloater:remove', ['unknown.package'])
       expect(result.removed).toBe(0)
       expect(result.failed).toBe(0)
     })
@@ -594,7 +599,9 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
     it('handles removal failure', async () => {
       mockValidateStringArray.mockReturnValue(['king.com.CandyCrushSaga'])
       mockExecFileAsync.mockRejectedValue(new Error('removal failed'))
-      const result = await callHandler('debloater:remove', ['king.com.CandyCrushSaga'])
+      const result = await callHandler<{ removed: number; failed: number }>('debloater:remove', [
+        'king.com.CandyCrushSaga',
+      ])
       expect(result.removed).toBe(0)
       expect(result.failed).toBe(1)
     })
@@ -603,7 +610,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
       mockValidateStringArray.mockReturnValue(['ThirdParty.App'])
       mockWin32UninstallCommands.set('ThirdParty.App', { type: 'msi', command: '{ABC-123}' })
       mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: '' })
-      const result = await callHandler('debloater:remove', ['ThirdParty.App'])
+      const result = await callHandler<{ removed: number; failed: number }>('debloater:remove', ['ThirdParty.App'])
       expect(result.removed).toBe(1)
       const msiCall = mockExecFileAsync.mock.calls.find((c: unknown[]) => c[0] === 'msiexec')
       expect(msiCall).toBeTruthy()
@@ -613,7 +620,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
       mockValidateStringArray.mockReturnValue(['ThirdParty.App'])
       mockWin32UninstallCommands.set('ThirdParty.App', { type: 'exe', command: 'uninstall.exe /S' })
       mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: '' })
-      const result = await callHandler('debloater:remove', ['ThirdParty.App'])
+      const result = await callHandler<{ removed: number; failed: number }>('debloater:remove', ['ThirdParty.App'])
       expect(result.removed).toBe(1)
       const cmdCall = mockExecFileAsync.mock.calls.find((c: unknown[]) => c[0] === 'cmd.exe')
       expect(cmdCall).toBeTruthy()
@@ -623,7 +630,7 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
       mockValidateStringArray.mockReturnValue(['ThirdParty.App'])
       mockWin32UninstallCommands.set('ThirdParty.App', { type: 'msi', command: '{ABC-123}' })
       mockExecFileAsync.mockRejectedValue(new Error('msi failed'))
-      const result = await callHandler('debloater:remove', ['ThirdParty.App'])
+      const result = await callHandler<{ removed: number; failed: number }>('debloater:remove', ['ThirdParty.App'])
       expect(result.failed).toBe(1)
     })
 
@@ -631,18 +638,21 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
       mockValidateStringArray.mockReturnValue(['ThirdParty.App'])
       mockWin32UninstallCommands.set('ThirdParty.App', { type: 'exe', command: 'uninstall.exe' })
       mockExecFileAsync.mockRejectedValue(new Error('exe failed'))
-      const result = await callHandler('debloater:remove', ['ThirdParty.App'])
+      const result = await callHandler<{ removed: number; failed: number }>('debloater:remove', ['ThirdParty.App'])
       expect(result.failed).toBe(1)
     })
 
     it('sends progress callback during removal', async () => {
       mockValidateStringArray.mockReturnValue(['king.com.CandyCrushSaga'])
       mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: '' })
-      const mockWin = { webContents: { send: vi.fn() }, isDestroyed: vi.fn().mockReturnValue(false) }
+      const mockWin = {
+        webContents: { send: vi.fn() },
+        isDestroyed: vi.fn().mockReturnValue(false),
+      } as unknown as BrowserWindow
       mockHandlers.clear()
       registerDebloaterIpc(() => mockWin)
 
-      await callHandler('debloater:remove', ['king.com.CandyCrushSaga'])
+      await callHandler<{ removed: number; failed: number }>('debloater:remove', ['king.com.CandyCrushSaga'])
       expect(mockWin.webContents.send).toHaveBeenCalledWith(
         'debloater:remove:progress',
         expect.objectContaining({ currentApp: 'king.com.CandyCrushSaga' }),
@@ -652,25 +662,30 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
     it('skips progress when window is destroyed', async () => {
       mockValidateStringArray.mockReturnValue(['king.com.CandyCrushSaga'])
       mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: '' })
-      const mockWin = { webContents: { send: vi.fn() }, isDestroyed: vi.fn().mockReturnValue(true) }
+      const mockWin = {
+        webContents: { send: vi.fn() },
+        isDestroyed: vi.fn().mockReturnValue(true),
+      } as unknown as BrowserWindow
       mockHandlers.clear()
       registerDebloaterIpc(() => mockWin)
 
-      await callHandler('debloater:remove', ['king.com.CandyCrushSaga'])
+      await callHandler<{ removed: number; failed: number }>('debloater:remove', ['king.com.CandyCrushSaga'])
       expect(mockWin.webContents.send).not.toHaveBeenCalled()
     })
 
     it('escapes single quotes in package name', async () => {
       mockValidateStringArray.mockReturnValue(["king.com.CandyCrushSaga'--evil"])
       mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: '' })
-      const result = await callHandler('debloater:remove', ["king.com.CandyCrushSaga'--evil"])
+      const result = await callHandler<{ removed: number; failed: number }>('debloater:remove', [
+        "king.com.CandyCrushSaga'--evil",
+      ])
       expect(result).toBeDefined()
     })
 
     it('attempts deprovision after AppX removal', async () => {
       mockValidateStringArray.mockReturnValue(['king.com.CandyCrushSaga'])
       mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: '' })
-      await callHandler('debloater:remove', ['king.com.CandyCrushSaga'])
+      await callHandler<{ removed: number; failed: number }>('debloater:remove', ['king.com.CandyCrushSaga'])
       const provCalls = mockExecFileAsync.mock.calls.filter((c: unknown[]) => {
         const args = c[1] as string[]
         return c[0] === 'powershell' && args?.some((a: string) => a.includes('AppxProvisionedPackage'))
@@ -686,35 +701,43 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
         if (callCount === 2) return Promise.reject(new Error('deprovision failed'))
         return Promise.resolve({ stdout: '', stderr: '' })
       })
-      const result = await callHandler('debloater:remove', ['king.com.CandyCrushSaga'])
+      const result = await callHandler<{ removed: number; failed: number }>('debloater:remove', [
+        'king.com.CandyCrushSaga',
+      ])
       expect(result.removed).toBe(1)
     })
 
     it('sends failed status in progress on removal error', async () => {
       mockValidateStringArray.mockReturnValue(['king.com.CandyCrushSaga'])
       mockExecFileAsync.mockRejectedValue(new Error('fail'))
-      const mockWin = { webContents: { send: vi.fn() }, isDestroyed: vi.fn().mockReturnValue(false) }
+      const mockWin = {
+        webContents: { send: vi.fn() },
+        isDestroyed: vi.fn().mockReturnValue(false),
+      } as unknown as BrowserWindow
       mockHandlers.clear()
       registerDebloaterIpc(() => mockWin)
 
-      await callHandler('debloater:remove', ['king.com.CandyCrushSaga'])
-      const failedCall = mockWin.webContents.send.mock.calls.find(
-        (c: unknown[]) => (c[1] as { status: string }).status === 'failed',
-      )
+      await callHandler<{ removed: number; failed: number }>('debloater:remove', ['king.com.CandyCrushSaga'])
+      const failedCall = vi
+        .mocked(mockWin.webContents.send)
+        .mock.calls.find((c: unknown[]) => (c[1] as { status: string }).status === 'failed')
       expect(failedCall).toBeTruthy()
     })
 
     it('sends done status after successful removal', async () => {
       mockValidateStringArray.mockReturnValue(['king.com.CandyCrushSaga'])
       mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: '' })
-      const mockWin = { webContents: { send: vi.fn() }, isDestroyed: vi.fn().mockReturnValue(false) }
+      const mockWin = {
+        webContents: { send: vi.fn() },
+        isDestroyed: vi.fn().mockReturnValue(false),
+      } as unknown as BrowserWindow
       mockHandlers.clear()
       registerDebloaterIpc(() => mockWin)
 
-      await callHandler('debloater:remove', ['king.com.CandyCrushSaga'])
-      const doneCall = mockWin.webContents.send.mock.calls.find(
-        (c: unknown[]) => (c[1] as { status: string }).status === 'done',
-      )
+      await callHandler<{ removed: number; failed: number }>('debloater:remove', ['king.com.CandyCrushSaga'])
+      const doneCall = vi
+        .mocked(mockWin.webContents.send)
+        .mock.calls.find((c: unknown[]) => (c[1] as { status: string }).status === 'done')
       expect(doneCall).toBeTruthy()
     })
 
@@ -724,7 +747,9 @@ describe('debloater/handlers.ts — registerDebloaterIpc', () => {
       mockHandlers.clear()
       registerDebloaterIpc(() => null)
 
-      const result = await callHandler('debloater:remove', ['king.com.CandyCrushSaga'])
+      const result = await callHandler<{ removed: number; failed: number }>('debloater:remove', [
+        'king.com.CandyCrushSaga',
+      ])
       expect(result.removed).toBe(1)
     })
   })

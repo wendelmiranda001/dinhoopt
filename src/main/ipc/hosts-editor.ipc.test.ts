@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   renameSync: vi.fn(),
+  existsSync: vi.fn(),
   execFile: vi.fn(),
   isAdmin: vi.fn(),
 }))

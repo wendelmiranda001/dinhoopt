@@ -1,3 +1,4 @@
+import type { BrowserWindow } from 'electron'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockHandle = vi.fn()
@@ -885,7 +886,9 @@ describe('GAMING_CLEAN handler', () => {
       },
     )
 
-    registerGamingCleanerIpc(() => ({ isDestroyed: () => true, webContents: { send: mockSend } }))
+    registerGamingCleanerIpc(
+      () => ({ isDestroyed: () => true, webContents: { send: mockSend } }) as unknown as BrowserWindow,
+    )
     const handler = getHandler('cleaner:gaming:clean')
 
     await handler({}, ['id1'])

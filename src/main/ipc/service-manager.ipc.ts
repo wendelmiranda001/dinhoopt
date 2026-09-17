@@ -78,7 +78,9 @@ export async function scanServices(onProgress?: (data: ServiceScanProgress) => v
 
   const { stdout } = await execFileAsync('powershell', psArgs(script), PS_OPTS)
 
-  const lines = stdout.split('\n').filter((l) => l.startsWith('SVC|'))
+  const lines = String(stdout)
+    .split('\n')
+    .filter((l) => l.startsWith('SVC|'))
   const serviceNames: string[] = []
   const rawServices: {
     name: string
@@ -128,7 +130,9 @@ export async function scanServices(onProgress?: (data: ServiceScanProgress) => v
   const depMap: Record<string, { dependsOn: string[]; dependents: string[] }> = {}
   try {
     const { stdout: depOut } = await execFileAsync('powershell', psArgs(depScript), PS_OPTS)
-    for (const line of depOut.split('\n').filter((l) => l.startsWith('DEP|'))) {
+    for (const line of String(depOut)
+      .split('\n')
+      .filter((l) => l.startsWith('DEP|'))) {
       const parts = line.trim().split('|')
       if (parts.length >= 4) {
         depMap[parts[1]!] = {
@@ -259,7 +263,7 @@ try {
       timeout: validChanges.length * 10_000 + 30_000, // generous timeout
     })
 
-    for (const line of stdout.split('\n')) {
+    for (const line of String(stdout).split('\n')) {
       const trimmed = line.trim()
       if (trimmed.startsWith('OK|')) {
         succeeded++

@@ -297,7 +297,7 @@ export function registerNetworkTweaks(_getWindow: WindowGetter): void {
 
         if (stdout.includes('ERROR')) {
           getLogger().error('windows-tweaks', `netsh TCP failed: ${stdout}`)
-          return { success: false, error: stdout.replace('ERROR: ', '').trim() }
+          return { success: false, error: String(stdout).replace('ERROR: ', '').trim() }
         }
         getLogger().success('windows-tweaks', `netsh TCP ${action} concluído`)
         return { success: true }

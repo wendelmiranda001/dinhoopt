@@ -479,7 +479,6 @@ describe('SHREDDER_SHRED handler', () => {
 
     const dirPath = '/home/user/temp/mydir'
     const subdirPath = `${dirPath}/subdir`
-    const _filePath = `${dirPath}/inner.txt`
 
     mockLstat.mockImplementation((p: string) => {
       const path = String(p)
@@ -545,7 +544,6 @@ describe('SHREDDER_SHRED handler', () => {
 
     const topPath = '/home/user/temp/nested'
     const levelPath = '/home/user/temp/nested/level1'
-    const _deepFile = '/home/user/temp/nested/level1/deep.txt'
 
     mockLstat.mockImplementation((p: string) => {
       const path = String(p)
