@@ -17,7 +17,7 @@ const ctx: CliContext = { json: false, verbosity: 'quiet' }
 describe('handleDrivers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(cleanDrivers).mockResolvedValue({ succeeded: 1, failed: 0, errors: [] })
+    vi.mocked(cleanDrivers).mockResolvedValue({ removed: 1, failed: 0, spaceRecovered: 0, errors: [] })
   })
 
   it('passes every positional name to cleanDrivers', async () => {

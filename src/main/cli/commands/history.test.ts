@@ -27,7 +27,18 @@ describe('handleHistory', () => {
 
   it('returns SUCCESS for a list with entries', async () => {
     vi.mocked(getHistory).mockReturnValue([
-      { timestamp: '2026-01-01T00:00:00', type: 'system', totalItemsCleaned: 12, totalSpaceSaved: 4096 },
+      {
+        id: 'e1',
+        timestamp: '2026-01-01T00:00:00',
+        type: 'registry',
+        duration: 0,
+        totalItemsFound: 12,
+        totalItemsCleaned: 12,
+        totalItemsSkipped: 0,
+        totalSpaceSaved: 4096,
+        categories: [],
+        errorCount: 0,
+      },
     ])
     const result = await handleHistory(['list'], ctx)
     expect(result).toBe(ExitCode.SUCCESS)

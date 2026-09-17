@@ -25,7 +25,7 @@ describe('handleUpdates', () => {
       currentVersion: '',
       availableVersion: '',
     } as never)
-    vi.mocked(runUpdates).mockResolvedValue({ succeeded: 2, failed: 0 })
+    vi.mocked(runUpdates).mockResolvedValue({ succeeded: 2, failed: 0, errors: [] })
   })
 
   it('passes every positional id to runUpdates', async () => {

@@ -56,7 +56,7 @@ describe('handleMetricsServer', () => {
 
   it('drains active connections on shutdown', async () => {
     const { handleMetricsServer } = await import('./metrics')
-    const p = handleMetricsServer([], { json: false, verbosity: 'info' })
+    const p = handleMetricsServer([], { json: false, verbosity: 'normal' })
 
     await vi.waitFor(() => expect(mockState.handler).not.toBeNull())
 
@@ -70,7 +70,7 @@ describe('handleMetricsServer', () => {
 
   it('responds to /metrics with prometheus text', async () => {
     const { handleMetricsServer } = await import('./metrics')
-    const p = handleMetricsServer([], { json: false, verbosity: 'info' })
+    const p = handleMetricsServer([], { json: false, verbosity: 'normal' })
 
     await vi.waitFor(() => expect(mockState.handler).not.toBeNull())
 
@@ -85,7 +85,7 @@ describe('handleMetricsServer', () => {
 
   it('responds to /health with ok status', async () => {
     const { handleMetricsServer } = await import('./metrics')
-    const p = handleMetricsServer([], { json: false, verbosity: 'info' })
+    const p = handleMetricsServer([], { json: false, verbosity: 'normal' })
 
     await vi.waitFor(() => expect(mockState.handler).not.toBeNull())
 
@@ -100,7 +100,7 @@ describe('handleMetricsServer', () => {
 
   it('responds with 404 for unknown routes', async () => {
     const { handleMetricsServer } = await import('./metrics')
-    const p = handleMetricsServer([], { json: false, verbosity: 'info' })
+    const p = handleMetricsServer([], { json: false, verbosity: 'normal' })
 
     await vi.waitFor(() => expect(mockState.handler).not.toBeNull())
 
@@ -118,7 +118,7 @@ describe('handleMetricsServer', () => {
     vi.mocked(collectMetrics).mockRejectedValueOnce(new Error('db down'))
 
     const { handleMetricsServer } = await import('./metrics')
-    const p = handleMetricsServer([], { json: false, verbosity: 'info' })
+    const p = handleMetricsServer([], { json: false, verbosity: 'normal' })
 
     await vi.waitFor(() => expect(mockState.handler).not.toBeNull())
 
@@ -136,7 +136,7 @@ describe('handleMetricsServer', () => {
     vi.mocked(collectMetrics).mockRejectedValueOnce('string crash')
 
     const { handleMetricsServer } = await import('./metrics')
-    const p = handleMetricsServer([], { json: false, verbosity: 'info' })
+    const p = handleMetricsServer([], { json: false, verbosity: 'normal' })
 
     await vi.waitFor(() => expect(mockState.handler).not.toBeNull())
 

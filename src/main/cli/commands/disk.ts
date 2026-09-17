@@ -1,3 +1,4 @@
+import type { DiskNode } from '@shared/types'
 import type { CliContext } from '../types'
 import { ExitCode } from '../types'
 import { cliLog, cliOut, cliUsage, formatBytes } from '../utils'
@@ -28,12 +29,10 @@ export async function handleDisk(args: string[], ctx: CliContext): Promise<numbe
     if (ctx.json) {
       cliOut(ctx, tree)
     } else {
-      const printNode = (node: Record<string, unknown>, depth: number): void => {
+      const printNode = (node: DiskNode, depth: number): void => {
         if (depth > 2) return
-        cliLog(ctx, `${'  '.repeat(depth + 1)}${node.name as string} — ${formatBytes(node.size as number)}`)
-        if (node.children)
-          for (const child of (node.children as Array<Record<string, unknown>>).slice(0, 10))
-            printNode(child, depth + 1)
+        cliLog(ctx, `${'  '.repeat(depth + 1)}${node.name} — ${formatBytes(node.size)}`)
+        if (node.children) for (const child of node.children.slice(0, 10)) printNode(child, depth + 1)
       }
       printNode(tree, 0)
     }

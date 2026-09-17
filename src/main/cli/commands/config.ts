@@ -8,7 +8,7 @@ export async function handleConfig(args: string[], ctx: CliContext): Promise<num
 
   if (sub === 'get') {
     const key = args[1]
-    const settings = getSettings() as Record<string, unknown>
+    const settings = getSettings() as unknown as Record<string, unknown>
     if (!key) {
       cliOut(ctx, settings)
       return
@@ -43,8 +43,9 @@ export async function handleConfig(args: string[], ctx: CliContext): Promise<num
     const obj: Record<string, unknown> = {}
     let cursor = obj
     for (let i = 0; i < parts.length - 1; i++) {
-      cursor[parts[i]!] = {}
-      cursor = cursor[parts[i]!]
+      const next: Record<string, unknown> = {}
+      cursor[parts[i]!] = next
+      cursor = next
     }
     cursor[parts[parts.length - 1]!] = value
     setSettings(obj as Record<string, unknown>)

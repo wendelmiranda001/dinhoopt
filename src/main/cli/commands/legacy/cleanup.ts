@@ -54,6 +54,7 @@ export async function cleanDatabasesCli(itemIds: string[]): Promise<CleanResult>
     options?: { fileMustExist?: boolean },
   ) => {
     pragma: (key: string, options?: { simple?: boolean }) => unknown
+    exec: (sql: string) => unknown
     close: () => void
   }
   try {
