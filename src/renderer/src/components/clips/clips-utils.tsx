@@ -128,11 +128,6 @@ export const VK_MAP: Record<number, string> = {
   226: '\\',
 }
 export const MODIFIER_KEYS = new Set([0x11, 0x10, 0x12])
-export const MODIFIER_MAP: Record<number, 'Ctrl' | 'Shift' | 'Alt'> = {
-  17: 'Ctrl',
-  16: 'Shift',
-  18: 'Alt',
-}
 export const REPLAY_DURATIONS = [30, 60, 120, 300, 600]
 
 export function formatUptime(seconds: number, t: (key: string) => string): string {
@@ -383,11 +378,12 @@ export function TogglePill({
   enabled,
   accent = 'blue',
   onToggle,
+  ...rest
 }: {
   enabled: boolean
   accent?: 'blue' | 'violet'
   onToggle: () => void
-}) {
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const colorMap = { blue: '#3b82f6', violet: '#8b5cf6' }
   const c = colorMap[accent]
   return (
@@ -395,6 +391,7 @@ export function TogglePill({
       type="button"
       onClick={onToggle}
       aria-pressed={enabled}
+      {...rest}
       className="relative h-5 w-9 shrink-0 rounded-full transition-all duration-200"
       style={{
         background: enabled ? c : 'rgba(113,113,122,0.25)',

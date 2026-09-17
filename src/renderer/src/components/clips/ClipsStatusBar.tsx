@@ -1,4 +1,17 @@
-import { CircleStop, Cpu, Download, Gamepad2, HardDrive, Loader2, Microscope, TriangleAlert, Video } from 'lucide-react'
+import {
+  Activity,
+  CircleStop,
+  Cpu,
+  Download,
+  Gamepad2,
+  HardDrive,
+  Loader2,
+  Mic,
+  Microscope,
+  ShieldAlert,
+  TriangleAlert,
+  Video,
+} from 'lucide-react'
 import { formatUptime } from './clips-utils'
 import type { ClipsState } from './useClipsState'
 
@@ -87,6 +100,28 @@ export function ClipsStatusBar({
                 )}
               </div>
             )}
+            {status.running && status.micLevel != null && (
+              <div
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
+                style={{ background: 'rgba(113,113,122,0.08)', color: 'var(--text-dim)' }}
+                title={t('micLevel')}
+              >
+                <Mic className="h-3 w-3" />
+                <div className="flex items-end gap-0.5">
+                  {[0.25, 0.5, 0.75, 0.9, 1].map((th) => (
+                    <div
+                      key={th}
+                      className="w-1 rounded-sm transition-colors"
+                      style={{
+                        height: `${3 + th * 7}px`,
+                        background:
+                          (status.micLevel ?? 0) >= th ? (th >= 0.9 ? '#ef4444' : '#22c55e') : 'rgba(113,113,122,0.25)',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
             {status.running && status.captureBackend && (
               <div
                 className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
@@ -121,6 +156,17 @@ export function ClipsStatusBar({
                   {status.replayBufferBytes
                     ? `${Math.round(status.replayBufferBytes / 1024 / 1024)}${t('megabytes')}`
                     : `~${estimatedRamMB}${t('megabytes')}`}
+                </span>
+              </div>
+            )}
+            {status.running && status.memoryMB && status.memoryMB > 0 && (
+              <div
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
+                style={{ background: 'rgba(113,113,122,0.08)', color: 'var(--text-dim)' }}
+              >
+                <Activity className="h-3 w-3" />
+                <span title={t('memoryMBDesc')}>
+                  {t('memoryMB')}: {status.memoryMB} {t('megabytes')}
                 </span>
               </div>
             )}
@@ -161,6 +207,15 @@ export function ClipsStatusBar({
               >
                 <HardDrive className="h-3 w-3" />
                 <span>{t('lowDisk')}</span>
+              </div>
+            )}
+            {status.running && status.watchdogOk === false && (
+              <div
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
+                style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}
+              >
+                <ShieldAlert className="h-3 w-3" />
+                <span title={t('watchdogFailedDesc')}>{t('watchdogFailed')}</span>
               </div>
             )}
           </div>

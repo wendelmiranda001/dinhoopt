@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockGetStatus = vi.fn()
@@ -13,6 +13,7 @@ const mockStopCapture = vi.fn()
 const mockSaveClip = vi.fn()
 const mockDeleteClip = vi.fn()
 const mockOpenClip = vi.fn()
+const mockGetAudioSessions = vi.fn()
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -35,6 +36,7 @@ vi.mock('framer-motion', () => ({
 vi.mock('lucide-react', () => {
   const Icon = ({ children, ...props }: { children?: React.ReactNode }) => <div {...props}>{children}</div>
   const icons = [
+    'Activity',
     'ChevronDown',
     'CircleStop',
     'Clapperboard',
@@ -57,6 +59,7 @@ vi.mock('lucide-react', () => {
     'RefreshCw',
     'Search',
     'Settings',
+    'ShieldAlert',
     'Sparkles',
     'Star',
     'Trash2',
@@ -88,6 +91,7 @@ window.dinho = {
   clipsSaveClip: mockSaveClip,
   clipsDelete: mockDeleteClip,
   clipsOpen: mockOpenClip,
+  clipsGetAudioSessions: mockGetAudioSessions,
   clipsOnEngineStatus: mockOnEngineStatus,
   clipsGetVideoUrl: (path: string) => `clip-video://file?path=${encodeURIComponent(path)}`,
 } as Record<string, unknown> as typeof window.dinho
@@ -130,6 +134,7 @@ describe('ClipsPage', () => {
       ],
     })
     mockList.mockResolvedValue([])
+    mockGetAudioSessions.mockResolvedValue([])
   })
 
   const showSettings = () => {
@@ -298,6 +303,94 @@ describe('ClipsPage', () => {
     const alToggle = screen.getByText('audioLoopback')
     alToggle.click()
     expect(mockSetConfig).toHaveBeenCalledWith({ audioLoopback: true, gameAudioOnly: false })
+  })
+
+  it('toggling loopback off restores gameAudioOnly', async () => {
+    const store: Record<string, unknown> = {
+      replayTimeSeconds: 120,
+      micEnabled: true,
+      gameAudioOnly: true,
+      audioLoopback: false,
+      fps: 30,
+      width: 1920,
+      height: 1080,
+      bitrateKbps: 50000,
+      cq: 22,
+      maxrateKbps: 30000,
+      bufsizeKbps: 60000,
+      bframes: 2,
+      lookahead: 16,
+      encoderPreset: 'p4',
+      outputDirectory: 'C:\\Users\\Test\\Desktop\\DiNhoClips',
+      forceSoftware: false,
+      pushToTalk: 'off',
+      pushToTalkKeys: [0x7a],
+      gameDetection: false,
+      hotkeys: [],
+    }
+    mockGetConfig.mockImplementation(async () => store)
+    mockSetConfig.mockImplementation(async (partial: Record<string, unknown>) => Object.assign(store, partial))
+    render(<ClipsPage />)
+    showSettings()
+    await screen.findByText('recordingQuality')
+    screen.getByText('audioLoopback').click()
+    await waitFor(() => expect(mockSetConfig).toHaveBeenCalledWith({ audioLoopback: true, gameAudioOnly: false }))
+    await waitFor(() => expect(mockGetConfig).toHaveBeenCalledTimes(2))
+    mockSetConfig.mockClear()
+    screen.getByText('audioLoopback').click()
+    expect(mockSetConfig).toHaveBeenCalledWith({ audioLoopback: false, gameAudioOnly: true })
+  })
+
+  it('turning gameAudioOnly off enables full system loopback', async () => {
+    const store: Record<string, unknown> = {
+      replayTimeSeconds: 120,
+      micEnabled: true,
+      gameAudioOnly: false,
+      audioLoopback: true,
+      fps: 30,
+      width: 1920,
+      height: 1080,
+      bitrateKbps: 50000,
+      cq: 22,
+      maxrateKbps: 30000,
+      bufsizeKbps: 60000,
+      bframes: 2,
+      lookahead: 16,
+      encoderPreset: 'p4',
+      outputDirectory: 'C:\\Users\\Test\\Desktop\\DiNhoClips',
+      forceSoftware: false,
+      pushToTalk: 'off',
+      pushToTalkKeys: [0x7a],
+      gameDetection: false,
+      hotkeys: [],
+    }
+    mockGetConfig.mockImplementation(async () => store)
+    mockSetConfig.mockImplementation(async (partial: Record<string, unknown>) => Object.assign(store, partial))
+    render(<ClipsPage />)
+    showSettings()
+    await screen.findByText('recordingQuality')
+    screen.getByTestId('gameAudioOnly-toggle').click()
+    await waitFor(() =>
+      expect(mockSetConfig).toHaveBeenCalledWith({ gameAudioOnly: true, micEnabled: true, audioLoopback: false }),
+    )
+    await waitFor(() => expect(mockGetConfig).toHaveBeenCalledTimes(2))
+    mockSetConfig.mockClear()
+    screen.getByTestId('gameAudioOnly-toggle').click()
+    expect(mockSetConfig).toHaveBeenCalledWith({ gameAudioOnly: false, audioLoopback: true })
+  })
+
+  it('renders audio sessions picker and includes an app session', async () => {
+    mockGetAudioSessions.mockResolvedValue([
+      { processId: 4421, processName: 'FiveM_b2944.exe', displayName: 'Grand Theft Auto V', isSelected: true },
+      { processId: 2233, processName: 'Spotify.exe', displayName: 'Spotify', isSelected: false },
+    ])
+    render(<ClipsPage />)
+    showSettings()
+    await screen.findByText('recordingQuality')
+    screen.getByText('audioSessions').click()
+    expect(await screen.findByText('Spotify')).toBeTruthy()
+    screen.getByText('sessionInclude').click()
+    expect(mockSetConfig).toHaveBeenLastCalledWith({ selectedAudioSessions: [2233] })
   })
 
   it('renders game detection toggle', async () => {

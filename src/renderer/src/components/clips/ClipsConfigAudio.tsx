@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import type { AudioSessionInfo } from '@shared/types'
+import { RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TipBadge } from './ClipsConfigQuality'
 import { CollapsibleMini, ToggleItem, TogglePill, VK_MAP, VolumeSlider } from './clips-utils'
@@ -28,6 +30,28 @@ export function AudioSection({
   | 'handleConfigUpdate'
   | 't'
 >) {
+  const [audioSessions, setAudioSessions] = useState<AudioSessionInfo[]>([])
+  const loadSessions = useCallback(async () => {
+    try {
+      const sessions = await window.dinho?.clipsGetAudioSessions()
+      setAudioSessions(Array.isArray(sessions) ? sessions : [])
+    } catch {
+      setAudioSessions([])
+    }
+  }, [])
+  useEffect(() => {
+    void loadSessions()
+  }, [loadSessions])
+  const toggleSession = useCallback(
+    (pid: number) => {
+      if (!config) return
+      const current = new Set(config.selectedAudioSessions ?? [])
+      if (current.has(pid)) current.delete(pid)
+      else current.add(pid)
+      void handleConfigUpdate({ selectedAudioSessions: [...current] })
+    },
+    [config, handleConfigUpdate],
+  )
   if (!config) return null
   return (
     <div className="space-y-3">
@@ -57,7 +81,7 @@ export function AudioSection({
             const newVal = !config.audioLoopback
             handleConfigUpdate({
               audioLoopback: newVal,
-              ...(newVal ? { gameAudioOnly: false } : {}),
+              gameAudioOnly: !newVal,
             })
           }}
         />
@@ -204,13 +228,14 @@ export function AudioSection({
           )}
         </div>
         <TogglePill
+          data-testid="gameAudioOnly-toggle"
           enabled={config.gameAudioOnly}
           accent="blue"
           onToggle={() => {
             const newVal = !config.gameAudioOnly
             handleConfigUpdate({
               gameAudioOnly: newVal,
-              ...(newVal ? { micEnabled: true, audioLoopback: false } : {}),
+              ...(newVal ? { micEnabled: true, audioLoopback: false } : { audioLoopback: true }),
             })
           }}
         />
@@ -264,6 +289,75 @@ export function AudioSection({
           )}
         </div>
       </div>
+
+      {/* App Audio Sessions */}
+      <CollapsibleMini
+        label={
+          <span className="flex items-center gap-1.5">
+            {t('audioSessions')}
+            <TipBadge id="audio-sessions" activeTip={activeTip} setActiveTip={setActiveTip} />
+          </span>
+        }
+        defaultOpen={false}
+      >
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px]" style={{ color: 'var(--text-dim)' }}>
+              {audioSessions.length > 0 ? t('audioSessionsCount') : t('audioSessionsEmpty')}
+            </span>
+            <button
+              type="button"
+              onClick={() => void loadSessions()}
+              title={t('refreshSessions')}
+              className="rounded p-0.5 transition-colors hover:bg-white/10"
+              style={{ color: 'var(--text-dim)' }}
+            >
+              <RefreshCw className="h-3 w-3" />
+            </button>
+          </div>
+          <div className="max-h-44 space-y-1 overflow-y-auto pr-0.5">
+            {audioSessions.map((s) => {
+              const selected = (config.selectedAudioSessions ?? []).includes(s.processId) || s.isSelected
+              return (
+                <div
+                  key={s.processId}
+                  className="flex items-center justify-between gap-2 rounded-lg border px-2 py-1.5"
+                  style={{ borderColor: selected ? 'var(--accent)' : 'var(--border-subtle)' }}
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                      {s.displayName}
+                    </div>
+                    <div className="truncate text-[9px]" style={{ color: 'var(--text-dim)' }}>
+                      {s.processName} &middot; PID {s.processId}
+                    </div>
+                  </div>
+                  {s.isSelected ? (
+                    <span
+                      className="shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-medium"
+                      style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6' }}
+                    >
+                      {t('requiredSession')}
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => toggleSession(s.processId)}
+                      className="shrink-0 rounded-md px-2 py-0.5 text-[9px] font-semibold transition-all"
+                      style={{
+                        background: selected ? 'var(--accent)' : 'rgba(113,113,122,0.1)',
+                        color: selected ? '#fff' : 'var(--text-dim)',
+                      }}
+                    >
+                      {selected ? t('sessionRemove') : t('sessionInclude')}
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </CollapsibleMini>
     </div>
   )
 }
