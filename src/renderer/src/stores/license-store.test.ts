@@ -87,7 +87,7 @@ describe('license-store', () => {
 
   it('activate sets error to reason even when reason is null', async () => {
     const kudu = mockKudu()
-    const result = makeLicenseResult({ valid: false, reason: null as unknown as undefined })
+    const result: LicenseResult = { valid: false }
     kudu.licenseActivate.mockResolvedValue(result)
     await useLicenseStore.getState().activate('KEY-NULL')
     expect(useLicenseStore.getState().error).toBeNull()

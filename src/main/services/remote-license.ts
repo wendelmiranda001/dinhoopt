@@ -62,14 +62,14 @@ async function callApi(body: Record<string, unknown>): Promise<Record<string, un
         clearTimeout(timer)
         reject(new Error(err.message || 'network error'))
       })
-      req.on('aborted' as unknown as 'aborted', () => {
+      req.on('abort', () => {
         clearTimeout(timer)
         reject(new Error('aborted/connection closed'))
       })
       req.on('response', (resp: Electron.IncomingMessage) => {
         clearTimeout(timer)
         const code = resp.statusCode ?? 0
-        const stream = resp.response ?? resp
+        const stream = (resp as Electron.IncomingMessage & { response?: Electron.IncomingMessage }).response ?? resp
         if (!stream || typeof stream.on !== 'function') {
           reject(new Error('invalid response stream'))
           return
@@ -177,15 +177,23 @@ export async function validateLicense(key: string, hwid: string): Promise<Remote
   try {
     const data = await callApi({ action: 'validate', key, hwid })
     if (data?.valid) {
-      const result: RemoteLicenseResult = { valid: true, type: data.type, expires_at: data.expires_at || null }
+      const result: RemoteLicenseResult = {
+        valid: true,
+        ...(typeof data.type === 'string' ? { type: data.type } : {}),
+        ...(typeof data.expires_at === 'string' && data.expires_at !== ''
+          ? { expires_at: data.expires_at }
+          : { expires_at: null }),
+      }
       writeCache({ ...result, timestamp: Date.now() } as CacheEntry)
       return result
     }
     return {
       valid: false,
-      reason: data?.reason || 'Licença inválida',
-      type: data?.type,
-      expires_at: data?.expires_at || null,
+      reason: typeof data?.reason === 'string' ? data.reason : 'Licença inválida',
+      ...(typeof data.type === 'string' ? { type: data.type } : {}),
+      ...(typeof data.expires_at === 'string' && data.expires_at !== ''
+        ? { expires_at: data.expires_at }
+        : { expires_at: null }),
     }
   } catch {
     return { valid: false, reason: 'Sem conexao com o servidor' }
