@@ -11,7 +11,7 @@ files:
 
 # asar DESLIGADO: o leitor C++ de asar do Chromium (netstack) falha com
 # ERR_FILE_NOT_FOUND no mainframe quando o exe e processado pelo builder
-# (rcedit/fuses) nesta combinacao Electron 44.3.0 + electron-vite 6 beta.
+# (rcedit/fuses) nesta combinacao Electron 44.4.1 + electron-vite 6 beta.
 # Node fs le o mesmo asar normalmente - bug isolado em 2026-08-23.
 # Sem asar, o app vai para resources/app/ como diretorio real.
 asar: false

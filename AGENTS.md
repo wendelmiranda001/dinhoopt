@@ -79,9 +79,9 @@ Commit format: `<type>: <description>` — Types: feat, fix, refactor, docs, tes
 
 ---
 
-## Current Status (consolidado — 2026-08-23)
+## Current Status (consolidado — 2026-09-17)
 
-**Stack (versões atuais):** Electron 44.3.0 · Vite 8.3.0 · Biome 2.5.13 · Vitest 5.0.0 · TypeScript 7.0.2 · React 19.3.0 · NAudio 3.1.0 · ffmpeg 9.0.1 · electron-vite 6.0.0-beta.1 (intencional, beta mais novo que o 5.0.0 estável)
+**Stack (versões atuais):** Electron 44.4.1 · Vite 8.3.0 · Biome 2.5.14 · Vitest 5.0.1 · TypeScript 7.0.2 · React 19.3.0 · NAudio 3.1.0 · ffmpeg 9.0.1 · electron-vite 6.0.0-beta.1 (intencional, beta mais novo que o 5.0.0 estável) · framer-motion 13.4.0 · lucide-react 1.46.0 · react-router-dom 7.18.4 · systeminformation 5.33.11 · jsdom 30.1.0 · Microsoft.NET.Test.Sdk 18.10.1
 
 **Testes/Qualidade:**
 - TS: ~6900 testes, 229 arquivos, 0 falhas — cobertura Stmts 93.7% / Branches 85.3% / Functions 93.7% / Lines 94.9%
