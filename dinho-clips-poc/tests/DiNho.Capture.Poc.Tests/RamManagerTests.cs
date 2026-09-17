@@ -5,10 +5,19 @@ namespace DiNho.Capture.Poc.Tests;
 public sealed class RamManagerTests : IDisposable
 {
     private readonly Func<long> _originalProbe;
+    private readonly Func<double> _originalUsedProbe;
 
-    public RamManagerTests() => _originalProbe = RamManager.GetAvailableRamBytesProbe;
+    public RamManagerTests()
+    {
+        _originalProbe = RamManager.GetAvailableRamBytesProbe;
+        _originalUsedProbe = RamManager.GetUsedPercentProbe;
+    }
 
-    public void Dispose() => RamManager.GetAvailableRamBytesProbe = _originalProbe;
+    public void Dispose()
+    {
+        RamManager.GetAvailableRamBytesProbe = _originalProbe;
+        RamManager.GetUsedPercentProbe = _originalUsedProbe;
+    }
 
     [Fact]
     public void ComputeSafeBudget_HugeRam_FullBudget()
@@ -343,5 +352,134 @@ public sealed class RamManagerTests : IDisposable
 
         Assert.True(p.MaxBufferBytes > 0, $"MaxBufferBytes must stay positive, got {p.MaxBufferBytes}");
         Assert.True(p.MaxBufferBytes <= int.MaxValue);
+    }
+
+    // ── Adaptative gradual (watchdog): passos de 30s, sem "baque" ──────
+
+    private static RamManager CreateFullProfileRamManager(int repeatReplay)
+    {
+        RamManager.GetAvailableRamBytesProbe = () => 8L * 1024 * 1024 * 1024; // Full profile
+        return new RamManager(1920, 1080, repeatReplay, 24);
+    }
+
+    [Fact]
+    public void CriticalPressure_StepsReplayDownBy30()
+    {
+        using var rm = CreateFullProfileRamManager(300);
+        rm.ResolveProfile();
+        List<int> steps = [];
+        rm.OnReduceReplay = s => steps.Add(s);
+
+        rm.EvaluatePressure(0.95);
+
+        Assert.Equal([270], steps);
+    }
+
+    [Fact]
+    public void RepeatedCriticalPressure_StepsDownToFloorAndStops()
+    {
+        using var rm = CreateFullProfileRamManager(300);
+        rm.ResolveProfile();
+        List<int> steps = [];
+        rm.OnReduceReplay = s => steps.Add(s);
+
+        for (int i = 0; i < 12; i++) rm.EvaluatePressure(0.95);
+
+        Assert.Equal([270, 240, 210, 180, 150, 120, 90, 60, 30], steps);
+        Assert.Equal(9, steps.Count); // no-op após atingir o piso de 30s
+    }
+
+    [Fact]
+    public void PressureWarning_DoesNotReduceReplay()
+    {
+        using var rm = CreateFullProfileRamManager(300);
+        rm.ResolveProfile();
+        List<int> steps = [];
+        rm.OnReduceReplay = s => steps.Add(s);
+
+        rm.EvaluatePressure(0.90);
+
+        Assert.Empty(steps);
+    }
+
+    [Fact]
+    public void NormalAfterPressure_RestoresGradually()
+    {
+        using var rm = CreateFullProfileRamManager(300);
+        rm.ResolveProfile();
+        List<int> reduce = [];
+        List<int> increase = [];
+        bool normal = false;
+        rm.OnReduceReplay = s => reduce.Add(s);
+        rm.OnIncreaseReplay = s => increase.Add(s);
+        rm.OnNormal = () => normal = true;
+
+        rm.EvaluatePressure(0.95);
+        Assert.Equal([270], reduce);
+
+        rm.EvaluatePressure(0.60);
+        Assert.Equal([300], increase);
+        Assert.True(normal);
+    }
+
+    [Fact]
+    public void NormalAfterMultiStepPressure_RestoresStepByStep()
+    {
+        using var rm = CreateFullProfileRamManager(300);
+        rm.ResolveProfile();
+        List<int> increase = [];
+        bool normal = false;
+        rm.OnReduceReplay = _ => { };
+        rm.OnIncreaseReplay = s => increase.Add(s);
+        rm.OnNormal = () => normal = true;
+
+        rm.EvaluatePressure(0.95);
+        rm.EvaluatePressure(0.95); // 300 → 240
+
+        rm.EvaluatePressure(0.60); // 240 → 270, ainda não normal
+        Assert.Equal([270], increase);
+        Assert.False(normal);
+
+        rm.EvaluatePressure(0.60); // 270 → 300, normal agora
+        Assert.Equal([270, 300], increase);
+        Assert.True(normal);
+    }
+
+    [Fact]
+    public void NormalWithoutPressure_DoesNothing()
+    {
+        using var rm = CreateFullProfileRamManager(300);
+        rm.ResolveProfile();
+        List<int> reduce = [];
+        List<int> increase = [];
+        bool normal = false;
+        rm.OnReduceReplay = s => reduce.Add(s);
+        rm.OnIncreaseReplay = s => increase.Add(s);
+        rm.OnNormal = () => normal = true;
+
+        rm.EvaluatePressure(0.60);
+
+        Assert.Empty(reduce);
+        Assert.Empty(increase);
+        Assert.False(normal);
+    }
+
+    [Fact]
+    public void Watchdog_UsesUsedPercentProbe_AndReducesGradually()
+    {
+        RamManager.GetUsedPercentProbe = () => 0.95;
+        using var rm = CreateFullProfileRamManager(300);
+        rm.ResolveProfile();
+        List<int> steps = [];
+        rm.OnReduceReplay = s => steps.Add(s);
+
+        rm.StartWatchdog(TimeSpan.FromMilliseconds(10));
+        Thread.Sleep(300);
+        rm.StopWatchdog();
+
+        Assert.NotEmpty(steps);
+        Assert.Equal(270, steps[0]); // 1º passo degrada em 30s (não cai pela metade para 150s)
+        Assert.Equal(30, steps[^1]); // converge ao piso e para
+        Assert.True(steps[^1] <= steps[0]);
     }
 }

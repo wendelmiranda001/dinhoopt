@@ -138,12 +138,10 @@ export function useClipsState(): ClipsState {
   const tooltipContent: Record<string, string> = useMemo(
     () => ({
       quality: t('tooltipQuality'),
-      codec: t('tooltipCodec'),
       gpu: t('tooltipGpu'),
       resolution: t('tooltipResolution'),
       fps: t('tooltipFps'),
       replay: t('tooltipReplay'),
-      'force-software': t('forceSoftwareTooltip'),
       'stretch-to-fit': t('stretchToFitTooltip'),
       'replay-buffer-mode': t('replayBufferModeTooltip'),
       mic: t('tooltipMic'),

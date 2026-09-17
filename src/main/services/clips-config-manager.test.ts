@@ -397,7 +397,7 @@ describe('clips-config-manager', () => {
       expect(config.stretchToFit).toBe(false)
     })
 
-    it('syncs replayTimeSeconds and fps from store', () => {
+    it('syncs replayTimeSeconds and normalized fps (legacy 120 clamps to 60) from store', () => {
       const saved: ReturnType<typeof loadClipsConfig> = {
         replayTimeSeconds: 600,
         fps: 120,
@@ -440,8 +440,56 @@ describe('clips-config-manager', () => {
       vi.mocked(loadClipsConfig).mockReturnValueOnce(saved)
       loadPersistedClipsConfig()
       expect(config.engineReplayTimeSeconds).toBe(600)
-      expect(config.engineFps).toBe(120)
       expect(config.replayBufferMode).toBe('disk')
+      expect(config.engineFps).toBe(60)
+    })
+
+    it('forces legacy codec and forceSoftware back to auto/false (codec UI removed)', () => {
+      const saved: ReturnType<typeof loadClipsConfig> = {
+        replayTimeSeconds: 120,
+        fps: 60,
+        micEnabled: true,
+        noiseSuppression: false,
+        audioLoopback: false,
+        width: 1920,
+        height: 1080,
+        bitrateKbps: 40000,
+        cq: 20,
+        maxrateKbps: 30000,
+        bufsizeKbps: 60000,
+        bframes: 3,
+        lookahead: 16,
+        encoderPreset: 'p5',
+        codec: 'h264',
+        adapterIndex: -1,
+        outputDirectory: '',
+        forceSoftware: true,
+        hotkeys: [],
+        pushToTalk: 'hold',
+        pushToTalkKeys: [],
+        gameDetection: true,
+        gameAudioOnly: false,
+        customGameProcess: '',
+        micDeviceId: '',
+        autoStartCapture: false,
+        useExcludeMode: false,
+        excludeProcessId: 0,
+        gameVolume: 1.0,
+        micVolume: 1.0,
+        selectedAudioSessions: [],
+        audioSampleRate: 48000,
+        autoCleanupEnabled: true,
+        autoCleanupThresholdGB: 100,
+        adaptiveQuality: true,
+        replayBufferMode: 'disk',
+        stretchToFit: false,
+      }
+      config.codec = 'h264'
+      config.forceSoftware = true
+      vi.mocked(loadClipsConfig).mockReturnValueOnce(saved)
+      loadPersistedClipsConfig()
+      expect(config.codec).toBe('auto')
+      expect(config.forceSoftware).toBe(false)
     })
   })
 

@@ -249,6 +249,14 @@ public sealed partial class EngineCoordinator
                             Log.I("EngineCoordinator", $"RAM normal — replay buffer restaurado para {_activeProfile.ReplaySeconds}s");
                         }
                     };
+                    _ramManager.OnIncreaseReplay = increasedReplay =>
+                    {
+                        if (_buffer != null)
+                        {
+                            _buffer.MaxDuration = TimeSpan.FromSeconds(increasedReplay);
+                            Log.I("EngineCoordinator", $"RAM estável — replay buffer restaurado parcialmente para {increasedReplay}s");
+                        }
+                    };
                     _ramManager.StartWatchdog();
                     _activeProfile = _ramManager.ResolveProfile();
                 }

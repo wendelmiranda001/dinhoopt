@@ -157,28 +157,6 @@ export function QualitySection({
         })}
       </div>
 
-      {/* Codec selector */}
-      <div>
-        <FieldLabel>
-          {t('codec')}
-          <TipBadge id="codec" activeTip={activeTip} setActiveTip={setActiveTip} />
-        </FieldLabel>
-        <SegmentedControl
-          layoutId="codec"
-          wrap
-          options={[
-            { value: 'auto', label: t('codecAuto') },
-            { value: 'h264', label: t('codecH264') },
-            { value: 'hevc', label: t('codecHevc') },
-            { value: 'av1', label: t('codecAv1') },
-            { value: 'libx264', label: t('codecSwH264') },
-            { value: 'libx265', label: t('codecSwHevc') },
-          ]}
-          value={(config.codec ?? 'auto') as 'auto' | 'h264' | 'hevc' | 'av1' | 'libx264' | 'libx265'}
-          onChange={(codec) => handleConfigUpdate({ codec })}
-        />
-      </div>
-
       {/* GPU selector */}
       {gpuList.length > 0 && (
         <div>
@@ -269,10 +247,8 @@ export function QualitySection({
             options={[
               { value: '30', label: '30' },
               { value: '60', label: '60' },
-              { value: '75', label: '75' },
-              { value: '120', label: '120' },
             ]}
-            value={String(config.fps) as '30' | '60' | '75' | '120'}
+            value={String(config.fps) as '30' | '60'}
             onChange={(v) => handleConfigUpdate({ fps: Number(v) })}
           />
         </div>
@@ -372,17 +348,6 @@ export function QualitySection({
           </div>
         )}
       </div>
-
-      {/* Force Software Encoding */}
-      <ToggleRow
-        title={t('forceSoftware')}
-        tip={t('forceSoftwareTooltip')}
-        tooltipId="force-software"
-        activeTip={activeTip}
-        setActiveTip={setActiveTip}
-        enabled={config.forceSoftware ?? false}
-        onToggle={() => handleConfigUpdate({ forceSoftware: !(config.forceSoftware ?? false) })}
-      />
 
       {/* Adaptive Quality */}
       <ToggleRow

@@ -275,7 +275,7 @@ public sealed class ConfigManager : IDisposable
         if (config.ReplayTimeSeconds < 30 || config.ReplayTimeSeconds > 600)
             config.ReplayTimeSeconds = _defaults.ReplayTimeSeconds;
 
-        if (config.Fps is not (30 or 60 or 75 or 120))
+        if (config.Fps is not (30 or 60))
             config.Fps = _defaults.Fps;
 
         if (config.AudioSampleRate is not (44100 or 48000 or 96000))

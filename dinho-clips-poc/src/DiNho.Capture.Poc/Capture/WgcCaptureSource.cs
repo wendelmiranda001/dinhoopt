@@ -48,7 +48,7 @@ public sealed class WgcCaptureSource : ICaptureSource
     /// <summary>
     /// Intervalo de captura (ticks de Stopwatch) para o fps alvo.
     /// fps &lt;= 0 desliga o cap (aceita todos os frames). Divisão truncada:
-    /// 30→333.333, 60→166.666, 75→133.333, 120→83.333, 144→69.444.
+    /// 30→333.333, 60→166.666, 144→69.444.
     /// </summary>
     public static long ComputeCapIntervalTicks(int fps) => fps <= 0 ? 0 : 10_000_000L / fps;
 

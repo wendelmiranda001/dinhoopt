@@ -32,6 +32,7 @@ public sealed class RamManager : IDisposable
     private const long GameReserveBytes = 400L * 1024 * 1024;
     private const long CaptureOverheadBytes = 200L * 1024 * 1024;
     private const int MinReplaySec = 30;
+    private const int ReplayStepSeconds = 30;
     private const int MinHeight = 720;
     private const int MaxCq = 26;
 
@@ -53,6 +54,7 @@ public sealed class RamManager : IDisposable
     private bool _disposed;
     private CaptureProfile? _lastProfile;
     private bool _wasUnderPressure;
+    private int _currentReplaySec;
 
     public RamManager(
         int captureWidth,
@@ -76,10 +78,14 @@ public sealed class RamManager : IDisposable
 
     public Action<string>? OnBroadcast { get; set; }
     public Action<int>? OnReduceReplay { get; set; }
+    public Action<int>? OnIncreaseReplay { get; set; }
     public Action? OnNormal { get; set; }
 
     // 6.10: seam de RAM disponível p/ testes determinísticos do ResolveProfile.
     internal static Func<long> GetAvailableRamBytesProbe = GetAvailableRamBytes;
+
+    // Seam de % de RAM usada p/ testes determinísticos do watchdog (EvaluatePressure).
+    internal static Func<double> GetUsedPercentProbe = GetRamUsedPercent;
 
     public static long ComputeSafeBudget(long availableBytes)
     {
@@ -222,18 +228,21 @@ public sealed class RamManager : IDisposable
 
         _lastProfile = profile;
         _wasUnderPressure = level != RamProfileLevel.Full;
+        _currentReplaySec = profile.ReplaySeconds;
         var memMb = (int)(availableBytes / (1024L * 1024L));
         Logging.Log.I("RamManager", $"ResolveProfile: availableRAM={memMb}MB budget={budgetMb}MB profile={level} cq={profile.Cq} replay={profile.ReplaySeconds}s encode={profile.EncodeWidth}x{profile.EncodeHeight} maxBuf={profile.MaxBufferBytes / (1024*1024)}MB");
         return profile;
     }
 
-    public void StartWatchdog()
+    public void StartWatchdog() => StartWatchdog(TimeSpan.FromSeconds(5));
+
+    internal void StartWatchdog(TimeSpan interval)
     {
         if (_disposed) return;
         lock (_lock)
         {
             _watchdog?.Dispose();
-            _watchdog = new Timer(WatchdogCheck, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+            _watchdog = new Timer(WatchdogCheck, null, interval, interval);
         }
     }
 
@@ -251,35 +260,59 @@ public sealed class RamManager : IDisposable
         if (_disposed) return;
         try
         {
-            double usedPct = GetRamUsedPercent();
-            if (usedPct >= CriticalThreshold)
-            {
-                if (_lastProfile != null)
-                {
-                    int reducedReplay = Math.Max(_lastProfile.ReplaySeconds / 2, MinReplaySec);
-                    OnReduceReplay?.Invoke(reducedReplay);
-                    _wasUnderPressure = true;
-                    var msg = BuildPressureMessage("critical", usedPct, reducedReplay);
-                    OnBroadcast?.Invoke(msg);
-                }
-            }
-            else if (usedPct >= PressureThreshold)
-            {
-                _wasUnderPressure = true;
-                var msg = BuildPressureMessage("warning", usedPct, null);
-                OnBroadcast?.Invoke(msg);
-            }
-            else if (usedPct < NormalThreshold - 0.05 && _wasUnderPressure)
-            {
-                _wasUnderPressure = false;
-                OnNormal?.Invoke();
-                var msg = BuildNormalMessage(usedPct);
-                OnBroadcast?.Invoke(msg);
-            }
+            EvaluatePressure(GetUsedPercentProbe());
         }
         catch (Exception ex)
         {
             Logging.Log.E("RamManager", $"Watchdog error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Núcleo do watchdog: recebe a % de RAM usada e degrada/restaura o replay
+    /// buffer GRADUALMENTE (passos de <see cref="ReplayStepSeconds"/>).
+    /// Crítico (≥93%): reduz 30s por checagem até o piso de MinReplaySec.
+    /// Aviso (≥85%): apenas alerta, não mexe no buffer.
+    /// Normal (&lt;70%): restaura 30s por checagem até o replay ativo do perfil.
+    /// </summary>
+    internal void EvaluatePressure(double usedPct)
+    {
+        if (usedPct >= CriticalThreshold)
+        {
+            _wasUnderPressure = true;
+            int next = Math.Max(_currentReplaySec - ReplayStepSeconds, MinReplaySec);
+            if (next != _currentReplaySec)
+            {
+                _currentReplaySec = next;
+                OnReduceReplay?.Invoke(next);
+            }
+            OnBroadcast?.Invoke(BuildPressureMessage("critical", usedPct, next));
+        }
+        else if (usedPct >= PressureThreshold)
+        {
+            _wasUnderPressure = true;
+            OnBroadcast?.Invoke(BuildPressureMessage("warning", usedPct, null));
+        }
+        else if (usedPct < NormalThreshold - 0.05 && _wasUnderPressure)
+        {
+            if (_lastProfile != null && _currentReplaySec < _lastProfile.ReplaySeconds)
+            {
+                int next = Math.Min(_currentReplaySec + ReplayStepSeconds, _lastProfile.ReplaySeconds);
+                _currentReplaySec = next;
+                OnIncreaseReplay?.Invoke(next);
+                if (next >= _lastProfile.ReplaySeconds)
+                {
+                    _wasUnderPressure = false;
+                    OnNormal?.Invoke();
+                    OnBroadcast?.Invoke(BuildNormalMessage(usedPct));
+                }
+            }
+            else
+            {
+                _wasUnderPressure = false;
+                OnNormal?.Invoke();
+                OnBroadcast?.Invoke(BuildNormalMessage(usedPct));
+            }
         }
     }
 

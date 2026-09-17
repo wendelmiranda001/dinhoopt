@@ -660,11 +660,13 @@ describe('CLIPS_SET_CONFIG', () => {
     vi.clearAllMocks()
   })
 
-  it('returns success when pipe is not connected', async () => {
+  it('returns success when pipe is not connected and clamps fps to 60', async () => {
     const handlers = captureHandlers()
     const handler = getAsyncHandler(handlers, IPC.CLIPS_SET_CONFIG)
     const result = (await handler({}, { fps: 120 })) as { success: boolean; error?: string }
     expect(result.success).toBe(true)
+    const cfg = getSyncHandler(handlers, IPC.CLIPS_GET_CONFIG)() as Record<string, unknown>
+    expect(cfg.fps).toBe(60)
   })
 
   it('updates outputDirectory when set via config', async () => {
@@ -736,7 +738,7 @@ describe('CLIPS_SET_CONFIG', () => {
         adapterIndex: 0,
         micEnabled: true,
         audioLoopback: true,
-        forceSoftware: false,
+        forceSoftware: true,
         gameDetection: true,
         autoStartCapture: false,
         useExcludeMode: true,
@@ -759,6 +761,7 @@ describe('CLIPS_SET_CONFIG', () => {
     expect(cfg.gameVolume).toBe(0.8)
     expect(cfg.micVolume).toBe(1.2)
     expect(cfg.encoderPreset).toBe('p4')
+    expect(cfg.codec).toBe('auto')
     expect(cfg.autoCleanupThresholdGB).toBe(100)
   })
 

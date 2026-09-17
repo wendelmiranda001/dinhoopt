@@ -494,12 +494,6 @@ describe('ClipsPage', () => {
     expect(mockSetConfig).toHaveBeenCalledWith(expect.objectContaining({ cq: 18, maxrateKbps: 55000 }))
   })
 
-  it('renders force software toggle', async () => {
-    render(<ClipsPage />)
-    showSettings()
-    expect(await screen.findByText('forceSoftware')).toBeTruthy()
-  })
-
   it('switches replay buffer mode to disk via 3-way selector', async () => {
     render(<ClipsPage />)
     showSettings()
@@ -566,17 +560,6 @@ describe('ClipsPage', () => {
     render(<ClipsPage />)
     expect(await screen.findByText('recording')).toBeTruthy()
     expect(screen.queryByText(/droppedFrames/)).toBeNull()
-  })
-
-  it('calls setConfig when force software toggle is clicked', async () => {
-    render(<ClipsPage />)
-    showSettings()
-    await screen.findByText('recordingQuality')
-    const row = screen.getByText('forceSoftware').parentElement!.parentElement!
-    const buttons = row.querySelectorAll('button')
-    const fsToggle = buttons[buttons.length - 1]!
-    fsToggle.click()
-    expect(mockSetConfig).toHaveBeenCalledWith({ forceSoftware: true })
   })
 
   it('calls setConfig with 150 when selecting custom replay time from a preset', async () => {

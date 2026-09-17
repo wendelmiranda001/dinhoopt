@@ -727,13 +727,16 @@ public sealed class EngineCoordinatorTests
         Assert.Equal(50000, loaded.Config.BitrateKbps);
     }
 
-    [Fact]
-    public void ConfigManager_Load_InvalidFps_Reverts()
+    [Theory]
+    [InlineData(75)]
+    [InlineData(120)]
+    [InlineData(999)]
+    public void ConfigManager_Load_InvalidFps_Reverts(int fps)
     {
         var tempFile = Path.Combine(Path.GetTempPath(), "DiNhoTest_" + Guid.NewGuid().ToString("N"), "config.json");
         var dir = Path.GetDirectoryName(tempFile)!;
         Directory.CreateDirectory(dir);
-        File.WriteAllText(tempFile, """{"Fps": 999}""");
+        File.WriteAllText(tempFile, $"{{\"Fps\": {fps}}}");
         var cfg = new ConfigManager(tempFile);
         Assert.Equal(60, cfg.Config.Fps);
     }
@@ -1200,8 +1203,6 @@ public sealed class EngineCoordinatorTests
     [Theory]
     [InlineData(30)]
     [InlineData(60)]
-    [InlineData(75)]
-    [InlineData(120)]
     public void ConfigManager_Load_ValidFps_Kept(int fps)
     {
         var tempFile = Path.Combine(Path.GetTempPath(), "DiNhoTest_" + Guid.NewGuid().ToString("N"), "config.json");

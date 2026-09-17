@@ -18,6 +18,7 @@ import {
   clipPathInOutputDir,
   getCurrentConfigPayload,
   getDefaultOutputDir,
+  normalizeFps,
   persistClipsConfig,
 } from '../services/clips-config-manager'
 import {
@@ -324,7 +325,7 @@ export function registerClipsIpc(): void {
     if (c) {
       if (typeof c.replayTimeSeconds === 'number')
         C.engineReplayTimeSeconds = Math.max(30, Math.min(600, c.replayTimeSeconds))
-      if (typeof c.fps === 'number') C.engineFps = c.fps
+      if (typeof c.fps === 'number') C.engineFps = normalizeFps(c.fps)
       if (typeof c.width === 'number') C.width = c.width
       if (typeof c.height === 'number') C.height = c.height
       if (typeof c.bitrateKbps === 'number') C.bitrateKbps = c.bitrateKbps
@@ -335,11 +336,10 @@ export function registerClipsIpc(): void {
       if (typeof c.lookahead === 'number') C.lookahead = Math.max(0, Math.min(256, c.lookahead))
       if (typeof c.encoderPreset === 'string' && VALID_ENCODER_PRESETS.has(c.encoderPreset))
         C.encoderPreset = c.encoderPreset
-      if (typeof c.codec === 'string') C.codec = c.codec
+      C.codec = 'auto'
       if (typeof c.adapterIndex === 'number') C.adapterIndex = c.adapterIndex
       if (typeof c.micEnabled === 'boolean') C.micEnabled = c.micEnabled
       if (typeof c.audioLoopback === 'boolean') C.audioLoopback = c.audioLoopback
-      if (typeof c.forceSoftware === 'boolean') C.forceSoftware = c.forceSoftware
       if (typeof c.stretchToFit === 'boolean') C.stretchToFit = c.stretchToFit
       if (c.replayBufferMode === 'ram' || c.replayBufferMode === 'hybrid' || c.replayBufferMode === 'disk')
         C.replayBufferMode = c.replayBufferMode

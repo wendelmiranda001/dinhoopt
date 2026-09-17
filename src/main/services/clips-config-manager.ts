@@ -8,6 +8,12 @@ const MODIFIER_VK_MAP: Record<string, number> = {
   Alt: 0x12,
 }
 
+// Clip recording only supports 30/60 FPS (UI + engine whitelist). Any other
+// value (75/120 legacy persisted) is normalized back to 60 for consistency.
+export function normalizeFps(fps: number): number {
+  return fps === 30 || fps === 60 ? fps : 60
+}
+
 export interface ConfigState {
   engineFps: number
   engineReplayTimeSeconds: number
@@ -198,11 +204,11 @@ export function loadPersistedClipsConfig(): void {
   config.bframes = saved.bframes ?? 3
   config.lookahead = saved.lookahead ?? 16
   config.encoderPreset = saved.encoderPreset ?? 'p5'
-  config.codec = saved.codec ?? 'auto'
+  config.codec = 'auto'
   config.adapterIndex = saved.adapterIndex ?? -1
   config.micEnabled = saved.micEnabled
   config.audioLoopback = saved.audioLoopback
-  config.forceSoftware = saved.forceSoftware
+  config.forceSoftware = false
   config.pushToTalk = saved.pushToTalk
   config.pushToTalkKeys = saved.pushToTalkKeys
   config.gameDetection = saved.gameDetection
@@ -225,7 +231,7 @@ export function loadPersistedClipsConfig(): void {
   config.hotkeys = saved.hotkeys
   config.outputDirectory = saved.outputDirectory
   config.engineReplayTimeSeconds = saved.replayTimeSeconds
-  config.engineFps = saved.fps
+  config.engineFps = normalizeFps(saved.fps)
 }
 
 export function persistClipsConfig(): void {
