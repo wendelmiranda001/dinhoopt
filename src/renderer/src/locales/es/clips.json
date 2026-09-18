@@ -138,6 +138,7 @@
   "presetMuitoAlta": "Muy Alta",
   "presetAlta": "Alta",
   "presetBoa": "Buena",
+  "presetPerformance": "Rendimiento",
   "codecAuto": "Auto",
   "gpuLabel": "GPU",
   "actionSaveClipLabel": "Replay",

@@ -60,6 +60,7 @@ import { CLIP_VIDEO_SCHEME, handleClipVideoRequest } from './ipc/clip-video-prot
 import { stopEngineProcess } from './ipc/clips-engine-connection'
 import { ensureRulesLoaded } from './ipc/winapp2-rules-store'
 import { initAuditLog } from './services/audit-log'
+import { relaunchElevated } from './services/auto-elevate'
 import { initAutoUpdater } from './services/auto-updater'
 import { initBackupManager } from './services/backup-manager'
 import { isAdmin } from './services/elevation'
@@ -134,14 +135,24 @@ function initGui(): void {
   // Skip elevation during E2E tests — the runner launches non-admin and would
   // otherwise block on a UAC prompt that never gets accepted.
   if (process.platform === 'win32' && !isAdmin() && process.env.DINHO_E2E !== '1') {
-    getLogger().info('app', 'Not running as admin — spawning UAC elevation via PowerShell')
+    getLogger().info('app', 'Not running as admin — spawning UAC elevation')
     let psScript: string
     if (app.isPackaged) {
-      // Packaged: relaunch the app exe directly (it has the entry point).
-      const exePath = app.getPath('exe')
-      const escapedExe = exePath.replace(/'/g, "''")
-      const argList = dataDirFlag ? ` -ArgumentList '${dataDirFlag.replace(/'/g, "''")}'` : ''
-      psScript = `Start-Process -FilePath '${escapedExe}'${argList} -Verb RunAs`
+      // Packaged: relaunch the app exe elevated without PowerShell. elevate.exe
+      // (shipped by electron-builder in resources/) shows the UAC prompt and
+      // runs the entry-point exe elevated — removes the PowerShell+RunAs pattern
+      // that Defender/CrowdStrike ML flags as a false positive (Trojan:Script/
+      // Wacatac.B!ml), which was quarantining out/main/index.js on install.
+      const result = relaunchElevated({
+        childExecutable: app.getPath('exe'),
+        resourcesPath: process.resourcesPath,
+        childArgs: dataDirFlag ? [dataDirFlag] : [],
+        onError: (err) => getLogger().error('app', `UAC elevation failed: ${err.message}`),
+      })
+      getLogger().info('app', `UAC elevation via ${result.method} — exiting un-elevated instance`)
+      app.releaseSingleInstanceLock()
+      app.exit(0)
+      return
     } else {
       // Dev: relaunch the whole `npm run dev` command elevated.
       // We cannot just relaunch electron.exe (app.getPath('exe') is the bare

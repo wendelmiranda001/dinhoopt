@@ -928,6 +928,191 @@ describe('useClipsActions', () => {
       expect(dinho.clipsSetConfig).not.toHaveBeenCalled()
     })
   })
+
+  describe('fallback messages and unexpected errors', () => {
+    it('uses the generic start message when the engine fails without an error', async () => {
+      const dinho = mockDinho()
+      dinho.clipsStartEngine.mockResolvedValue({ success: false })
+      const deps = getDeps(makeDeps({ status: { running: false, capturing: false } }))
+      const { result } = renderHook(() => useClipsActions(deps))
+
+      await act(async () => {
+        await result.current.handleStartRecording()
+      })
+
+      expect(toast.error).toHaveBeenCalledWith('failedToStart')
+      expect(dinho.clipsStartCapture).not.toHaveBeenCalled()
+    })
+
+    it('uses the generic save message when save fails without an error', async () => {
+      const dinho = mockDinho()
+      dinho.clipsSaveClip.mockResolvedValue({ success: false })
+      const deps = getDeps(makeDeps())
+      const { result } = renderHook(() => useClipsActions(deps))
+
+      await act(async () => {
+        await result.current.handleSaveClip()
+      })
+
+      expect(toast.error).toHaveBeenCalledWith('failedToSaveClip')
+    })
+
+    it('uses the generic delete message and surfaces rejections', async () => {
+      const dinho = mockDinho()
+      dinho.clipsDelete.mockResolvedValue({ success: false })
+      const deps = getDeps(makeDeps())
+      const { result } = renderHook(() => useClipsActions(deps))
+
+      await act(async () => {
+        await result.current.handleDeleteClip('a.mp4')
+      })
+      expect(toast.error).toHaveBeenCalledWith('failedToDeleteClip')
+
+      dinho.clipsDelete.mockRejectedValue('boom')
+      await act(async () => {
+        await result.current.handleDeleteClip('a.mp4')
+      })
+      expect(toast.error).toHaveBeenCalledWith('boom')
+    })
+
+    it('aborts a multi-delete when the confirmation is declined', async () => {
+      const dinho = mockDinho()
+      window.confirm = vi.fn(() => false) as never
+      const deps = getDeps(makeDeps({ selectedClips: new Set(['a.mp4']) }))
+      const { result } = renderHook(() => useClipsActions(deps))
+
+      await act(async () => {
+        await result.current.handleDeleteSelected()
+      })
+
+      expect(dinho.clipsDelete).not.toHaveBeenCalled()
+      expect(deps.refreshClips).not.toHaveBeenCalled()
+    })
+
+    it('uses the generic rename message and surfaces rejections', async () => {
+      const dinho = mockDinho()
+      dinho.clipsRename.mockResolvedValue({ success: false })
+      const deps = getDeps(makeDeps())
+      const { result } = renderHook(() => useClipsActions(deps))
+
+      await act(async () => {
+        await result.current.handleRenameClip('a.mp4', 'b')
+      })
+      expect(toast.error).toHaveBeenCalledWith('renameError')
+
+      dinho.clipsRename.mockRejectedValue('kaboom')
+      await act(async () => {
+        await result.current.handleRenameClip('a.mp4', 'b')
+      })
+      expect(toast.error).toHaveBeenCalledWith('kaboom')
+    })
+
+    it('surfaces a non-Error publish rejection', async () => {
+      const dinho = mockDinho()
+      dinho.clipsPublish.mockRejectedValue('nope')
+      const deps = getDeps(makeDeps())
+      const { result } = renderHook(() => useClipsActions(deps))
+
+      await act(async () => {
+        await result.current.handlePublishClip('a', 'C:\\clips\\a.mp4')
+      })
+
+      expect(toast.error).toHaveBeenCalledWith('publishFailed')
+      expect(deps.setPublishingPath).toHaveBeenLastCalledWith(null)
+    })
+  })
+
+  describe('hotkey gap coverage', () => {
+    const hk = (id: string, vk: number): HotkeyBinding => ({
+      id,
+      vk,
+      modifiers: [],
+      action: 'saveClip',
+      replayDurationSeconds: 60,
+      enabled: true,
+    })
+
+    it('leaves hotkeys untouched when patching an unknown id', async () => {
+      const dinho = mockDinho()
+      dinho.clipsSetConfig.mockResolvedValue(true)
+      const deps = getDeps(makeDeps({ config: makeConfig({ hotkeys: [hk('hk-1', 0x50)] }) }))
+      const { result } = renderHook(() => useClipsActions(deps))
+
+      await act(async () => {
+        await result.current.updateHotkey('missing', { vk: 0x99 })
+      })
+
+      const [patch] = dinho.clipsSetConfig.mock.calls[0]!
+      const hotkeys = (patch as { hotkeys: HotkeyBinding[] }).hotkeys
+      expect(hotkeys).toHaveLength(1)
+      expect(hotkeys[0]!.vk).toBe(0x50)
+    })
+
+    function dispatchKey(opts: KeyboardEventInit) {
+      window.dispatchEvent(new KeyboardEvent('keydown', opts))
+    }
+
+    it('rebinds with shift only and leaves other hotkeys untouched', async () => {
+      const dinho = mockDinho()
+      dinho.clipsSetConfig.mockResolvedValue(true)
+      const deps = getDeps(makeDeps({ config: makeConfig({ hotkeys: [hk('hk-1', 0x50), hk('hk-2', 0x51)] }) }))
+      const { result } = renderHook(() => useClipsActions(deps))
+      const cleanup = result.current.setupRebindingListeners('hk-1')
+
+      dispatchKey({ keyCode: 0x42, ctrlKey: false, shiftKey: true, altKey: false })
+
+      const [patch] = dinho.clipsSetConfig.mock.calls[0]!
+      const hotkeys = (patch as { hotkeys: HotkeyBinding[] }).hotkeys
+      expect(hotkeys[0]!.modifiers).toEqual(['Shift'])
+      expect(hotkeys[1]!.vk).toBe(0x51)
+      expect(hotkeys[1]!.modifiers).toEqual([])
+      cleanup()
+    })
+
+    it('adds a push-to-talk mouse button but not duplicates', async () => {
+      const dinho = mockDinho()
+      dinho.clipsSetConfig.mockResolvedValue(true)
+      const deps = getDeps(makeDeps({ config: makeConfig({ pushToTalkKeys: [0x14] }) }))
+      const { result } = renderHook(() => useClipsActions(deps))
+      const cleanup = result.current.setupRebindingListeners('hk-ptt')
+
+      window.dispatchEvent(new MouseEvent('mousedown', { button: 3 }))
+
+      const [patch] = dinho.clipsSetConfig.mock.calls[0]!
+      expect((patch as { pushToTalkKeys: number[] }).pushToTalkKeys).toEqual([0x14, 0x05])
+      expect(deps.setRebindingId).toHaveBeenCalledWith(null)
+      cleanup()
+
+      const dinho2 = mockDinho()
+      dinho2.clipsSetConfig.mockResolvedValue(true)
+      const deps2 = getDeps(makeDeps({ config: makeConfig({ pushToTalkKeys: [0x05] }) }))
+      const second = renderHook(() => useClipsActions(deps2))
+      const cleanup2 = second.result.current.setupRebindingListeners('hk-ptt')
+
+      window.dispatchEvent(new MouseEvent('mousedown', { button: 3 }))
+
+      expect(dinho2.clipsSetConfig).not.toHaveBeenCalled()
+      expect(deps2.setRebindingId).toHaveBeenCalledWith(null)
+      cleanup2()
+    })
+
+    it('rebinds a hotkey from a mouse button with modifiers', async () => {
+      const dinho = mockDinho()
+      dinho.clipsSetConfig.mockResolvedValue(true)
+      const deps = getDeps(makeDeps({ config: makeConfig({ hotkeys: [hk('hk-1', 0x50), hk('hk-2', 0x51)] }) }))
+      const { result } = renderHook(() => useClipsActions(deps))
+      const cleanup = result.current.setupRebindingListeners('hk-1')
+
+      window.dispatchEvent(new MouseEvent('mousedown', { button: 4, ctrlKey: true, shiftKey: true, altKey: true }))
+
+      const [patch] = dinho.clipsSetConfig.mock.calls[0]!
+      const hotkeys = (patch as { hotkeys: HotkeyBinding[] }).hotkeys
+      expect(hotkeys[0]!.vk).toBe(0x06)
+      expect(hotkeys[0]!.modifiers).toEqual(['Ctrl', 'Shift', 'Alt'])
+      expect(hotkeys[1]!.vk).toBe(0x51)
+      cleanup()
+    })
+  })
 })
 
 describe('formatClipsSize', () => {

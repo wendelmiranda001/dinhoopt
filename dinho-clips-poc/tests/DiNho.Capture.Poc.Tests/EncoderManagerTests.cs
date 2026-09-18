@@ -185,6 +185,155 @@ public sealed class EncoderManagerTests
         finally { EncoderManager.Av1HwProbe = original; }
     }
 
+    // ── DetectBestCodec — variantes 1/2 e 1/4 herdam o resultado do probe NATIVO ──
+    // BUG AMD RDNA1 (RX 5700 XT): av1_amf existe na lista `-encoders` (compile-time) mas
+    // o probe real falha (CreateComponent(AMFVideoEncoderHW_AV1)). O loop selecionava a
+    // variante 1/2 por listagem e fazia CacheBest("av1_amf") → restart → av1_amf de novo.
+    // Fix: probe nativo falho expulsa a codec INTEIRA da cadeia; nada é cacheado.
+
+    [Fact]
+    public void DetectBestCodec_NativeAv1ProbeFails_ScaledVariantsSkipped_SelectsH264Amf()
+    {
+        var originalVendor = EncoderManager.VendorIdProbe;
+        var originalAv1 = EncoderManager.Av1HwProbe;
+        var originalProbe = EncoderManager.ProbeEncoderProbe;
+
+        var probedCodecs = new List<string>();
+        EncoderManager.VendorIdProbe = () => 0x1002; // AMD — AV1 block entra na chain
+        EncoderManager.Av1HwProbe = _ => true;       // mas av1_amf não funciona no RDNA1
+        EncoderManager.ProbeEncoderProbe = codec =>
+        {
+            lock (probedCodecs) probedCodecs.Add(codec);
+            return codec == "av1_amf"
+                ? new EncoderManager.ProbeResult { Codec = codec, Success = false, OutputBytes = 0, Error = "CreateComponent(AMFVideoEncoderHW_AV1) failed" }
+                : new EncoderManager.ProbeResult { Codec = codec, Success = true, OutputBytes = 1024 };
+        };
+
+        FfmpegEncoder.ResetEncoderCachesForTest();
+        try
+        {
+            var enc = CreateUninitializedEncoder(hardware: true);
+            typeof(FfmpegEncoder).GetField("_codec", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(enc, "auto");
+
+            var result = InvokeDetectBestCodec(enc);
+
+            Assert.Equal("h264_amf", result);
+            Assert.Equal(1, GetScaleDivisor(enc));
+            // só o probe nativo do av1_amf e do h264_amf rodaram — variantes 1/2 e 1/4 do
+            // av1_amf NEM foram consultadas (nem por listagem): hero de probedCodecs == [av1_amf, h264_amf]
+            Assert.Equal(new List<string> { "av1_amf", "h264_amf" }, probedCodecs);
+            Assert.True(FfmpegEncoder.TryGetCachedBestCodec(out var cached));
+            Assert.Equal("h264_amf", cached); // código falho NUNCA vai pro cache
+        }
+        finally
+        {
+            EncoderManager.VendorIdProbe = originalVendor;
+            EncoderManager.Av1HwProbe = originalAv1;
+            EncoderManager.ProbeEncoderProbe = originalProbe;
+            FfmpegEncoder.ResetEncoderCachesForTest();
+        }
+    }
+
+    [Fact]
+    public void DetectBestCodec_AllNativeProbesFail_NeverSelectsFailedHwScaled_EndsOnCpu()
+    {
+        var originalVendor = EncoderManager.VendorIdProbe;
+        var originalAv1 = EncoderManager.Av1HwProbe;
+        var originalProbe = EncoderManager.ProbeEncoderProbe;
+
+        var probedCodecs = new List<string>();
+        EncoderManager.VendorIdProbe = () => 0x1002;
+        EncoderManager.Av1HwProbe = _ => true;
+        EncoderManager.ProbeEncoderProbe = codec =>
+        {
+            lock (probedCodecs) probedCodecs.Add(codec);
+            return new EncoderManager.ProbeResult { Codec = codec, Success = false, OutputBytes = 0, Error = "probe simulada falhou" };
+        };
+
+        FfmpegEncoder.ResetEncoderCachesForTest();
+        try
+        {
+            var enc = CreateUninitializedEncoder(hardware: true);
+            typeof(FfmpegEncoder).GetField("_codec", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(enc, "auto");
+
+            var result = InvokeDetectBestCodec(enc);
+
+            // Nenhuma variante escalada de codec HW falha é selecionada: cai no CPU 1/2.
+            Assert.Equal("libx264", result);
+            Assert.Equal(2, GetScaleDivisor(enc));
+            Assert.True(FfmpegEncoder.TryGetCachedBestCodec(out var cached));
+            Assert.Equal("libx264", cached);
+            Assert.DoesNotContain(probedCodecs, c => c.StartsWith("av1_") && probedCodecs.Count(x => x == c) > 1);
+        }
+        finally
+        {
+            EncoderManager.VendorIdProbe = originalVendor;
+            EncoderManager.Av1HwProbe = originalAv1;
+            EncoderManager.ProbeEncoderProbe = originalProbe;
+            FfmpegEncoder.ResetEncoderCachesForTest();
+        }
+    }
+
+    [Fact]
+    public void DetectBestCodec_NativeAv1ProbeSucceeds_SelectsAtFullResolution()
+    {
+        var originalVendor = EncoderManager.VendorIdProbe;
+        var originalAv1 = EncoderManager.Av1HwProbe;
+        var originalProbe = EncoderManager.ProbeEncoderProbe;
+
+        var probedCodecs = new List<string>();
+        EncoderManager.VendorIdProbe = () => 0x1002;
+        EncoderManager.Av1HwProbe = _ => true;
+        EncoderManager.ProbeEncoderProbe = codec =>
+        {
+            lock (probedCodecs) probedCodecs.Add(codec);
+            return new EncoderManager.ProbeResult { Codec = codec, Success = true, OutputBytes = 4096 };
+        };
+
+        FfmpegEncoder.ResetEncoderCachesForTest();
+        try
+        {
+            var enc = CreateUninitializedEncoder(hardware: true);
+            typeof(FfmpegEncoder).GetField("_codec", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(enc, "auto");
+
+            var result = InvokeDetectBestCodec(enc);
+
+            Assert.Equal("av1_amf", result); // caminho feliz mantido: AV1 funcional → primeira posição
+            Assert.Equal(1, GetScaleDivisor(enc));
+            Assert.Equal(new List<string> { "av1_amf" }, probedCodecs);
+        }
+        finally
+        {
+            EncoderManager.VendorIdProbe = originalVendor;
+            EncoderManager.Av1HwProbe = originalAv1;
+            EncoderManager.ProbeEncoderProbe = originalProbe;
+            FfmpegEncoder.ResetEncoderCachesForTest();
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SupportsAv1Hardware_Amd_RequiresRealProbe(bool av1ProbeOk)
+    {
+        var originalProbe = EncoderManager.ProbeEncoderProbe;
+
+        EncoderManager.ProbeEncoderProbe = codec => new EncoderManager.ProbeResult
+        {
+            Codec = codec,
+            Success = codec == "av1_amf" && av1ProbeOk,
+            OutputBytes = av1ProbeOk ? 2048 : 0,
+            Error = av1ProbeOk ? null : "CreateComponent(AMFVideoEncoderHW_AV1) failed on RDNA1",
+        };
+        try
+        {
+            // Presença na lista `-encoders` NÃO basta: RX 5700 XT (VCN 1.0) lista av1_amf
+            // mas o encode real falha. O gate AMD agora exige probe real.
+            Assert.Equal(av1ProbeOk, EncoderManager.SupportsAv1Hardware(0x1002));
+        }
+        finally { EncoderManager.ProbeEncoderProbe = originalProbe; }
+    }
+
     [Fact]
     public void ProbeEncoder_h264_d3d12va_DoesNotThrow()
     {
@@ -1259,6 +1408,22 @@ public sealed class EncoderManagerTests
         typeof(FfmpegEncoder).GetField("_useHardware",
             BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(enc, hardware);
         return enc;
+    }
+
+    private static string InvokeDetectBestCodec(FfmpegEncoder encoder)
+    {
+        var method = typeof(FfmpegEncoder).GetMethod("DetectBestCodec",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(method);
+        return (string)method!.Invoke(encoder, [])!;
+    }
+
+    private static int GetScaleDivisor(FfmpegEncoder encoder)
+    {
+        var field = typeof(FfmpegEncoder).GetField("_scaleDivisor",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(field);
+        return (int)field!.GetValue(encoder)!;
     }
 
     private static string InvokeResolveCodec(FfmpegEncoder encoder, string codec)

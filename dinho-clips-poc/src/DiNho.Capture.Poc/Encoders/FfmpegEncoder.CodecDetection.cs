@@ -97,10 +97,23 @@ internal partial class FfmpegEncoder
             }
         }
 
+        // Codec cujo probe NATIVO (escala 1) falhou — as variantes 1/2 e 1/4 da MESMA codec
+        // HERDAM a falha (o probe usa 320x240, é independente de resolução). Antes, a
+        // variante 1/2 era "aprovada" por listagem (`-encoders`) quando o nativo falhava
+        // e entrava no CacheBest — loop no AMD RDNA1 (RX 5700 XT lista av1_amf mas o
+        // encode real falha: CreateComponent(AMFVideoEncoderHW_AV1)). Probe nativo falho
+        // agora expulsa a codec INTEIRA da cadeia, sem CacheBest.
+        var failedNativeCodecs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var entry in _fallbackChain)
         {
             if (entry.ScaleDivisor > 1)
             {
+                if (failedNativeCodecs.Contains(entry.Codec))
+                {
+                    Logging.Log.W("FfmpegEncoder", $"skip {entry.Label}: native probe of {entry.Codec} failed");
+                    continue;
+                }
                 if (entry.Codec == "libx264" || EncoderManager.CheckFfmpegEncoder(entry.Codec))
                 {
                     _currentFallbackIndex = _fallbackChain.IndexOf(entry);
@@ -112,16 +125,19 @@ internal partial class FfmpegEncoder
                 continue;
             }
 
-            var probe = EncoderManager.ProbeEncoder(entry.Codec);
+            var probe = EncoderManager.ProbeEncoderProbe(entry.Codec);
             if (probe.Success)
             {
                 _currentFallbackIndex = _fallbackChain.IndexOf(entry);
+                _scaleDivisor = entry.ScaleDivisor;
                 CacheBest(entry.Codec);
                 Logging.Log.I("FfmpegEncoder", $"probed OK: {entry.Label} ({probe.OutputBytes}B output)");
                 return entry.Codec;
             }
 
             Logging.Log.W("FfmpegEncoder", $"probe FAILED: {entry.Label} — {probe.Error}");
+            if (entry.Codec is not ("libx264" or "libx265"))
+                failedNativeCodecs.Add(entry.Codec);
             if (probe.IsNvencSessionLimit)
             {
                 Logging.Log.E("FfmpegEncoder", "NVENC session limit detected — removing all NVENC from fallback chain");

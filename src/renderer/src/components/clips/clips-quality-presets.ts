@@ -1,6 +1,6 @@
 import type { ClipsConfig } from '@shared/types'
 
-export type QualityPresetKey = 'muito-alta' | 'alta' | 'boa'
+export type QualityPresetKey = 'muito-alta' | 'alta' | 'boa' | 'performance'
 
 /**
  * Fonte única dos presets de qualidade. O componente usa estes valores para
@@ -42,5 +42,17 @@ export const QUALITY_PRESETS: Record<QualityPresetKey, Partial<ClipsConfig>> = {
     width: 1280,
     height: 720,
     fps: 60,
+  },
+  performance: {
+    cq: 22,
+    maxrateKbps: 12000,
+    bufsizeKbps: 24000,
+    encoderPreset: 'p5',
+    bframes: 2,
+    lookahead: 16,
+    bitrateKbps: 12000,
+    width: 1280,
+    height: 720,
+    fps: 30,
   },
 }

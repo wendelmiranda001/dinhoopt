@@ -56,7 +56,9 @@ describe('clipsMethods invoke wrappers', () => {
     { name: 'clipsSetFavorite', args: ['clip.mp4', true], channel: IPC.CLIPS_SET_FAVORITE },
     { name: 'clipsTrimClip', args: ['clip.mp4', 10, 20, true, 'none', 0.5], channel: IPC.CLIPS_TRIM_CLIP },
     { name: 'clipsMergeClips', args: [['a.mp4', 'b.mp4'], 'none', 0.5], channel: IPC.CLIPS_MERGE_CLIPS },
+    { name: 'clipsPublish', args: ['C:\\clips\\clip.mp4'], channel: IPC.CLIPS_PUBLISH },
     { name: 'clipsPublishCancel', args: ['C:\\clips\\clip.mp4'], channel: IPC.CLIPS_PUBLISH_CANCEL },
+    { name: 'clipsOpenExternal', args: ['https://dinho.dev/clip'], channel: IPC.CLIPS_OPEN_EXTERNAL },
   ]
 
   for (const { name, args, channel } of invokeCases) {
@@ -152,5 +154,22 @@ describe('clipsMethods listener wrappers', () => {
 
     unsubscribe()
     expect(mockIpc.removeListener).toHaveBeenCalledWith(IPC.CLIPS_DURATIONS_READY, handler)
+  })
+
+  it('clipsOnPublishProgress forwards progress and can be unsubscribed', () => {
+    const cb = vi.fn()
+    const unsubscribe = clipsMethods.clipsOnPublishProgress(cb)
+
+    expect(mockIpc.on).toHaveBeenCalledWith(IPC.CLIPS_PUBLISH_PROGRESS, expect.any(Function))
+    const handler = mockIpc.on.mock.calls[0]?.[1] as (
+      _event: unknown,
+      data: { clipPath?: string; loaded?: number; total?: number; percent?: number },
+    ) => void
+
+    handler({}, { clipPath: 'C:\\clips\\clip.mp4', loaded: 2, total: 4, percent: 50 })
+    expect(cb).toHaveBeenCalledWith({ clipPath: 'C:\\clips\\clip.mp4', loaded: 2, total: 4, percent: 50 })
+
+    unsubscribe()
+    expect(mockIpc.removeListener).toHaveBeenCalledWith(IPC.CLIPS_PUBLISH_PROGRESS, handler)
   })
 })

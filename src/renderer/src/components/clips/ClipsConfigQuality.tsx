@@ -110,12 +110,18 @@ export function QualitySection({
   return (
     <div className="space-y-3">
       {/* Quick Preset */}
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-4 gap-1.5">
         {(
           [
             { id: 'muito-alta', label: t('presetMuitoAlta'), sub: 'CQ 16 \u00b7 1080p', icon: '\u25cf\u25cf\u25cf' },
             { id: 'alta', label: t('presetAlta'), sub: 'CQ 18 \u00b7 1080p', icon: '\u25cf\u25cf\u25cb' },
             { id: 'boa', label: t('presetBoa'), sub: 'CQ 20 \u00b7 720p', icon: '\u25cf\u25cb\u25cb' },
+            {
+              id: 'performance',
+              label: t('presetPerformance'),
+              sub: 'CQ 22 \u00b7 720p30',
+              icon: '\u25cb\u25cb\u25cb',
+            },
           ] as Array<{ id: QualityPresetKey; label: string; sub: string; icon: string }>
         ).map((p) => {
           const preset = QUALITY_PRESETS[p.id]

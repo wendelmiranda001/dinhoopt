@@ -484,6 +484,7 @@ describe('ClipsPage', () => {
     expect(screen.getByText('presetMuitoAlta')).toBeTruthy()
     expect(screen.getByText('presetAlta')).toBeTruthy()
     expect(screen.getByText('presetBoa')).toBeTruthy()
+    expect(screen.getByText('presetPerformance')).toBeTruthy()
   })
 
   it('calls setConfig when quality preset is clicked', async () => {
@@ -492,6 +493,16 @@ describe('ClipsPage', () => {
     await screen.findByText('recordingQuality')
     screen.getByText('presetAlta').click()
     expect(mockSetConfig).toHaveBeenCalledWith(expect.objectContaining({ cq: 18, maxrateKbps: 55000 }))
+  })
+
+  it('calls setConfig with low-end values when performance preset is clicked', async () => {
+    render(<ClipsPage />)
+    showSettings()
+    await screen.findByText('recordingQuality')
+    screen.getByText('presetPerformance').click()
+    expect(mockSetConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ cq: 22, maxrateKbps: 12000, width: 1280, height: 720, fps: 30 }),
+    )
   })
 
   it('switches replay buffer mode to disk via 3-way selector', async () => {

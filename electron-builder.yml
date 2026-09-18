@@ -21,6 +21,8 @@ extraResources:
     to: icon.ico
   - from: resources/icon.png
     to: icon.png
+  - from: resources/elevate.exe
+    to: elevate.exe
   - from: resources/clips-engine-staging
     to: clips-engine
     filter:

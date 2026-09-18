@@ -220,6 +220,12 @@ internal sealed partial class FfmpegEncoder : IEncoder
         var cpuCq = Math.Clamp(cq, 1, 51);
         var qsvQp = Math.Clamp(cq - 4, 0, 51);
         var amfPresetNorm = NormalizeAmfPreset(amfPreset);
+        // AMF: vbr_peak com alvo médio derivado do maxrate do front (36% — altar 55000→19800
+        // ≈ Medal 1080p h264 de 15-20 Mbps) + teto VBV (maxrate/bufsize). Sem QP junto: o QP
+        // sobrepõe o alvo (issue obs-ffmpeg #12994); e o CQP puro (sem alvo) estourou ~180 Mbps
+        // com cq 18 na RX 5700 XT → VCN + spill ~10x e clip de 94s ≈ 930 MB. Clamp mantém
+        // presets fracos ≥6 Mbps e 4K sem estourar.
+        var amfTarget = Math.Clamp((int)Math.Round(maxrateKbps * 0.36), 6000, 50000);
         return codec switch
         {
             "libx264" => $"-preset fast -crf {cpuCq} -maxrate {maxrateKbps}K -bufsize {bufsizeKbps}K -bf 0 -profile:v high",
@@ -227,15 +233,14 @@ internal sealed partial class FfmpegEncoder : IEncoder
             "h264_nvenc" => $"-preset {nvencPreset} -tune hq -rc vbr -b:v 0 -cq {cq} -maxrate {maxrateKbps}K -bufsize {bufsizeKbps}K -profile:v high -bf {bframes} -rc-lookahead {lookahead} -spatial-aq 1 -aq-strength 8 -temporal-aq 1 -multipass {(multipass ? "fullres" : "disabled")}{BuildWeightedPredArg(bframes == 0)} -nonref_p 1 -g 120 -keyint_min 120",
             "hevc_nvenc" => $"-preset {nvencPreset} -tune hq -rc vbr -b:v 0 -cq {cq} -maxrate {maxrateKbps}K -bufsize {bufsizeKbps}K -profile:v main10 -bf {bframes} -b_ref_mode middle -rc-lookahead {lookahead} -spatial-aq 1 -aq-strength 8 -temporal-aq 1 -multipass {(multipass ? "fullres" : "disabled")}{BuildWeightedPredArg(bframes == 0)} -nonref_p 1 -g 120 -keyint_min 120",
             "av1_nvenc" => $"-preset {nvencPreset} -tune hq -rc vbr -b:v 0 -cq {cq} -maxrate {maxrateKbps}K -bufsize {bufsizeKbps}K -bf {bframes} -rc-lookahead {lookahead} -spatial-aq 1 -aq-strength 8 -temporal-aq 1 -multipass {(multipass ? "fullres" : "disabled")} -nonref_p 1 -g 120 -keyint_min 120",
-            // AMF: CQP (qualidade constante) com QP = cq do front direto — mesmo padrão OBS/AMD
-            // (QP 16-23; cq 18/20/24 cai na faixa) e NVENC (-cq). Sem -b:v/-maxrate/-bufsize: CQP
-            // não tem teto de bitrate (OBS não mostra bitrate em CQP). O antigo vbr_peak + QP
-            // setado (issue obs-ffmpeg #12994) fazia o QP sobrepor o alvo; e sem -b:v o AMF
-            // subalocava ~3 Mbps (borrado). GOP 120 = keyframe/2s @60fps (padrão recording
-            // GPUOpen/OBS/NVENC). PA/preanalysis fora (RDNA1 VCN 1.0 overload).
-            "h264_amf" => $"-quality {amfPresetNorm} -rc cqp -qp_i {cpuCq} -qp_p {cpuCq} -bf 0 -g 120 -filler_data 0 -enforce_hrd 0 -vbaq true -me_quarter_pel true{amfPaChain}{amfSavArg}",
-            "hevc_amf" => $"-quality {amfPresetNorm} -rc cqp -qp_i {cpuCq} -qp_p {cpuCq} -bf 0 -g 120 -filler_data 0 -enforce_hrd 0 -vbaq true -me_quarter_pel true{amfPaChain}{amfSavArg}",
-            "av1_amf" => $"-quality {amfPresetNorm} -rc cqp -qp_i {cpuCq} -qp_p {cpuCq} -bf 0 -g 120 -filler_data 0 -enforce_hrd 0 -aq_mode caq{amfPaChain}{amfSavArg}",
+            // AMF: vbr_peak (alvo médio em -b:v, teto em -maxrate) + VBV. rc h264/hevc: VBAQ +
+            // me_quarter_pel (AQ clássico AVC/HEVC). av1_amf usa -aq_mode caq (o AQ do AV1; vbaq
+            // não existe p/ av1_amf no ffmpeg 9). Sem QP junto ao RC de bitrate (issue obs-ffmpeg
+            // #12994: QP sobrepõe o alvo). GOP 120 = keyframe/2s @60fps (padrão GPUOpen/OBS/
+            // NVENC). PA/preanalysis fora por padrão (RDNA1 VCN 1.0 overload).
+            "h264_amf" => $"-quality {amfPresetNorm} -rc vbr_peak -b:v {amfTarget}K -maxrate {maxrateKbps}K -bufsize {bufsizeKbps}K -bf 0 -g 120 -filler_data 0 -enforce_hrd 0 -vbaq true -me_quarter_pel true{amfPaChain}{amfSavArg}",
+            "hevc_amf" => $"-quality {amfPresetNorm} -rc vbr_peak -b:v {amfTarget}K -maxrate {maxrateKbps}K -bufsize {bufsizeKbps}K -bf 0 -g 120 -filler_data 0 -enforce_hrd 0 -vbaq true -me_quarter_pel true{amfPaChain}{amfSavArg}",
+            "av1_amf" => $"-quality {amfPresetNorm} -rc vbr_peak -b:v {amfTarget}K -maxrate {maxrateKbps}K -bufsize {bufsizeKbps}K -bf 0 -g 120 -filler_data 0 -enforce_hrd 0 -aq_mode caq{amfPaChain}{amfSavArg}",
             // QSV: veryslow + global_quality + extbrc/rdo/adaptive/mbbrc. Sem -extra_hw_frames:
             // ffmpeg 9 rejeita extra_hw_frames como opção de encoder ("not a encoding option") —
             // é opção frame-level (valida p/ vf hwupload=...). QSV precisa de -init_hw_device qsv

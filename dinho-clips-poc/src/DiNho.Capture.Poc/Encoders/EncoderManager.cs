@@ -146,6 +146,10 @@ public sealed class EncoderManager : IDisposable
         public bool IsNvencSessionLimit { get; init; }
     }
 
+    /// <summary>Seam trocável nos testes — injeta resultados de probe sem spawnar ffmpeg.
+    /// Mantém a assinatura 1-arg (resolução/fps fixos do DetectBestCodec).</summary>
+    internal static Func<string, ProbeResult> ProbeEncoderProbe = codec => ProbeEncoder(codec);
+
     // ── Fallback chain entry ─────────────────────────────────────────
 
     public record FallbackEntry
@@ -245,10 +249,15 @@ public sealed class EncoderManager : IDisposable
         return adapters.FirstOrDefault(a => a.VendorId is 0x10DE or 0x1002 or 0x8086);
     }
 
+    /// <summary>Seam trocável nos testes — evita DXGI real e dá vendor determinístico.</summary>
+    internal static Func<int> VendorIdProbe = DetectEncodingVendorIdCore;
+
     /// <summary>Detect the primary encoding vendor from the list of available adapters.
     /// For hybrid laptops (iGPU + dGPU), picks the first discrete GPU with encoding support.
     /// Falls back to first adapter if no discrete GPU found.</summary>
-    public static int DetectEncodingVendorId()
+    public static int DetectEncodingVendorId() => VendorIdProbe();
+
+    private static int DetectEncodingVendorIdCore()
     {
         var adapters = DetectAllGpuAdapters();
         return PickBestAdapter(adapters)?.VendorId ?? 0;
@@ -924,13 +933,16 @@ public sealed class EncoderManager : IDisposable
     internal static Func<int, bool> Av1HwProbe = SupportsAv1Hardware;
 
     /// <summary>Check if a given GPU vendor supports AV1 hardware encoding.
-    /// RTX 40+, RDNA3+, Arc Alchemist+.</summary>
+    /// RTX 40+, RDNA3+, Arc Alchemist+.
+    /// O gate AMD usa PROBE REAL, não a lista `-encoders`: o ffmpeg é compilado com
+    /// av1_amf (lista estática) mesmo em GPUs sem bloco AV1 — RX 5700 XT (RDNA1/VCN 1.0)
+    /// lista av1_amf mas o encode real falha (CreateComponent(AMFVideoEncoderHW_AV1)).</summary>
     public static bool SupportsAv1Hardware(int vendorId)
     {
         return vendorId switch
         {
             0x10DE => DetectNvidiaGeneration() >= 89, // Ada Lovelace = compute capability 8.9 (RTX 40+)
-            0x1002 => DetectAmdGeneration() >= 3,      // RDNA3+ (simplified: check if av1_amf exists)
+            0x1002 => ProbeEncoderProbe("av1_amf").Success, // RDNA3+ real; RDNA1 RDNA2 caem fora
             0x8086 => CheckFfmpegEncoder("av1_qsv"),  // Arc Alchemist+ tem av1_qsv; HD/UHD antiga não
             _ => false,
         };
@@ -960,12 +972,6 @@ public sealed class EncoderManager : IDisposable
         }
         catch { }
         return 0;
-    }
-
-    private static int DetectAmdGeneration()
-    {
-        // Simplified: if av1_amf is in ffmpeg encoders, the driver supports it
-        return CheckFfmpegEncoder("av1_amf") ? 3 : 0;
     }
 
     // ── Cascading fallback chain builder ─────────────────────────────
