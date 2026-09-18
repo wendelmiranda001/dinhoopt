@@ -15,6 +15,7 @@ if (!app.isPackaged) {
 
 // ─── Security: move secrets out of process.env ─────────────
 import { sanitizeEnvVars } from './services/env-sanitize'
+import { isWebPermissionAllowed } from './services/web-permissions'
 
 sanitizeEnvVars()
 
@@ -423,8 +424,13 @@ function initGui(): void {
     })
 
     // Deny all web permissions (camera/mic/geo/etc) — the app never grants
-    // these via web APIs; system features go through IPC instead.
+    // these via web APIs; system features go through IPC instead. Fullscreen is
+    // the exception: the clip editor relies on the HTML5 Fullscreen API.
     session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+      if (isWebPermissionAllowed(permission)) {
+        callback(true)
+        return
+      }
       getLogger().warning('app', `Denied web permission request: ${permission}`)
       callback(false)
     })
