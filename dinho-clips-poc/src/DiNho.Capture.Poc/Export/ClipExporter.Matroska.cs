@@ -139,10 +139,7 @@ public sealed partial class ClipExporter
         // separado e mapeado no mux via -f aac. Gravar trilha A_AAC aqui só
         // adicionava parsing do matroskadec (que não seta frame_size para A_AAC)
         // e bytes gastos no temp, além de risco residual de falha de demux.
-        var minPts = packets.Count > 0 ? packets[0].Pts : TimeSpan.Zero;
-        for (int i = 1; i < packets.Count; i++)
-            if (packets[i].Pts < minPts)
-                minPts = packets[i].Pts;
+        var minPts = ComputeMinPts(packets);
 
         // EBML Header (known-size — ffmpeg must be able to skip it cleanly)
         WriteEbmlMaster(bw, 0x1A45DFA3, (w) =>

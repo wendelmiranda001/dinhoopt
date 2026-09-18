@@ -1,6 +1,7 @@
 using DiNho.Capture.Poc.Encoders;
 using DiNho.Capture.Poc.Logging;
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 
 namespace DiNho.Capture.Poc.Export;
@@ -277,7 +278,12 @@ public sealed partial class ClipExporter : IDisposable
                     Log.I("Exporter", $"ADTS temp: {adtsTemp} ({adtsLen / 1024} KB) audioFrames={audioPackets.Count}");
                 }
 
-                MuxWithFfmpegStreaming(outputPath, mkvTemp, hasAudioTracks, rawFormat, adtsTemp);
+                // O offset de áudio intencional (áudio começando depois do vídeo) era
+                // perdido no mux: o ADTS cru não tem PTS. Passa-o como -itsoffset.
+                var audioOffset = ComputeAudioMuxOffset(videoPackets, audioPackets);
+                if (audioOffset > TimeSpan.Zero)
+                    Log.I("Exporter", $"Mux audio offset: {audioOffset.TotalMilliseconds:F0}ms (-itsoffset)");
+                MuxWithFfmpegStreaming(outputPath, mkvTemp, hasAudioTracks, rawFormat, adtsTemp, audioOffset);
 
                 // Pós-mux: verifica presença de áudio no MP4 E gera thumbnail em
                 // UMA chamada ffmpeg (B4 — antes eram 2 processos de 217MB por save).
@@ -305,46 +311,19 @@ public sealed partial class ClipExporter : IDisposable
         string videoPath,
         bool hasAudioTracks,
         string rawFormat = "h264",
-        string? adtsPath = null)
+        string? adtsPath = null,
+        TimeSpan audioOffset = default)
     {
-        string args;
-        if (hasAudioTracks && adtsPath != null && File.Exists(adtsPath))
-        {
-            // Two-input mux: Matroska for video (preserves per-frame PTS), raw ADTS for audio.
-            // -c copy preserves exact quality of both video (NVENC) and audio (AAC).
-            args = $"-y -loglevel warning " +
-                   $"-f matroska -i \"{videoPath}\" " +
-                   $"-f aac -i \"{adtsPath}\" " +
-                   $"-max_muxing_queue_size 4096 " +
-                   $"-map 0:v:0 -map 1:a:0 " +
-                   $"-c:v copy -c:a copy " +
-                   $"-metadata title=\"DiNho Clip\" -metadata comment=\"Recorded with DiNho Clips\" " +
-                   $"-movflags +faststart \"{outputPath}\"";
-        }
-        else if (hasAudioTracks)
-        {
-            // M3: hasAudioTracks mas adtsPath é null/inexistente — o áudio foi
-            // perdido antes do mux (falha ao escrever ADTS). O MKV agora NÃO
-            // contém trilha de áudio (M4), então não há como recuperar. Em vez de
-            // um dead-end silencioso, loga warning explícito para o operador.
-            Log.W("Exporter", $"Áudio disponível ({adtsPath ?? "null"}) mas arquivo ADTS não existe — exportando vídeo sem áudio!");
-            args = $"-y -loglevel warning " +
-                   $"-f matroska -i \"{videoPath}\" " +
-                   $"-max_muxing_queue_size 4096 " +
-                   $"-map 0:v:0 -c:v copy " +
-                   $"-metadata title=\"DiNho Clip\" -metadata comment=\"Recorded with DiNho Clips\" " +
-                   $"-movflags +faststart \"{outputPath}\"";
-        }
-        else
-        {
-            args = $"-y -loglevel warning " +
-                   $"-f matroska -i \"{videoPath}\" " +
-                   $"-max_muxing_queue_size 4096 " +
-                   $"-map 0:v:0 -c:v copy " +
-                   $"-metadata title=\"DiNho Clip\" -metadata comment=\"Recorded with DiNho Clips\" " +
-                   $"-movflags +faststart \"{outputPath}\"";
-        }
+        bool audioInput = hasAudioTracks && adtsPath != null && File.Exists(adtsPath);
 
+        // M3: hasAudioTracks mas adtsPath é null/inexistente — o áudio foi
+        // perdido antes do mux (falha ao escrever ADTS). O MKV agora NÃO
+        // contém trilha de áudio (M4), então não há como recuperar. Em vez de
+        // um dead-end silencioso, loga warning explícito para o operador.
+        if (hasAudioTracks && !audioInput)
+            Log.W("Exporter", $"Áudio disponível ({adtsPath ?? "null"}) mas arquivo ADTS não existe — exportando vídeo sem áudio!");
+
+        var args = BuildMuxArgs(outputPath, videoPath, audioInput, audioOffset, adtsPath);
         Log.I("Exporter", $"ffmpeg mux: {args.Replace("\"", "'")}");
 
         // Option A: reduz prioridade do processo durante o mux pesado de leitura
@@ -388,6 +367,58 @@ public sealed partial class ClipExporter : IDisposable
         {
             try { Process.GetCurrentProcess().PriorityClass = savedPriority; } catch { }
         }
+    }
+
+    // Monta o comando ffmpeg do mux. Extraído para permitir testar a posição do
+    // -itsoffset (opção de INPUT: precisa vir imediatamente antes do -f aac -i).
+    internal static string BuildMuxArgs(
+        string outputPath,
+        string videoPath,
+        bool hasAudio,
+        TimeSpan audioOffset,
+        string? adtsPath)
+    {
+        // O offset positivo atrasa o áudio para preservar o silêncio inicial
+        // decidido pelo sync (NoSyncNeeded). Sem ele, o ADTS cru começa em 0 e o
+        // áudio toca adiantado em relação ao vídeo.
+        string offsetArg = hasAudio && audioOffset > TimeSpan.Zero
+            ? $"-itsoffset {audioOffset.TotalSeconds.ToString("0.######", CultureInfo.InvariantCulture)} "
+            : "";
+        string audioIn = hasAudio ? $"{offsetArg}-f aac -i \"{adtsPath}\" " : "";
+        string maps = hasAudio ? "-map 0:v:0 -map 1:a:0 " : "-map 0:v:0 ";
+        string codecs = hasAudio ? "-c:v copy -c:a copy " : "-c:v copy ";
+
+        return $"-y -loglevel warning " +
+               $"-f matroska -i \"{videoPath}\" " +
+               audioIn +
+               $"-max_muxing_queue_size 4096 " +
+               maps +
+               codecs +
+               $"-metadata title=\"DiNho Clip\" -metadata comment=\"Recorded with DiNho Clips\" " +
+               $"-movflags +faststart \"{outputPath}\"";
+    }
+
+    // Menor PTS da lista. É a mesma base de re-baseline usada por
+    // WriteMatroskaFile (o MKV começa em 0), então o offset do áudio precisa ser
+    // medido contra ela.
+    internal static TimeSpan ComputeMinPts(List<EncodedPacket> packets)
+    {
+        if (packets.Count == 0) return TimeSpan.Zero;
+        var min = packets[0].Pts;
+        for (int i = 1; i < packets.Count; i++)
+            if (packets[i].Pts < min)
+                min = packets[i].Pts;
+        return min;
+    }
+
+    // Deslocamento de áudio desejado no mux = (início do áudio) − (início do MKV).
+    // Negativo (áudio antes do vídeo) é clampado para 0 — não atrasamos o vídeo.
+    internal static TimeSpan ComputeAudioMuxOffset(
+        List<EncodedPacket> videoPackets, List<EncodedPacket> audioPackets)
+    {
+        if (videoPackets.Count == 0 || audioPackets.Count == 0) return TimeSpan.Zero;
+        var offset = audioPackets[0].Pts - ComputeMinPts(videoPackets);
+        return offset > TimeSpan.Zero ? offset : TimeSpan.Zero;
     }
 
     internal static bool IsAdts(EncodedPacket pkt) =>

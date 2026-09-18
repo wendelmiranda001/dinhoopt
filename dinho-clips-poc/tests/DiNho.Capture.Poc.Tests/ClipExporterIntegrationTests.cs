@@ -598,6 +598,108 @@ public sealed class ClipExporterIntegrationTests
         }
     }
 
+    [Fact]
+    [Trait("Category", "Integration")]
+    public void ExportToMp4_AudioStartOffset_ProducesDelayedAudioEdit()
+    {
+        if (!ToolAvailable("ffmpeg"))
+            return;
+
+        var tempMp4 = Path.Combine(Path.GetTempPath(), $"offset_{Guid.NewGuid():N}.mp4");
+
+        try
+        {
+            var videoPackets = GenerateValidH264Packets(60, 640, 360);
+            if (videoPackets.Count < 2)
+                return;
+
+            // Áudio começa 600ms depois do vídeo (cenário NoSyncNeeded real).
+            var audioPackets = ClipExporter.GenerateSilentAacFrames(
+                videoPackets.Count, TimeSpan.FromMilliseconds(600), 48000);
+
+            using var exporter = new ClipExporter();
+            var resultPath = exporter.ExportToMp4(
+                tempMp4, videoPackets, audioPackets, 640, 360, Fps, "h264");
+
+            var dbg = RunFfmpegDebug(resultPath);
+            Assert.NotNull(dbg);
+            // O ADTS cru não carrega PTS: sem -itsoffset o áudio começaria em 0 e o
+            // movenc NÃO gravaria empty edit. Com o offset de 600ms ele grava um
+            // empty edit (media time: -1) no áudio, preservando o atraso.
+            Assert.Contains("media time: -1", dbg);
+        }
+        finally
+        {
+            try { File.Delete(tempMp4); } catch { }
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public void ExportToMp4_ZeroAudioOffset_NoEmptyEdit()
+    {
+        if (!ToolAvailable("ffmpeg"))
+            return;
+
+        var tempMp4 = Path.Combine(Path.GetTempPath(), $"zero_{Guid.NewGuid():N}.mp4");
+
+        try
+        {
+            var videoPackets = GenerateValidH264Packets(60, 640, 360);
+            if (videoPackets.Count < 2)
+                return;
+
+            var audioPackets = ClipExporter.GenerateSilentAacFrames(
+                videoPackets.Count, TimeSpan.Zero, 48000);
+
+            using var exporter = new ClipExporter();
+            var resultPath = exporter.ExportToMp4(
+                tempMp4, videoPackets, audioPackets, 640, 360, Fps, "h264");
+
+            var dbg = RunFfmpegDebug(resultPath);
+            Assert.NotNull(dbg);
+            // Sem offset não há -itsoffset: o mux não deve introduzir empty edit
+            // espúrio (senão o teste positivo acima passaria por outro motivo).
+            Assert.DoesNotContain("media time: -1", dbg);
+        }
+        finally
+        {
+            try { File.Delete(tempMp4); } catch { }
+        }
+    }
+
+    private static string? RunFfmpegDebug(string filePath)
+    {
+        try
+        {
+            using var proc = new Process
+            {
+                StartInfo = new ProcessStartInfo("ffmpeg")
+                {
+                    Arguments = $"-v debug -i \"{filePath}\" -t 0.01 -f null NUL",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+            proc.Start();
+            var errTask = proc.StandardError.ReadToEndAsync();
+            var outTask = proc.StandardOutput.ReadToEndAsync();
+            if (!proc.WaitForExit(30000))
+            {
+                proc.Kill();
+                return null;
+            }
+            _ = outTask.Result;
+            return errTask.Result;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static string? RunFfprobe(string filePath, string entries)
     {
         try
