@@ -31,7 +31,8 @@ export function ClipsGrid({
   handleDeleteSelected,
   setMergeModePaths,
   handleOpenClip,
-  setEditingClip,
+  openClipEditor,
+  openClipPlayer,
   setRenameTarget,
   handlePublishClip,
   handleCancelPublish,
@@ -209,9 +210,13 @@ export function ClipsGrid({
                     />
                   </div>
 
-                  {/* Thumbnail */}
-                  <div
-                    className="flex aspect-video items-center justify-center overflow-hidden rounded-t-xl"
+                  {/* Thumbnail — click to play fullscreen */}
+                  <button
+                    type="button"
+                    onClick={() => openClipPlayer(clip)}
+                    title={t('playVideo')}
+                    aria-label={t('playVideo')}
+                    className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-t-xl"
                     style={{ background: 'rgba(113,113,122,0.08)' }}
                   >
                     {thumbnails[clip.name] ? (
@@ -219,7 +224,7 @@ export function ClipsGrid({
                     ) : (
                       <Clapperboard className="h-8 w-8" style={{ color: 'var(--text-dim)', opacity: 0.4 }} />
                     )}
-                  </div>
+                  </button>
 
                   {/* Info */}
                   <div className="p-2.5">
@@ -266,7 +271,7 @@ export function ClipsGrid({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setEditingClip(clip)}
+                      onClick={() => openClipEditor(clip)}
                       title={t('edit')}
                       aria-label={t('edit')}
                       className="rounded-md p-1.5 transition-colors hover:bg-white/10"

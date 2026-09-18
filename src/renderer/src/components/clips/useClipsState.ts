@@ -42,6 +42,9 @@ export interface ClipsState {
   setActiveTip: (tip: string | null) => void
   editingClip: ClipInfo | null
   setEditingClip: (clip: ClipInfo | null) => void
+  editingClipFullscreen: boolean
+  openClipEditor: (clip: ClipInfo) => void
+  openClipPlayer: (clip: ClipInfo) => void
   renameTarget: string | null
   setRenameTarget: (name: string | null) => void
   mergeModePaths: string[] | null
@@ -119,6 +122,17 @@ export function useClipsState(): ClipsState {
   })
   const [activeTip, setActiveTip] = useState<string | null>(null)
   const [editingClip, setEditingClip] = useState<ClipInfo | null>(null)
+  const [editingClipFullscreen, setEditingClipFullscreen] = useState(false)
+
+  const openClipEditor = useCallback((clip: ClipInfo) => {
+    setEditingClipFullscreen(false)
+    setEditingClip(clip)
+  }, [])
+
+  const openClipPlayer = useCallback((clip: ClipInfo) => {
+    setEditingClipFullscreen(true)
+    setEditingClip(clip)
+  }, [])
   const [renameTarget, setRenameTarget] = useState<string | null>(null)
   const [mergeModePaths, setMergeModePaths] = useState<string[] | null>(null)
   const [statusLoaded, setStatusLoaded] = useState(false)
@@ -468,6 +482,9 @@ export function useClipsState(): ClipsState {
     setActiveTip,
     editingClip,
     setEditingClip,
+    editingClipFullscreen,
+    openClipEditor,
+    openClipPlayer,
     renameTarget,
     setRenameTarget,
     mergeModePaths,

@@ -75,6 +75,7 @@ export function ClipsPage() {
       {state.editingClip && !state.mergeModePaths && (
         <ClipEditorModal
           clip={state.editingClip}
+          startFullscreen={state.editingClipFullscreen}
           onClose={() => state.setEditingClip(null)}
           onSave={() => {
             state.setEditingClip(null)
