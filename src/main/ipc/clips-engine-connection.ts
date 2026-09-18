@@ -71,7 +71,9 @@ const _durationCache = new Map<string, CacheEntry>()
 
 function cacheGet(filePath: string, currentMtimeMs: number): number | null {
   const entry = _durationCache.get(filePath)
-  if (entry && entry.mtimeMs === currentMtimeMs) {
+  // A cached 0 means a previous probe failed — treat it as a miss so it is
+  // retried instead of pinning the clip to "0:00" forever.
+  if (entry && entry.duration > 0 && entry.mtimeMs === currentMtimeMs) {
     _durationCache.delete(filePath)
     _durationCache.set(filePath, entry)
     return entry.duration
@@ -80,6 +82,11 @@ function cacheGet(filePath: string, currentMtimeMs: number): number | null {
 }
 
 function cacheSet(filePath: string, duration: number, mtimeMs: number): void {
+  if (duration <= 0) {
+    // Never persist failed probes.
+    _durationCache.delete(filePath)
+    return
+  }
   if (_durationCache.size >= MAX_CACHE_ENTRIES) {
     const oldest = _durationCache.keys().next().value
     if (oldest !== undefined) _durationCache.delete(oldest)
@@ -119,6 +126,7 @@ function loadPersistedCache(): void {
     for (const entry of parsed) {
       const e = entry as Record<string, unknown> | null
       if (!e || typeof e.path !== 'string' || typeof e.duration !== 'number' || typeof e.mtimeMs !== 'number') continue
+      if (e.duration <= 0) continue
       if (_durationCache.size >= MAX_CACHE_ENTRIES) break
       _durationCache.set(e.path, { duration: e.duration, mtimeMs: e.mtimeMs })
     }

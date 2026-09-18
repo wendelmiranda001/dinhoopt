@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 let _cachedPath: string | null = null
 
@@ -32,6 +32,23 @@ function commonDirs(): string[] {
   return dirs
 }
 
+// ffmpeg shipped next to the clips engine — used by the encoder, so probes and
+// thumbnails must use the same binary when there is no system ffmpeg on PATH.
+function bundledDirs(): string[] {
+  const dirs: string[] = []
+  const enginePath = process.env.DINHO_CLIPS_ENGINE_PATH
+  if (enginePath) dirs.push(dirname(enginePath))
+  const resourcesPath = (process as { resourcesPath?: string }).resourcesPath
+  if (resourcesPath) {
+    dirs.push(join(resourcesPath, 'clips-engine'), join(resourcesPath, 'clips-engine-staging'))
+  }
+  const cwd = process.cwd()
+  if (cwd) {
+    dirs.push(join(cwd, 'resources', 'clips-engine'), join(cwd, 'resources', 'clips-engine-staging'))
+  }
+  return dirs
+}
+
 function findFfmpeg(): string | null {
   // Try PATH first (most common: WinGet, scoop, choco, manual)
   const pathDirs = (process.env.PATH || '').split(';')
@@ -41,6 +58,10 @@ function findFfmpeg(): string | null {
   // Fall back to common install directories
   const fromDirs = findInDirs(commonDirs())
   if (fromDirs) return fromDirs
+
+  // Fall back to the ffmpeg bundled with the clips engine
+  const bundled = findInDirs(bundledDirs())
+  if (bundled) return bundled
 
   try {
     const result = execFileSync('where.exe', ['ffmpeg'], { encoding: 'utf-8', timeout: 3000 }).trim()

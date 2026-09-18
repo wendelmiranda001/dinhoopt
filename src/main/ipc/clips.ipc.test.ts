@@ -383,6 +383,44 @@ describe('CLIPS_LIST_CLIPS', () => {
     expect(list[0]!.duration).toBe(0)
   })
 
+  it('recomputes duration after a failed probe cached a zero', async () => {
+    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(readdir).mockResolvedValue(['clip.mp4'] as unknown as Awaited<ReturnType<typeof readdir>>)
+    vi.mocked(stat).mockResolvedValue({ size: 100, birthtime: new Date(), mtime: new Date() } as Awaited<
+      ReturnType<typeof stat>
+    >)
+
+    // Phase 1: ffmpeg probe fails — 0 must not poison the duration cache
+    vi.mocked(execFile).mockImplementation(
+      (
+        _cmd: string,
+        _args: readonly string[] | null | undefined,
+        _opts: ExecFileOptions | null | undefined,
+        cb?:
+          | ((
+              error: ExecFileException | null,
+              stdout: string | NonSharedBuffer,
+              stderr: string | NonSharedBuffer,
+            ) => void)
+          | null,
+      ) => {
+        if (cb) cb(new Error('ffmpeg not found'), '', '')
+        return undefined as never
+      },
+    )
+    const handler = getAsyncHandler(captureHandlers(), IPC.CLIPS_LIST_CLIPS)
+    const first = (await handler()) as ClipInfo[]
+    expect(first[0]!.duration).toBe(0)
+    await new Promise((r) => setTimeout(r, 0))
+
+    // Phase 2: ffmpeg works — the stale zero is refetched instead of stuck
+    mockDuration('Duration: 00:01:30.50, start: 0.000000, bitrate: 1000 kb/s\n')
+    await handler()
+    await new Promise((r) => setTimeout(r, 0))
+    const third = (await handler()) as ClipInfo[]
+    expect(third[0]!.duration).toBe(91)
+  })
+
   it('re-reads the disk on every call so manual refresh picks up new clips', async () => {
     vi.mocked(existsSync).mockReturnValue(true)
     mockDuration('Duration: 00:01:00.00\n')

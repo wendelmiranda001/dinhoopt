@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('node:child_process', () => ({
   execFileSync: vi.fn(),
@@ -10,6 +10,7 @@ vi.mock('node:fs', () => ({
 
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { getFfmpegPath, resolveFfmpegOrNull } from './ffmpeg-path'
 
 const execFileSyncMock = vi.mocked(execFileSync)
@@ -97,6 +98,56 @@ describe('ffmpeg-path', () => {
     it('falls back to "ffmpeg" when not found', () => {
       existsSyncMock.mockReturnValue(false)
       expect(getFfmpegPath()).toBe('ffmpeg')
+    })
+  })
+
+  describe('bundled ffmpeg resolution', () => {
+    // These tests run after the getFfmpegPath suite, so _cachedPath is null at
+    // start. Each test mocks existsSync to match only its own path, so a stale
+    // cached path is always re-resolved.
+    const originalResourcesPath = (process as { resourcesPath?: string }).resourcesPath
+
+    beforeEach(() => {
+      delete process.env.DINHO_CLIPS_ENGINE_PATH
+    })
+
+    afterEach(() => {
+      Object.defineProperty(process, 'resourcesPath', {
+        value: originalResourcesPath,
+        configurable: true,
+      })
+      delete process.env.DINHO_CLIPS_ENGINE_PATH
+    })
+
+    it('finds ffmpeg in resourcesPath/clips-engine when not in PATH or common dirs', () => {
+      Object.defineProperty(process, 'resourcesPath', {
+        value: 'C:\\app\\resources',
+        configurable: true,
+      })
+      existsSyncMock.mockImplementation((p: unknown) => p === 'C:\\app\\resources\\clips-engine\\ffmpeg.exe')
+      expect(resolveFfmpegOrNull()).toBe('C:\\app\\resources\\clips-engine\\ffmpeg.exe')
+      expect(execFileSyncMock).not.toHaveBeenCalled()
+    })
+
+    it('finds ffmpeg next to DINHO_CLIPS_ENGINE_PATH', () => {
+      process.env.DINHO_CLIPS_ENGINE_PATH = 'D:\\eng\\DiNho.Capture.Poc.exe'
+      existsSyncMock.mockImplementation((p: unknown) => p === 'D:\\eng\\ffmpeg.exe')
+      expect(resolveFfmpegOrNull()).toBe('D:\\eng\\ffmpeg.exe')
+    })
+
+    it('finds staged ffmpeg under cwd/resources/clips-engine-staging in dev', () => {
+      const staged = join(process.cwd(), 'resources', 'clips-engine-staging', 'ffmpeg.exe')
+      existsSyncMock.mockImplementation((p: unknown) => p === staged)
+      expect(resolveFfmpegOrNull()).toBe(staged)
+    })
+
+    it('returns bundled ffmpeg via getFfmpegPath', () => {
+      Object.defineProperty(process, 'resourcesPath', {
+        value: 'C:\\app\\resources',
+        configurable: true,
+      })
+      existsSyncMock.mockImplementation((p: unknown) => p === 'C:\\app\\resources\\clips-engine\\ffmpeg.exe')
+      expect(getFfmpegPath()).toBe('C:\\app\\resources\\clips-engine\\ffmpeg.exe')
     })
   })
 })
