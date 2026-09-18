@@ -11,6 +11,37 @@ public sealed partial class EngineCoordinator
 {
     private const long ExportStallThresholdMs = 10_000;
 
+    /// <summary>
+    /// Roda o export num thread dedicada com prioridade BelowNormal. O mux do ffmpeg
+    /// e a clonagem de pacotes são CPU/GC-hungry; em Task.Run (threadpool, prioridade
+    /// normal) eles competiam com o pipeline de captura — drops observados durante mux
+    /// de clips grandes (2.6GB, sessão AMD 2026-09-18 01:03). Prioridade menor garante
+    /// que o pthread de captura (timing-sensitive) preempta o export.
+    /// </summary>
+    internal static async Task RunExportOnDedicatedThreadAsync(Action work)
+    {
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                work();
+                tcs.SetResult();
+            }
+            catch (Exception ex)
+            {
+                tcs.SetException(ex);
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "ExportWorker",
+            Priority = ThreadPriority.BelowNormal,
+        };
+        thread.Start();
+        await tcs.Task;
+    }
+
     private async Task SaveClipAsync(int? customDurationSeconds = null)
     {
         // Anti-double-press (spec 14.1)
@@ -123,7 +154,7 @@ public sealed partial class EngineCoordinator
             var cachedAvcc = ffEncoder?.AvccCache;
             var cachedHvcc = ffEncoder?.HvccCache;
             var exportSw = Stopwatch.StartNew();
-            await Task.Run(() =>
+            await RunExportOnDedicatedThreadAsync(() =>
             {
                 var result = _exporter.ExportToMp4(
                     outputPath,

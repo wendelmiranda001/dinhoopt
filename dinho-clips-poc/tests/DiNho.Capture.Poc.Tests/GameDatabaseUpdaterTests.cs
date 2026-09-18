@@ -291,7 +291,13 @@ public sealed class GameDatabaseUpdaterTests : IDisposable
 
         await _updater.CheckForUpdateAsync();
 
-        Assert.False(File.Exists(_stateFilePath), "State file should NOT exist after failed request");
+        // Falha persiste LastFailedUnixMs para backoff — evita re-try a cada 30s/launch.
+        Assert.True(File.Exists(_stateFilePath), "State file should exist with failure timestamp after failed request");
+
+        var savedJson = File.ReadAllText(_stateFilePath);
+        var savedState = JsonSerializer.Deserialize<GameDatabaseUpdater.UpdateState>(savedJson);
+        Assert.NotNull(savedState);
+        Assert.True(savedState!.LastFailedUnixMs > 0, "LastFailedUnixMs should be set after a failed request");
     }
 
     [Fact]
@@ -460,7 +466,7 @@ public sealed class GameDatabaseUpdaterTests : IDisposable
     }
 
     [Fact]
-    public async Task FailsAfterAllRetries_AndDoesNotPersistState()
+    public async Task FailsAfterAllRetries_AndPersistsFailureBackoff()
     {
         CleanupStateFile();
 
@@ -470,7 +476,101 @@ public sealed class GameDatabaseUpdaterTests : IDisposable
 
         Assert.False(result);
         Assert.Equal(2, _mockHandler.CallCount);
-        Assert.False(File.Exists(_stateFilePath), "State file should NOT exist after all retries failed");
+        // A falha persiste LastFailedUnixMs (backoff de 24h) — não fica tentando a cada launch.
+        Assert.True(File.Exists(_stateFilePath), "State file should persist after all retries to enable failure backoff");
+
+        var savedState = JsonSerializer.Deserialize<GameDatabaseUpdater.UpdateState>(File.ReadAllText(_stateFilePath));
+        Assert.NotNull(savedState);
+        Assert.True(savedState!.LastFailedUnixMs > 0, "LastFailedUnixMs should be persisted after retries exhausted");
+    }
+
+    [Fact]
+    public async Task SkipsCheck_WhenLastFailureWithinBackoff()
+    {
+        var recentFailure = new GameDatabaseUpdater.UpdateState
+        {
+            LastCheckUnixMs = 0,
+            LastVersion = 0,
+            LastFailedUnixMs = DateTimeOffset.UtcNow.AddMinutes(-30).ToUnixTimeMilliseconds(),
+        };
+        File.WriteAllText(_stateFilePath, JsonSerializer.Serialize(recentFailure));
+
+        _mockHandler.Response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(new
+            {
+                version = 99999,
+                games = new[]
+                {
+                    new { processName = "newgame.exe", windowClass = "NewWindow", displayName = "New Game" }
+                }
+            }))
+        };
+
+        var result = await _updater.CheckForUpdateAsync();
+
+        Assert.False(result);
+        Assert.False(_mockHandler.WasCalled, "HTTP request should be skipped within failure backoff");
+    }
+
+    [Fact]
+    public async Task ChecksAgain_WhenFailureBackoffExpired()
+    {
+        var oldFailure = new GameDatabaseUpdater.UpdateState
+        {
+            LastCheckUnixMs = 0,
+            LastVersion = 0,
+            LastFailedUnixMs = DateTimeOffset.UtcNow.AddHours(-25).ToUnixTimeMilliseconds(),
+        };
+        File.WriteAllText(_stateFilePath, JsonSerializer.Serialize(oldFailure));
+
+        _mockHandler.Response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(new
+            {
+                version = 99999,
+                games = new[]
+                {
+                    new { processName = "newgame.exe", windowClass = "NewWindow", displayName = "New Game" }
+                }
+            }))
+        };
+
+        var result = await _updater.CheckForUpdateAsync();
+
+        Assert.True(result, "After backoff expires the updater should check again");
+        Assert.True(_mockHandler.WasCalled, "HTTP request should be made after failure backoff expires");
+    }
+
+    [Fact]
+    public async Task SuccessfulCheck_ResetsFailureBackoff()
+    {
+        var failedBefore = new GameDatabaseUpdater.UpdateState
+        {
+            LastCheckUnixMs = 0,
+            LastVersion = 0,
+            LastFailedUnixMs = DateTimeOffset.UtcNow.AddHours(-25).ToUnixTimeMilliseconds(),
+        };
+        File.WriteAllText(_stateFilePath, JsonSerializer.Serialize(failedBefore));
+
+        _mockHandler.Response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(new
+            {
+                version = 99999,
+                games = new[]
+                {
+                    new { processName = "newgame.exe", windowClass = "NewWindow", displayName = "New Game" }
+                }
+            }))
+        };
+
+        var result = await _updater.CheckForUpdateAsync();
+
+        Assert.True(result, "A remote-version-larger-than-local check should succeed and reset backoff");
+        var savedState = JsonSerializer.Deserialize<GameDatabaseUpdater.UpdateState>(File.ReadAllText(_stateFilePath));
+        Assert.NotNull(savedState);
+        Assert.Equal(0, savedState!.LastFailedUnixMs);
     }
 
     private void CleanupStateFile()

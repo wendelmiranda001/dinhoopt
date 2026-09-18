@@ -1470,4 +1470,136 @@ public sealed class EngineCoordinatorTests
     }
 
     #endregion
+
+    #region ComputeAnchorGapMs — SYNC-DIAG anchor drift (corrige -415s falso)
+
+    [Fact]
+    public void ComputeAnchorGapMs_HealthySession_IsNearZero()
+    {
+        var firstPtsTicks = 0L;
+        var mediaElapsedTicks = TimeSpan.FromSeconds(370).Ticks;
+        var currentAnchor = TimeSpan.FromSeconds(370.05);
+
+        var gapMs = EngineCoordinator.ComputeAnchorGapMs(firstPtsTicks, mediaElapsedTicks, currentAnchor);
+
+        Assert.InRange(gapMs, -100, 100);
+    }
+
+    [Fact]
+    public void ComputeAnchorGapMs_AnchorOlderThanMedia_IsNegativeBounded()
+    {
+        var firstPtsTicks = 0L;
+        var mediaElapsedTicks = TimeSpan.FromSeconds(370).Ticks;
+        var currentAnchor = TimeSpan.FromSeconds(369.95);
+
+        var gapMs = EngineCoordinator.ComputeAnchorGapMs(firstPtsTicks, mediaElapsedTicks, currentAnchor);
+
+        Assert.InRange(gapMs, -100, 100);
+    }
+
+    [Fact]
+    public void ComputeAnchorGapMs_AnchorAhead_IsPositive()
+    {
+        var firstPtsTicks = 0L;
+        var mediaElapsedTicks = TimeSpan.FromSeconds(370).Ticks;
+        var currentAnchor = TimeSpan.FromSeconds(371);
+
+        var gapMs = EngineCoordinator.ComputeAnchorGapMs(firstPtsTicks, mediaElapsedTicks, currentAnchor);
+
+        Assert.Equal(1000, gapMs, 0.5);
+    }
+
+    #endregion
+
+    #region ComputeRelativeDriftMs — DriftMonitor baseline (corrige warning-spam de ~170ms fixos)
+
+    [Fact]
+    public void ComputeRelativeDriftMs_FirstCall_EstablishesBaseline()
+    {
+        double? baseline = null;
+
+        var relative = EngineCoordinator.ComputeRelativeDriftMs(170, ref baseline);
+
+        Assert.Equal(170, baseline!.Value, 0.001);
+        Assert.Equal(0, relative, 0.001);
+    }
+
+    [Fact]
+    public void ComputeRelativeDriftMs_ConstantOffset_StaysAtZeroRelative()
+    {
+        double? baseline = null;
+        EngineCoordinator.ComputeRelativeDriftMs(170, ref baseline);
+
+        // Mesmo offset fixo (~170ms) na sessão toda → relativo ~0 → nenhum warning futuro.
+        var relative = EngineCoordinator.ComputeRelativeDriftMs(173, ref baseline);
+
+        Assert.InRange(relative, -5, 5);
+    }
+
+    [Fact]
+    public void ComputeRelativeDriftMs_SmallDriftWithinThreshold_IsBounded()
+    {
+        double? baseline = null;
+        EngineCoordinator.ComputeRelativeDriftMs(170, ref baseline);
+
+        var relative = EngineCoordinator.ComputeRelativeDriftMs(220, ref baseline);
+
+        Assert.Equal(50, relative, 0.001);
+        Assert.True(Math.Abs(relative) < EngineCoordinator.DRIFT_WARN_THRESHOLD_MS);
+    }
+
+    [Fact]
+    public void ComputeRelativeDriftMs_RealDivergence_ExceedsThreshold()
+    {
+        double? baseline = null;
+        EngineCoordinator.ComputeRelativeDriftMs(170, ref baseline);
+
+        var relative = EngineCoordinator.ComputeRelativeDriftMs(370, ref baseline);
+
+        Assert.Equal(200, relative, 0.001);
+        Assert.True(Math.Abs(relative) > EngineCoordinator.DRIFT_WARN_THRESHOLD_MS);
+    }
+
+    #endregion
+
+    #region RunExportOnDedicatedThreadAsync — export fora do threadpool (drops durante mux)
+
+    [Fact]
+    public async Task RunExportOnDedicatedThreadAsync_RunsOnBelowNormalBackgroundThread()
+    {
+        var captureThreadId = Environment.CurrentManagedThreadId;
+        int workThreadId = 0;
+        ThreadPriority? priority = null;
+        bool? isBackground = null;
+
+        await EngineCoordinator.RunExportOnDedicatedThreadAsync(() =>
+        {
+            workThreadId = Environment.CurrentManagedThreadId;
+            priority = Thread.CurrentThread.Priority;
+            isBackground = Thread.CurrentThread.IsBackground;
+        });
+
+        Assert.NotEqual(captureThreadId, workThreadId);
+        Assert.Equal(ThreadPriority.BelowNormal, priority);
+        Assert.Equal(true, isBackground);
+    }
+
+    [Fact]
+    public async Task RunExportOnDedicatedThreadAsync_PropagatesResultSideEffects()
+    {
+        var executed = false;
+
+        await EngineCoordinator.RunExportOnDedicatedThreadAsync(() => executed = true);
+
+        Assert.True(executed);
+    }
+
+    [Fact]
+    public async Task RunExportOnDedicatedThreadAsync_ThrowsInsideWork_Propagates()
+    {
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            EngineCoordinator.RunExportOnDedicatedThreadAsync(() => throw new InvalidOperationException("mux failed")));
+    }
+
+    #endregion
 }

@@ -151,6 +151,19 @@ public sealed partial class EngineCoordinator
     private int _audioSampleRate = 48000;
     private long _lastAudioAnchorTicks; // TimeSpan.Ticks via Interlocked (16-byte struct torn read fix)
     private int _maxAacDrainCount;
+    // Tempo de mídia REAL consumido pelos pacotes PCM gravados (cada WASAPI = 10ms) e
+    // o PTS do primeiro pacote gravado. Alimentam o SYNC-DIAG/anchorGap: antes a fórmula
+    // usava (_audioPacketCount-1)*1024/48k ≈ 21,3ms/pacote — assumia 1 frame AAC por pacote,
+    // mas cada pacote é 10ms → o "esperado" crescia ~2,13x mais rápido que o real e o
+    // anchorGap ficava negativo sem limite (observado: -415s em 37k pacotes numa sessão OK).
+    private long _audioMediaElapsedTicks;
+    private long _audioFirstPacketPtsTicks = -1;
+
+    internal static double ComputeAnchorGapMs(long firstPacketPtsTicks, long mediaElapsedTicks, TimeSpan currentAnchor)
+    {
+        var expected = TimeSpan.FromTicks(firstPacketPtsTicks + mediaElapsedTicks);
+        return (currentAnchor - expected).TotalMilliseconds;
+    }
 
     private TimeSpan LastAudioAnchor
     {
@@ -169,6 +182,9 @@ public sealed partial class EngineCoordinator
         }
 
         _audioPacketCount++;
+        if (_audioFirstPacketPtsTicks == -1)
+            _audioFirstPacketPtsTicks = packet.Pts.Ticks;
+        _audioMediaElapsedTicks += packet.Duration.Ticks;
 
         var anchor = LastAudioAnchor; // snapshot once — avoid repeated volatile reads
 
@@ -239,7 +255,7 @@ public sealed partial class EngineCoordinator
 
         var currentAnchor = LastAudioAnchor;
         if (_audioPacketCount % 1000 == 0 && _audioPacketCount > 0)
-            Log.I("AudioDiag", $"SYNC-DIAG: packets={_audioPacketCount} maxAacDrain={_maxAacDrainCount} aacDropped={_aacEncoder?.DroppedFrameCount ?? 0} anchorGap={(currentAnchor - TimeSpan.FromSeconds((_audioPacketCount - 1) * 1024.0 / _audioSampleRate)).TotalMilliseconds:F1}ms");
+            Log.I("AudioDiag", $"SYNC-DIAG: packets={_audioPacketCount} maxAacDrain={_maxAacDrainCount} aacDropped={_aacEncoder?.DroppedFrameCount ?? 0} anchorGap={ComputeAnchorGapMs(_audioFirstPacketPtsTicks, _audioMediaElapsedTicks, currentAnchor):F1}ms");
 
         if ((_audioPacketCount <= 5 || _audioPacketCount % 100 == 0) && aacCount > 0)
             Log.D("AudioDiag", $"packet #{_audioPacketCount}: AAC frames produced={aacCount}");

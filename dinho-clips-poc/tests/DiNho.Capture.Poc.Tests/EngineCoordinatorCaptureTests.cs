@@ -397,7 +397,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
                 BindingFlags.Instance | BindingFlags.NonPublic)!;
             method.Invoke(coord, null);
 
-            Assert.True(SpinWait.SpinUntil(() => calls >= 2, 2000));
+            Assert.True(SpinWait.SpinUntil(() => calls >= 2 && GetField<List<IntPtr>>(coord, "_dinhoHwnds")!.Count == 1, 2000));
             Assert.Equal(1, GetField<int>(coord, "_wdaRetryCount"));
             Assert.Single(GetField<List<IntPtr>>(coord, "_dinhoHwnds")!);
         }
@@ -432,7 +432,7 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
                 BindingFlags.Instance | BindingFlags.NonPublic)!;
             method.Invoke(coord, null);
 
-            Assert.True(SpinWait.SpinUntil(() => calls >= 2, 2000));
+            Assert.True(SpinWait.SpinUntil(() => calls >= 2 && GetField<List<IntPtr>>(coord, "_dinhoHwnds")!.Count == 1, 2000));
             Assert.Equal(1, GetField<int>(coord, "_wdaRetryCount"));
             Assert.Single(GetField<List<IntPtr>>(coord, "_dinhoHwnds")!);
         }
@@ -1092,6 +1092,8 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
         SetField(coord, "_captureActive", true);
         SetField(coord, "_audioPacketCount", 999);
         SetField(coord, "_maxAacDrainCount", 50);
+        SetField(coord, "_audioMediaElapsedTicks", 123456789L);
+        SetField(coord, "_audioFirstPacketPtsTicks", 42L);
 
         var method = CoordinatorType.GetMethod("StopCapture",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -1099,6 +1101,8 @@ public sealed class EngineCoordinatorCaptureTests : IDisposable
 
         Assert.Equal(0, GetField<int>(coord, "_audioPacketCount"));
         Assert.Equal(0, GetField<int>(coord, "_maxAacDrainCount"));
+        Assert.Equal(0L, GetField<long>(coord, "_audioMediaElapsedTicks"));
+        Assert.Equal(-1L, GetField<long>(coord, "_audioFirstPacketPtsTicks"));
         Assert.Equal(48000, GetField<int>(coord, "_audioSampleRate"));
     }
 

@@ -156,7 +156,22 @@ public sealed partial class EngineCoordinator : IDisposable
 
     // DriftMonitor — acompanha continuamente a diferença entre PTS de vídeo e áudio
     // durante a captura, emitindo warning quando o drift acumulado excede limites perceptuais.
-    private const int DRIFT_WARN_THRESHOLD_MS = 150; // ITU-R BT.1359 detectável: 125ms áudio atrasado, 45ms liderando
+    internal const int DRIFT_WARN_THRESHOLD_MS = 150; // ITU-R BT.1359 detectável: 125ms áudio atrasado, 45ms liderando
+
+    // Baseline do DriftMonitor: offset fixo de início (~170ms — audio hookup inicia depois do
+    // vídeo). Sem baseline, uma sessão saudável dispara warning a cada ~5s porque o offset
+    // constante já supera o threshold. Warning só deve disparar por DESVIO da linha de base.
+    private double? _driftBaselineMs;
+
+    /// <summary>
+    /// Estabelece (primeira chamada) e retorna o drift RELATIVO à baseline. O offset de
+    /// início do áudio (~170ms) vira a baseline; sessões saudáveis mantêm o relativo ~0.
+    /// </summary>
+    internal static double ComputeRelativeDriftMs(double rawDriftMs, ref double? baselineMs)
+    {
+        baselineMs ??= rawDriftMs;
+        return rawDriftMs - baselineMs.Value;
+    }
 
     // True quando o áudio caiu para loopback completo (WasapiLoopbackSource)
     // porque o per-process loopback (ActivateAudioInterfaceAsync) foi bloqueado por anti-cheat

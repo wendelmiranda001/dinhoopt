@@ -386,7 +386,7 @@ namespace DiNho.Capture.Poc.Capture
                     Log.I("WDA", $"SetWindowDisplayAffinity(0x{WDA_EXCLUDEFROMCAPTURE:X}) OK on hwnd=0x{hwnd:X}");
                 }
                 if (!ok)
-                    Log.W("WDA", "SetWindowDisplayAffinity failed");
+                    Log.D("WDA", $"SetWindowDisplayAffinity failed on hwnd=0x{hwnd:X}");
                 return ok;
             }
             catch (Exception ex)

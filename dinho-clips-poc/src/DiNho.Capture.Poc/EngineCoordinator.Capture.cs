@@ -317,6 +317,9 @@ public sealed partial class EngineCoordinator
                 LastAudioAnchor = TimeSpan.Zero;
                 _audioPacketCount = 0;
                 _maxAacDrainCount = 0;
+                _audioMediaElapsedTicks = 0;
+                _audioFirstPacketPtsTicks = -1;
+                _driftBaselineMs = null;
                 _aacEncoderRecoveryAttempts = 0;
                 _audioMixer.OnMixedAudio += OnAudioPacket;
                 _audioMixer.Start();
@@ -494,6 +497,9 @@ public sealed partial class EngineCoordinator
             // Reseta contadores entre sessões de captura
             _audioPacketCount = 0;
             _maxAacDrainCount = 0;
+            _audioMediaElapsedTicks = 0;
+            _audioFirstPacketPtsTicks = -1;
+            _driftBaselineMs = null;
             _audioSampleRate = 48000;
 
             _capture?.Dispose();
@@ -1071,16 +1077,22 @@ public sealed partial class EngineCoordinator
 
                 // DriftMonitor: a cada ~300 frames (~5s a 60fps), verifica se o PTS de
                 // vídeo e áudio estão divergindo. Loga warning se drift > 150ms (ITU-R perceptível).
+                // Baseline: offset fixo de início do áudio (~170ms). Sem ela, toda sessão
+                // saudável spamava warning (drift constante já > threshold). Agora warning =
+                // DESVIO da baseline, não o valor absoluto.
                 if (diagFrames % 300 == 0)
                 {
                     var (vPts, aPts) = _buffer.StatsPtsRange();
                     if (vPts > TimeSpan.Zero && aPts > TimeSpan.Zero)
                     {
-                        var driftMs = (aPts - vPts).TotalMilliseconds;
-                        if (Math.Abs(driftMs) > DRIFT_WARN_THRESHOLD_MS)
-                            Log.W("DriftMonitor", $"A/V PTS drift: audio={aPts.TotalSeconds:F2}s video={vPts.TotalSeconds:F2}s drift={driftMs:F0}ms (threshold={DRIFT_WARN_THRESHOLD_MS}ms)");
+                        var rawDriftMs = (aPts - vPts).TotalMilliseconds;
+                        var baseline = _driftBaselineMs;
+                        var relativeDrift = ComputeRelativeDriftMs(rawDriftMs, ref baseline);
+                        _driftBaselineMs = baseline;
+                        if (Math.Abs(relativeDrift) > DRIFT_WARN_THRESHOLD_MS)
+                            Log.W("DriftMonitor", $"A/V PTS drift: audio={aPts.TotalSeconds:F2}s video={vPts.TotalSeconds:F2}s drift={relativeDrift:F0}ms rel. baseline={_driftBaselineMs:F0}ms (threshold={DRIFT_WARN_THRESHOLD_MS}ms)");
                         else if (diagFrames % 600 == 0)
-                            Log.D("DriftMonitor", $"A/V PTS drift OK: drift={driftMs:F0}ms video={vPts.TotalSeconds:F2}s audio={aPts.TotalSeconds:F2}s");
+                            Log.D("DriftMonitor", $"A/V PTS drift OK: drift={relativeDrift:F0}ms video={vPts.TotalSeconds:F2}s audio={aPts.TotalSeconds:F2}s baseline={_driftBaselineMs:F0}ms");
                     }
                 }
             }

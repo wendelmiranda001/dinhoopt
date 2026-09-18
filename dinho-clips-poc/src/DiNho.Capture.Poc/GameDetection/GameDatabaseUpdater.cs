@@ -10,6 +10,10 @@ public sealed class GameDatabaseUpdater
     public const int CHECK_INTERVAL_DAYS = 7;
     private const string STATE_FILE = "games-update-check.json";
     private const int MAX_ATTEMPTS = 2;
+    // Após uma falha (DNS/parede de rede, ex: cdn.dinho.app inalcançável), evita tentar
+    // de novo a cada 30s por toda a sessão e a cada launch — DNS não volta em 30s. Usa o
+    // cache local (games.json da última versão válida) e tenta de novo só após o backoff.
+    private const double FAILURE_BACKOFF_HOURS = 24;
 
     private static readonly Lazy<GameDatabaseUpdater> _instance = new(() => new GameDatabaseUpdater());
     public static GameDatabaseUpdater Instance => _instance.Value;
@@ -56,6 +60,19 @@ public sealed class GameDatabaseUpdater
                 return false;
             }
 
+            // Backoff de falha: DNS/rede indisponível não volta em 30s nem a cada launch.
+            // Persistimos LastFailedUnixMs e pulamos re-checks durante o backoff — o
+            // games.json local (última versão válida) segue servindo o GameDatabase.
+            if (state != null && state.LastFailedUnixMs > 0)
+            {
+                var sinceFail = DateTime.UtcNow - DateTimeOffset.FromUnixTimeMilliseconds(state.LastFailedUnixMs).UtcDateTime;
+                if (sinceFail.TotalHours < FAILURE_BACKOFF_HOURS)
+                {
+                    Log.I("GameDatabaseUpdater", $"Last update check failed {sinceFail.TotalHours:F1}h ago, skipping (backoff {FAILURE_BACKOFF_HOURS:0}h) — usando games.json local");
+                    return false;
+                }
+            }
+
             Log.I("GameDatabaseUpdater", $"Checking for updates from {REMOTE_URL}");
             RemoteGameDatabase? remoteDb = null;
             string json = null!;
@@ -63,7 +80,7 @@ public sealed class GameDatabaseUpdater
             {
                 if (attempt > 1)
                 {
-                    Log.W("GameDatabaseUpdater", $"Update check failed, retrying in {(int)RetryDelay.TotalSeconds}s (attempt {attempt}/{MAX_ATTEMPTS})");
+                    Log.D("GameDatabaseUpdater", $"Update check failed, retrying in {(int)RetryDelay.TotalSeconds}s (attempt {attempt}/{MAX_ATTEMPTS})");
                     await Task.Delay(RetryDelay);
                 }
 
@@ -79,6 +96,7 @@ public sealed class GameDatabaseUpdater
                 catch (HttpRequestException ex) when (IsClientError(ex))
                 {
                     Log.W("GameDatabaseUpdater", $"HTTP request failed with status {(int)ex.StatusCode!.Value}: {ex.Message}");
+                    SaveFailure(state);
                     return false;
                 }
                 catch (Exception ex)
@@ -86,9 +104,10 @@ public sealed class GameDatabaseUpdater
                     if (attempt == MAX_ATTEMPTS)
                     {
                         Log.W("GameDatabaseUpdater", $"Update check failed after {MAX_ATTEMPTS} attempts: {ex.Message}");
+                        SaveFailure(state);
                         return false;
                     }
-                    Log.W("GameDatabaseUpdater", $"Update check failed: {ex.Message}");
+                    Log.D("GameDatabaseUpdater", $"Update check failed: {ex.Message}");
                 }
             }
 
@@ -185,6 +204,21 @@ public sealed class GameDatabaseUpdater
         }
     }
 
+    /// <summary>
+    /// Persiste o timestamp do último check falho (para backoff) preservando o último
+    /// intervalo/versão conhecidos. Falhas de rede não devem zerar LastCheckUnixMs —
+    /// senão toda falha forçaria re-check na hora, anulando o backoff.
+    /// </summary>
+    private void SaveFailure(UpdateState? state)
+    {
+        SaveState(new UpdateState
+        {
+            LastCheckUnixMs = state?.LastCheckUnixMs ?? 0,
+            LastVersion = state?.LastVersion ?? 0,
+            LastFailedUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+        });
+    }
+
     private static bool IsDueForCheck(UpdateState state)
     {
         var lastCheck = DateTimeOffset.FromUnixTimeMilliseconds(state.LastCheckUnixMs).UtcDateTime;
@@ -208,5 +242,7 @@ public sealed class GameDatabaseUpdater
         public long LastCheckUnixMs { get; set; }
         [System.Text.Json.Serialization.JsonPropertyName("lastVersion")]
         public int LastVersion { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("lastFailedUnixMs")]
+        public long LastFailedUnixMs { get; set; }
     }
 }
